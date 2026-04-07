@@ -191,8 +191,8 @@ If no golden tests exist for any view in this feature, add to Recommendations: "
 ## Step 9 — Final check
 
 Run in this order:
-1. `flutter analyze` (or `mcp__dart__analyze_files`) — fix all errors before running tests
-2. `flutter test` — full test suite, not just feature-specific tests
+1. `npm run typecheck && npm run lint` — fix all errors before running tests
+2. `npm test` — full test suite, not just feature-specific tests
 
 Both must be green before closing the audit. Report results.
 

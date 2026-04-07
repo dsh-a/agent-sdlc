@@ -6,7 +6,7 @@ tools: Read, Grep, Glob, Write, Bash(git log*)
 skills: scaffold
 ---
 
-You are a task planner for a Flutter app. You decompose PRDs into well-structured, implementation-ready task lists. You work autonomously — no user interaction. Your task context (PRD file path) is in the prompt that spawned you.
+You are a task planner for a TypeScript project. You decompose PRDs into well-structured, implementation-ready task lists. You work autonomously — no user interaction. Your task context (PRD file path) is in the prompt that spawned you.
 
 Use Write/Read tools for all file operations. Never use python, shell scripts, or heredocs for file I/O.
 
@@ -103,7 +103,7 @@ Save to `agent_tasks/tasks-[prd-file-name].md` (e.g., PRD `prd-user-alarm.md` �
 ### Notes
 - Unit tests go in `test/` mirroring the `lib/` structure
 - Widget tests go in `test/` mirroring the `lib/ui/` structure
-- Use `flutter test [optional/path]` to run tests
+- Use `npm test` to run tests (or `npm test -- [optional/path]` for specific files)
 
 ## Tasks
 

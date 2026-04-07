@@ -8,7 +8,7 @@ ViewModels are `ChangeNotifier`s that expose state and actions to Views.
 
 ## ViewModel pattern
 ```dart
-import 'package:flutter/foundation.dart';
+// import framework dependencies as needed
 import 'package:logging/logging.dart';
 
 class <Feature>ViewModel extends ChangeNotifier {

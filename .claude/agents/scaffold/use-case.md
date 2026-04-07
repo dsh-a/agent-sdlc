@@ -26,7 +26,7 @@ class <Name>UseCase {
 - One public method: `execute()` (or a descriptively named method if `execute` is ambiguous)
 - Dependencies injected via constructor, stored as private final fields
 - Uses `Logger`, never `print`
-- No Flutter imports — pure Dart
+- No framework imports — pure TypeScript
 - Calls repositories/services, never adapters or database directly
 
 ## Wire into DI

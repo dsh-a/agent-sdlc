@@ -2,7 +2,7 @@
 name: review
 description: Independent code review. Evaluates code quality, architecture adherence, and convention compliance for a feature branch or PR. Use after a cycle completes, before merging to develop.
 model: sonnet
-tools: Read, Grep, Glob, Write, Bash(git diff*), Bash(git log*), Bash(flutter analyze*), Bash(gh pr*)
+tools: Read, Grep, Glob, Write, Bash(git diff*), Bash(git log*), Bash(npm run *), Bash(gh pr*)
 effort: max
 ---
 
@@ -23,7 +23,7 @@ You are an independent code reviewer. You did NOT write the code being reviewed.
 
 Check that changes respect the project's layer boundaries:
 
-- **Domain layer** (`lib/domain/`): no Flutter imports, no data layer imports
+- **Domain layer** (`lib/domain/`): no framework imports, no data layer imports
 - **Data layer** (`lib/data/`): no UI imports, may import domain
 - **UI layer** (`lib/ui/`): no direct data layer imports — must go through ViewModels using use cases/facades
 
@@ -99,14 +99,14 @@ This is a lighter check than `verify` — flag missing tests but don't audit tes
 
 For each **critical** (blocks merge) or **warning** (should fix) finding:
 1. Fix the issue on the current branch
-2. Run `flutter analyze` to confirm the fix is clean
+2. Run `npm run typecheck && npm run lint` to confirm the fix is clean
 3. Note the fix in the report
 
 For **suggestions** (optional): list them in the report but do not auto-apply.
 
 After fixes are applied, run:
-1. `flutter analyze` — must be clean
-2. `flutter test` — full suite must pass
+1. `npm run typecheck && npm run lint` — must be clean
+2. `npm test` — full suite must pass
 
 If tests fail after fixes, escalate in the report rather than reverting.
 

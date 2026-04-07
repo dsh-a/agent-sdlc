@@ -62,7 +62,7 @@ If $ARGUMENTS is empty, ask the user to provide the path to a PRD file (e.g. `ag
 ### Notes
 - Unit tests go in `test/` mirroring the `lib/` structure
 - Widget tests go in `test/widget/` mirroring the `lib/ui/` structure
-- Use `flutter test [optional/path]` to run tests
+- Use `npm test` to run tests (or `npm test -- [optional/path]` for specific files)
 
 ## Tasks
 

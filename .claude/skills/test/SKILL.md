@@ -186,7 +186,7 @@ testWidgets('default state matches golden', (tester) async {
 
 **Golden file location:** `test/goldens/` mirroring the view path.
 
-**Generate goldens:** `flutter test --update-goldens <test_file>`
+**Generate snapshots:** `npm test -- --updateSnapshot <test_file>`
 
 **Important:** Never auto-update goldens. Always present the update command to the user and let them review the generated images. Golden updates are a visual approval gate.
 
@@ -235,18 +235,13 @@ Integration tests run the full app on a device or emulator and exercise end-to-e
 - During `/cycle` autonomous execution (integration tests require a running device — flag them as follow-up items in the cycle report)
 
 **Pattern:**
-```dart
-// integration_test/login_flow_test.dart
-import 'package:integration_test/integration_test.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:your_app/main.dart' as app; // Replace 'your_app' with your package name
+```typescript
+// e2e/login-flow.test.ts
+import { test, expect } from '@playwright/test'; // or your e2e framework of choice
 
-void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
-  testWidgets('user can log in and reach home', (tester) async {
-    app.main();
-    await tester.pumpAndSettle();
+test('user can log in and reach home', async ({ page }) => {
+  await page.goto('/login');
+  // ... interact with the full app
     // ... interact with the full app
   });
 }
@@ -266,10 +261,10 @@ Integration tests are **not run by the pre-commit hook or CI by default** — th
 Run validation in this order:
 
 ### 1. Static analysis first
-Run `flutter analyze` (or `mcp__dart__analyze_files`). Fix all errors and warnings before running tests. A test that compiles is not the same as a test that is correct.
+Run `npm run typecheck && npm run lint`. Fix all errors and warnings before running tests. A test that compiles is not the same as a test that is correct.
 
 ### 2. Full test suite
-Run `flutter test` — not just the new test file — to catch regressions in existing tests. Fix any failures before proceeding.
+Run `npm test` — not just the new test file — to catch regressions in existing tests. Fix any failures before proceeding.
 
 ### 3. Adversarial second pass (subagent)
 

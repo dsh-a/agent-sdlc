@@ -9,7 +9,7 @@ Read the design context file:
 
 ## Step 2 — Load architecture context
 
-This is a Flutter app using MVVM (ChangeNotifier ViewModels + Provider). Views must:
+This is a TypeScript project. Views must:
 - Call methods on the ViewModel only — never repositories, services, or use cases directly
 - Use `Theme.of(context).textTheme` and `Theme.of(context).colorScheme` — never hardcoded styles
 - Use `const` constructors wherever possible
@@ -114,7 +114,7 @@ Generate golden files for:
 - Populated state (with representative data)
 - Error state (if visually distinct)
 
-Golden files are stored in `test/goldens/` mirroring the view path. On first run, generate with `flutter test --update-goldens <test_file>`. Present the golden update command to the user — **never auto-update goldens without user review**.
+Golden files are stored in `test/goldens/` mirroring the view path. On first run, generate with `npm test -- --updateSnapshot <test_file>`. Present the golden update command to the user — **never auto-update goldens without user review**.
 
 ### Test file location
 
@@ -130,7 +130,7 @@ Widget tests for views go in the test directory mirroring lib/:
 
 ## Step 9 — Verify
 
-- Run `flutter analyze`
-- Run the widget tests: `flutter test <test_file_path>`
+- Run `npm run typecheck && npm run lint`
+- Run the tests: `npm test -- <test_file_path>`
 - If golden tests were created, remind the user to review the golden images
 - Confirm the acceptance criteria from Step 4 are satisfied

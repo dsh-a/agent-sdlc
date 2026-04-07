@@ -9,7 +9,7 @@ Services wrap infrastructure concerns (auth, connectivity, settings). They live 
 - Class with `Logger` instance
 - Constructor takes external dependencies
 - Public methods expose the operations
-- May use Flutter imports (unlike domain layer)
+- May use framework imports (unlike domain layer)
 
 ## Wire into DI
 Add to `lib/dependencies/di_services.dart` as a `Provider`.

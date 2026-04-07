@@ -24,7 +24,7 @@ class <Feature>Facade {
 ## Convention
 - Dependencies are repository **interfaces** (not implementations)
 - Public constructor fields (not private) — unlike use cases, facades expose their repos for flexibility
-- No Flutter imports — pure Dart
+- No framework imports — pure TypeScript
 - Contains cross-repo orchestration logic, not business rules (those go in use cases)
 
 ## Wire into DI
