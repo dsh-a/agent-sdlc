@@ -1,6 +1,6 @@
 # agent-sdlc
 
-A Claude Code agent team for autonomous feature development on Flutter/Dart projects. Drop these agents and skills into your project's `.claude/` directory and get a full SDLC pipeline — from feature idea to tested, reviewed PR — driven by `/cycle`.
+A Claude Code agent team for autonomous feature development on TypeScript projects. Drop these agents and skills into your project's `.claude/` directory and get a full SDLC pipeline — from feature idea to tested, reviewed PR — driven by `/cycle`.
 
 ---
 
@@ -12,17 +12,17 @@ A Claude Code agent team for autonomous feature development on Flutter/Dart proj
 | Skill | `/create-prd` | Write a PRD from a feature description |
 | Skill | `/generate-tasks` | Decompose a PRD into an implementation task list |
 | Skill | `/process-tasks` | Step through a task list manually (one sub-task at a time) |
-| Skill | `/ui-story` | Build or modify a Flutter View + ViewModel |
+| Skill | `/ui-story` | Build or modify a UI component |
 | Skill | `/test` | Write rigorous, anti-faking tests |
 | Skill | `/verify` | Audit whether tests genuinely satisfy acceptance criteria |
 | Skill | `/review` | Independent code review before merging |
-| Skill | `/scaffold` | Scaffold new components (entities, use cases, facades, services, VMs) |
+| Skill | `/scaffold` | Scaffold new components (modules, services, controllers, etc.) |
 | Skill | `/feature-idea` | Capture a feature idea and optionally hand off to `/cycle` |
 | Skill | `/self-improve` | Analyze past cycle runs and tune agent/skill instructions |
 | Agent | `create-prd` | Spawned by `/cycle` — writes PRDs |
 | Agent | `generate-tasks` | Spawned by `/cycle` — generates task files |
 | Agent | `scaffold` | Spawned by `/cycle` — scaffolds new components |
-| Agent | `ui-story` | Spawned by `/cycle` — implements UI |
+| Agent | `ui-story` | Spawned by `/cycle` — implements UI components |
 | Agent | `test` | Spawned by `/cycle` — writes tests |
 | Agent | `verify` | Spawned after cycle — audits AC coverage |
 | Agent | `review` | Spawned after cycle — reviews code quality |
@@ -34,15 +34,13 @@ A Claude Code agent team for autonomous feature development on Flutter/Dart proj
 
 ## Setup
 
-1. Copy the `.claude/` directory into the root of your Flutter project.
+1. Copy the `.claude/` directory into the root of your TypeScript project.
 2. Ensure Claude Code is installed and you're running it from your project root.
 3. The pipeline expects a few conventions in your project:
    - `agent_tasks/` — where PRDs, task files, and run reports are stored
    - `agent_states/` — ephemeral cycle state (auto-created, auto-deleted)
    - `cycle_reports/` — per-cycle summaries
-   - `lib/` — Flutter source following MVVM (ChangeNotifier + Provider)
-   - `test/` — mirrors the `lib/` structure
-4. In `skills/test/SKILL.md`, replace `your_app` in the integration test example with your actual package name.
+4. Adapt the agent and skill files to match your project's source layout, test framework, and architecture.
 
 ---
 
@@ -155,6 +153,6 @@ The `monitor` agent runs in the background throughout Phase 3+, maintaining a st
 
 The agents and skills are plain Markdown files — edit them directly to match your project's conventions. Key files to personalize:
 
-- `.claude/agents/scaffold/*.md` — patterns for your data/domain layer
-- `.claude/agents/review.md` — layer boundary rules for your architecture
+- `.claude/agents/scaffold/*.md` — patterns for your project's component types
+- `.claude/agents/review.md` — code review rules for your architecture
 - `.claude/skills/cycle/SKILL.md` — model assignments, branch strategy, report format
