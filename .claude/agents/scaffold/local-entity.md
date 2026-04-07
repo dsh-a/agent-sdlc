@@ -18,7 +18,7 @@ Same as syncable entity with these differences. Stored only in Drift — no Supa
 - Include `id` (String, default `Utils.newUUID()`) and entity-specific fields
 - Still implement `copyWith()` and `toString()`
 - No `needsSync`, `lastSync`, `isDeleted` fields
-- No Flutter imports — domain layer is pure Dart
+- No framework imports — domain layer is pure TypeScript
 
 ## Drift table
 - Extend `Table` directly (not `SyncableTable`)
@@ -39,5 +39,5 @@ Same as syncable entity with these differences. Stored only in Drift — no Supa
 
 ## Run codegen
 ```
-flutter pub run build_runner build --delete-conflicting-outputs
+npm run codegen
 ```

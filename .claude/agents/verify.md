@@ -2,7 +2,7 @@
 name: verify
 description: Independent AC coverage audit. Evaluates whether the implementation and test suite genuinely satisfy the PRD's acceptance criteria. Use after a cycle completes to produce a verification report.
 model: sonnet
-tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*), Bash(flutter test*), Bash(flutter analyze*)
+tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*), Bash(npm test*), Bash(npm run *)
 effort: max
 ---
 
@@ -150,8 +150,8 @@ Check `test/goldens/` for golden files related to this feature's views:
 
 ## Step 9 — Run final checks
 
-1. `flutter analyze` — report results
-2. `flutter test` — full suite, not just feature tests — report results
+1. `npm run typecheck && npm run lint` — report results
+2. `npm test` — full suite, not just feature tests — report results
 
 Both must be green before closing. Report if either is red.
 

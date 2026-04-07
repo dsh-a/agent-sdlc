@@ -60,7 +60,7 @@ All work on feature branches, never `develop` or `master`.
 - **Naming**: `feature/[story-number]-[short-description]`, `fix/...`, or `refactor/...`
 - **Create at Phase 2B**: `git checkout -b feature/[name] develop`
 - **Parallel tasks**: worktrees branched from feature branch — `feature/[name]/task-[N.0]`
-- **Merge order**: dependency order. Run `flutter test` + `flutter analyze` after each merge.
+- **Merge order**: dependency order. Run `npm test` + `npm run typecheck && npm run lint` after each merge.
 - **Conflicts**: sonnet agent resolves. Ambiguous conflicts → escalate to user.
 - **After Phase 4**: do NOT merge into `develop`/`master`. User decides after `/verify` + `/review`.
 
@@ -215,7 +215,7 @@ For each parent task (independent in parallel, dependent when ready):
 
 ### 3.4 — Handle results
 
-- **Success**: merge worktree → feature branch, `flutter test` + `flutter analyze`, send status to monitor
+- **Success**: merge worktree → feature branch, `npm test` + `npm run typecheck && npm run lint`, send status to monitor
 - **Failure**: escalation ladder (below)
 - **Blocked**: notify user, continue independent tasks
 
@@ -242,7 +242,7 @@ Existing-code bugs (not agent-written code):
 ### Commit protocol
 
 Per parent task, when all sub-tasks pass:
-1. `flutter test` + `flutter analyze`
+1. `npm test` + `npm run typecheck && npm run lint`
 2. Green → merge worktree, stage specific files, commit (conventional format), mark parent `[x]`, update monitor, delete worktree branch
 3. Red → escalation ladder from L1
 
@@ -254,7 +254,7 @@ Agents do NOT add packages. On need:
 1. Agent pauses, reports to orchestrator (what, why, alternatives)
 2. Orchestrator evaluates
 3. If justified → present to user for approval
-4. Approved → `flutter pub add [package]`
+4. Approved → `npm install [package]`
 
 ### Usage limits
 
@@ -273,7 +273,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
 ### 4A — Wrap-up (MANDATORY — execute immediately, do not stop or ask)
 
-1. Run `flutter test` + `flutter analyze` (final full suite)
+1. Run `npm test` + `npm run typecheck && npm run lint` (final full suite)
 2. Mark ALL tasks and sub-tasks `[x]` in the task file (final sweep)
 3. Generate cycle report → `cycle_reports/[feature-name]-[YYYY-MM-DD].md`:
    - Summary (what was implemented, per parent task)

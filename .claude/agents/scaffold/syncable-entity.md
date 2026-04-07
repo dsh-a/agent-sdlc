@@ -21,7 +21,7 @@ For entities that sync between local Drift DB and remote Supabase.
 - Syncable fields: `needsSync`, `lastSync`, `isDeleted`
 - Implement `copyWith()` (required by Syncable)
 - Implement `toString()`
-- No Flutter imports — domain layer is pure Dart
+- No framework imports — domain layer is pure TypeScript
 
 ## Create the Drift table
 - Extend `SyncableTable` (provides `id`, `lastUpdated`, `needsSync`, `lastSync`, `isDeleted`)
@@ -55,7 +55,7 @@ For entities that sync between local Drift DB and remote Supabase.
 
 ## Run codegen
 ```
-flutter pub run build_runner build --delete-conflicting-outputs
+npm run codegen
 ```
 
 ## Supabase remote table

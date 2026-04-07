@@ -33,7 +33,7 @@ If $ARGUMENTS is empty, ask the user for a branch name or PR number.
 
 Check that the changes respect the project's layer boundaries:
 
-- **Domain layer** (`lib/domain/`): no Flutter imports, no data layer imports
+- **Domain layer** (`lib/domain/`): no framework imports, no data layer imports
 - **Data layer** (`lib/data/`): no UI imports, may import domain
 - **UI layer** (`lib/ui/`): no direct data layer imports — must go through ViewModels which use use cases/facades
 
@@ -142,5 +142,5 @@ For each finding, include:
 
 Present the review and ask: **"Would you like me to fix the critical issues and warnings?"**
 
-- If yes: fix them on the feature branch, run `flutter test` and `flutter analyze`, commit the fixes
+- If yes: fix them on the feature branch, run `npm test` and `npm run typecheck && npm run lint`, commit the fixes
 - If no: the review stands as documentation for the user to address

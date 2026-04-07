@@ -64,7 +64,7 @@ Wait for user approval before writing code.
 - Syncable fields: `needsSync`, `lastSync`, `isDeleted`
 - Implement `copyWith()` (required by Syncable)
 - Implement `toString()`
-- No Flutter imports — domain layer is pure Dart
+- No framework imports — domain layer is pure TypeScript
 
 ### Create the Drift table
 - Extend `SyncableTable` (provides `id`, `lastUpdated`, `needsSync`, `lastSync`, `isDeleted`)
@@ -96,7 +96,7 @@ Wait for user approval before writing code.
 - `lib/data/database/app_database.dart`: import table, add to `@DriftDatabase(tables: [...])`
 
 ### Run codegen
-`flutter pub run build_runner build --delete-conflicting-outputs`
+`npm run codegen`
 
 ### Supabase remote table (user-confirmed)
 
@@ -120,7 +120,7 @@ For syncable entities, a matching table must exist in Supabase. **Never auto-exe
 **Safety rule**: Prefer incomplete tasks over any risk of corrupting or destroying existing Supabase data. If there is any doubt about whether a SQL statement could affect existing data, do not execute it — present it to the user instead.
 
 ### Verify
-- `flutter analyze`
+- `npm run typecheck && npm run lint`
 - List remaining steps (UI, tests, any Supabase steps that were deferred)
 
 ---
@@ -192,7 +192,7 @@ class <Name>UseCase {
 - One public method: `execute()` (or a descriptively named method if `execute` is ambiguous)
 - Dependencies injected via constructor, stored as private final fields
 - Uses `Logger`, never `print`
-- No Flutter imports — pure Dart
+- No framework imports — pure TypeScript
 - Calls repositories/services, never adapters or database directly
 
 ### Wire into DI
@@ -235,7 +235,7 @@ class <Feature>Facade {
 ### Convention
 - Dependencies are repository **interfaces** (not implementations)
 - Public constructor fields (not private) — unlike use cases, facades expose their repos for flexibility
-- No Flutter imports — pure Dart
+- No framework imports — pure TypeScript
 - Contains cross-repo orchestration logic, not business rules (those go in use cases)
 
 ### Wire into DI
@@ -258,7 +258,7 @@ Services wrap infrastructure concerns (auth, connectivity, settings). They live 
 - Class with `Logger` instance
 - Constructor takes external dependencies
 - Public methods expose the operations
-- May use Flutter imports (unlike domain layer)
+- May use framework imports (unlike domain layer)
 
 ### Wire into DI
 Add to `lib/dependencies/di_services.dart` as a `Provider`.
@@ -281,7 +281,7 @@ ViewModels are `ChangeNotifier`s that expose state and actions to Views.
 
 ### ViewModel pattern (from `LoginViewModel`)
 ```dart
-import 'package:flutter/foundation.dart';
+// import framework dependencies as needed
 import 'package:logging/logging.dart';
 
 class <Feature>ViewModel extends ChangeNotifier {
@@ -317,6 +317,6 @@ class <Feature>ViewModel extends ChangeNotifier {
 
 ## Final step (all types)
 
-- Run `flutter analyze`
+- Run `npm run typecheck && npm run lint`
 - Confirm everything compiles cleanly
 - List remaining steps the user needs (tests, additional wiring)
