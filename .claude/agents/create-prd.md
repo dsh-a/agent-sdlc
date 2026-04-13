@@ -1,5 +1,6 @@
 ---
 name: create-prd
+label: "[PRD]"
 description: Create a Product Requirements Document for a feature. Use when the cycle pipeline needs a PRD written from a feature description or roadmap story. Receives a feature description and produces a complete PRD file ready for task generation.
 model: sonnet
 tools: Read, Grep, Glob, Write, Bash(git log*)
@@ -16,7 +17,7 @@ Use Write/Read tools for all file operations. Never use python, shell scripts, o
 Check if the feature already has a story in `documentation/ROADMAP.md`:
 
 1. Read the Story Index table at the top of ROADMAP.md
-2. If a matching story exists: read the full story section and pre-populate the PRD from its AC, Supabase notes, special considerations, and dependencies. Note the roadmap story number in the PRD Introduction.
+2. If a matching story exists: read the full story section and pre-populate the PRD from its AC, technical notes, special considerations, and dependencies. Note the roadmap story number in the PRD Introduction.
 3. If no match: proceed normally.
 
 ---
@@ -61,7 +62,7 @@ Based on the feature description, roadmap context, related PRD scan, and codebas
 5. **Acceptance Criteria** — See AC format rules below
 6. **Non-Goals (Out of Scope)** — What this feature will NOT include
 7. **Design Considerations** (if applicable) — UI/UX notes, relevant components/styles
-8. **Technical Considerations** — Known constraints, dependencies, Supabase schema notes
+8. **Technical Considerations** — Known constraints, dependencies, database/schema notes
 9. **Success Metrics** — How success will be measured
 10. **Open Questions** — Remaining unknowns or ambiguities
 

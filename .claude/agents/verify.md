@@ -1,5 +1,6 @@
 ---
 name: verify
+label: "[VERIFY]"
 description: Independent AC coverage audit. Evaluates whether the implementation and test suite genuinely satisfy the PRD's acceptance criteria. Use after a cycle completes to produce a verification report.
 model: sonnet
 tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*), Bash(npm test*), Bash(npm run *)
@@ -82,7 +83,7 @@ Read the code. Does it actually do what the criterion requires, or does it take 
 
 | # | Acceptance Criterion | Test File | Test Name | Verdict |
 |---|---|---|---|---|
-| 1 | [criterion] | file.dart:45 | `test name` | PASS |
+| 1 | [criterion] | file.test.ts:45 | `test name` | PASS |
 
 Verdicts:
 - **PASS** — criterion is tested and the test is robust
@@ -120,31 +121,32 @@ For each non-PASS verdict, provide a specific actionable fix:
 
 If the PRD includes non-functional requirements (performance, security, observability):
 - Are there tests or assertions for these?
-- Does the implementation use `Logger`, proper error handling, and null safety?
+- Does the implementation use proper logging, error handling, and null/undefined safety?
 - Any obvious security issues (hardcoded values, missing validation at system boundaries)?
 
 Add findings under a "Non-Functional" section.
 
 ---
 
-## Step 7 — Live widget tree verification (if app is running)
+## Step 7 — Live application verification (if available)
 
-If the app is connected via Dart MCP tools:
+If the application is running and accessible (e.g., via a dev server, browser, or connected tooling):
 
-1. Use `mcp__dart__get_widget_tree` to inspect each relevant screen
-2. For each UI-facing AC, check whether expected widgets are present
-3. Use `mcp__dart__get_runtime_errors` to check for runtime errors
+1. Check each UI-facing AC by inspecting the running application
+2. Verify expected elements are present and interactive
+3. Check for runtime errors in the console or error reporting
 
-Add a "Live Verification" section with findings. If no app is running, note: "Live widget tree verification skipped — no running app connected."
+Add a "Live Verification" section with findings. If no running app is available, note: "Live verification skipped — no running app connected."
 
 ---
 
-## Step 8 — Golden test review
+## Step 8 — Snapshot / visual regression test review
 
-Check `test/goldens/` for golden files related to this feature's views:
-- Note which views have golden coverage and which don't
-- Check whether golden tests are passing
-- If missing, add to Recommendations
+Check for snapshot or visual regression tests related to this feature's UI components. Common locations: `__snapshots__/`, `test/snapshots/`, `test/goldens/`, or framework-specific snapshot directories.
+
+- Note which views/components have snapshot coverage and which don't
+- Check whether snapshot tests are passing
+- If missing and the project uses snapshot testing, add to Recommendations
 
 ---
 

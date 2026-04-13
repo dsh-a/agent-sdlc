@@ -1,6 +1,7 @@
 ---
 name: scaffold
-description: Scaffold new components — syncable entities, local-only entities, use cases, facades, services, or ViewModel+View pairs. Use when the cycle pipeline needs a new component created end-to-end including DI wiring and codegen.
+label: "[SCAFFOLD]"
+description: Scaffold new components — models, services, repositories, controllers, or UI components. Use when the cycle pipeline needs a new component created end-to-end including wiring and codegen.
 model: sonnet
 tools: Read, Grep, Glob, Edit, Write, Bash(npm run *)
 effort: medium
@@ -16,33 +17,52 @@ Use Write/Edit/Read tools for all file operations. Never use python, shell scrip
 
 Inspect your task context for what to scaffold:
 
-| Type | Trigger | Pattern file |
-|---|---|---|
-| **Syncable entity** | "entity", "model", or a noun implying a data object | `.claude/agents/scaffold/syncable-entity.md` |
-| **Local-only entity** | "local entity", "local model", or explicitly no sync | `.claude/agents/scaffold/local-entity.md` |
-| **Use case** | "use case" or a verb phrase | `.claude/agents/scaffold/use-case.md` |
-| **Facade** | "facade" | `.claude/agents/scaffold/facade.md` |
-| **Service** | "service" | `.claude/agents/scaffold/service.md` |
-| **ViewModel + View** | "view", "screen", "page" | `.claude/agents/scaffold/view-model-view.md` |
+| Type | Trigger |
+|---|---|
+| **Model / entity** | "entity", "model", or a noun implying a data object |
+| **Service** | "service" or infrastructure concern |
+| **Repository** | "repository", "repo", or data access layer |
+| **Controller / handler** | "controller", "handler", "endpoint", or API route |
+| **UI component** | "view", "screen", "page", "component" |
 
 ## Step 2 — Check for conflicts
 
 Before creating anything:
-- Search `lib/` for existing files with the same name
+- Search the project's source directory for existing files with the same name
 - If conflicts exist, proceed with the requested work but note the conflict in your report
 
-## Step 3 — Execute
+## Step 3 — Load pattern (priority order)
 
-Read the pattern file matching your detected type from the table above.
-Follow all instructions in that file exactly.
+1. **Project-specific pattern**: Check `.claude/agents/scaffold/` for a file with `Type: project-specific` matching the scaffold type. If found, follow it — it reflects this project's actual conventions.
+2. **GoF template**: If no project-specific pattern exists, check for a GoF template in `.claude/agents/scaffold/` with `Type: template` (e.g., `service.md`, `use-case.md`, `command.md`). Use it as a starting point.
+3. **Codebase exploration**: If no pattern file matches, explore the codebase — find 1-2 existing examples of the same component type, read them, and extract conventions.
 
-After completing all steps in the pattern file:
+Also read `.claude/config.md` (Architecture Review Rules) for layer boundaries and pattern compliance rules.
+
+If no project-specific pattern files exist at all, autonomously spawn a setup-scaffold agent before proceeding:
+
+```
+Agent(subagent_type: "general-purpose", model: "sonnet",
+      prompt: "Run the /setup-scaffold skill in scan mode. Read .claude/skills/setup-scaffold/SKILL.md and follow its steps. Do not ask the user questions — use your best judgment for pattern discovery and create all pattern files you find. Report what was created.")
+```
+
+Wait for it to complete, then re-read `.claude/agents/scaffold/` and continue with the pattern matching above.
+
+## Step 4 — Execute
+
+Follow the loaded pattern to create the new component end-to-end:
+- Create the component file(s) matching the project's existing structure and conventions
+- Wire into DI / module registration following the project's pattern
+- Add exports/imports as needed
+- Follow the layer boundaries from config (e.g., domain layer has no framework imports)
+
+After completing all steps:
 
 1. Run `npm run typecheck && npm run lint` and fix all issues
-2. Run codegen if schema or generated types were modified
+2. Run codegen if schema or generated types were modified (`npm run codegen`)
 3. Return a report covering:
    - Files created and modified
-   - DI wiring added
+   - DI / module wiring added
    - Codegen status
-   - Any Supabase SQL that requires user approval (paste full SQL)
+   - Any database/schema changes that require user approval
    - Remaining steps (tests, route wiring, etc.)

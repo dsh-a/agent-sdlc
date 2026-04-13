@@ -1,5 +1,6 @@
 ---
 name: generate-tasks
+label: "[TASKS]"
 description: Generate a task list from a PRD. Use when the cycle pipeline needs implementation tasks derived from a PRD. Receives a PRD file path and produces a complete tasks file ready for Phase 3 implementation.
 model: sonnet
 tools: Read, Grep, Glob, Write, Bash(git log*)
@@ -92,17 +93,17 @@ Save to `agent_tasks/tasks-[prd-file-name].md` (e.g., PRD `prd-user-alarm.md` �
 ## Relevant Files
 
 ### Source Files (modify)
-- `lib/path/to/file.dart` — Brief description of why this file is relevant
+- `src/path/to/file.ts` — Brief description of why this file is relevant
 
 ### Source Files (create)
-- `lib/path/to/new_file.dart` — Brief description
+- `src/path/to/new-file.ts` — Brief description
 
 ### Test Files (create)
-- `test/path/to/file_test.dart` — Tests for `file.dart`
+- `test/path/to/file.test.ts` — Tests for `file.ts`
 
 ### Notes
-- Unit tests go in `test/` mirroring the `lib/` structure
-- Widget tests go in `test/` mirroring the `lib/ui/` structure
+- Unit tests go in `test/` mirroring the source structure
+- Component tests go in `test/` mirroring the UI structure
 - Use `npm test` to run tests (or `npm test -- [optional/path]` for specific files)
 
 ## Tasks
