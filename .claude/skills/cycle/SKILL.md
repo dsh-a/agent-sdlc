@@ -8,6 +8,10 @@ You are the orchestrator. You run as **opus**. Manage gates, delegate to agents,
 
 Feature or PRD: **$ARGUMENTS**
 
+## Configuration
+
+Read `.claude/config.md` at startup for model allocation, effort settings, artifact paths, optional agent settings, and cycle options. Use these values throughout — do not use hardcoded defaults when the config file exists. If no config file exists, fall back to: sonnet for implementation agents, haiku for pre-digest and monitor, opus for orchestrator.
+
 ## Live Environment (auto-injected)
 
 Active cycle states:
@@ -29,6 +33,10 @@ Pass `--exe` to execute: `/cycle --exe Add workout templates`
 
 Also accepts PRD paths, task file paths, or state files (for resume). Resuming from a state file implies `--exe`.
 
+Pass `--manual` to use manual mode: `/cycle --manual agent_tasks/tasks-prd-feature.md`
+
+`--manual` delegates to `/process-tasks` logic — one sub-task at a time with user approval gates after each. No parallel agents, no worktrees. Still creates a state file for resume capability. Requires a task file path (or will prompt for one).
+
 Dry-run ends with: **"Ready to execute? `/cycle --exe` to begin, or adjust first."**
 
 ---
@@ -45,6 +53,10 @@ Agent(subagent_type: "scaffold", model: "sonnet", isolation: "worktree", prompt:
 
 Named agents (`scaffold`, `ui-story`, `test`, etc.) have their model set in their definition. Pass `model:` only to override or for generic haiku agents (monitor, pre-digest).
 
+### Agent labels
+
+Each agent definition includes a `label` field in its frontmatter (e.g., `[SCAFFOLD]`, `[TEST]`). When reporting status to the user or sending updates to the monitor, prefix messages with the agent's label for identification. Example: `[SCAFFOLD] Task 1.2 complete` or `[TEST] 3 tests added for LoginService`.
+
 ### Pre-digestion
 
 Before spawning a named implementation agent, optionally spawn a **haiku** agent (background) to read relevant source files and return a ~200-line context digest. Pass the digest in the implementation agent's prompt to reduce redundant file reads.
@@ -60,7 +72,7 @@ All work on feature branches, never `develop` or `master`.
 - **Naming**: `feature/[story-number]-[short-description]`, `fix/...`, or `refactor/...`
 - **Create at Phase 2B**: `git checkout -b feature/[name] develop`
 - **Parallel tasks**: worktrees branched from feature branch — `feature/[name]/task-[N.0]`
-- **Merge order**: dependency order. Run `flutter test` + `flutter analyze` after each merge.
+- **Merge order**: dependency order. Run `npm test` + `npm run typecheck && npm run lint` after each merge.
 - **Conflicts**: sonnet agent resolves. Ambiguous conflicts → escalate to user.
 - **After Phase 4**: do NOT merge into `develop`/`master`. User decides after `/verify` + `/review`.
 
@@ -96,7 +108,7 @@ Inspect $ARGUMENTS:
 | Task file (`agent_tasks/tasks-*.md`) | Phase 2 review |
 | Story number (e.g., `1.6`) | Phase 1A (pre-populate from `documentation/ROADMAP.md`) |
 | Feature description (text) | Phase 1A (check ROADMAP.md for match first) |
-| Empty | Check `agent_states/` for active/paused cycles, ask if none |
+| Empty | Check `agent_states/` for active/paused cycles. If none: read `feature_idea_on_empty` from `.claude/config.md` Cycle Options. If true, read the Feature Ideas path from config (default `documentation/FEATURES.md`) and present any unstarted items — offer to start a cycle for one, or run `/feature-idea` to capture a new idea. If FEATURES.md doesn't exist, has no unstarted items, or `feature_idea_on_empty` is false, ask for a feature description. |
 
 Create/update state file immediately after determining entry point.
 
@@ -157,6 +169,15 @@ You delegate and track. You do not write code.
 
 ### 3.1 — Pre-flight
 
+Check `.claude/agents/scaffold/` for project-specific pattern files (files with `Type: project-specific`). If none exist and the task list includes scaffold-type work, autonomously spawn a setup-scaffold agent:
+
+```
+Agent(subagent_type: "general-purpose", model: "sonnet", run_in_background: true,
+      prompt: "Run the /setup-scaffold skill in scan mode. Read .claude/skills/setup-scaffold/SKILL.md and follow its steps. Do not ask the user questions — use your best judgment for pattern discovery and create all pattern files you find. Report what was created.")
+```
+
+Run this in the background — it does not block Phase 3 from continuing. Scaffold agents spawned later will pick up the pattern files once they exist.
+
 Spawn monitor agent (haiku, background) with feature name and state file path.
 
 ### 3.2 — Dependency analysis
@@ -192,13 +213,15 @@ For each parent task (independent in parallel, dependent when ready):
 
    | Sub-task type | subagent_type | Model |
    |---|---|---|
-   | New entity/model end-to-end | `scaffold` | sonnet |
-   | UI screen or component | `ui-story` | sonnet |
-   | DI wiring or use case | `scaffold` | sonnet |
-   | Multi-file implementation (3+ files) | general-purpose | sonnet |
+   | New entity/model end-to-end | `scaffold` | per config |
+   | UI screen or component | `ui-story` | per config |
+   | DI wiring or use case | `scaffold` | per config |
+   | Multi-file implementation (3+ files) | general-purpose | per config |
+
+   Read the **Model Allocation** table in `.claude/config.md` for each agent's assigned model under the active preset. If no config file exists, default to sonnet for all implementation agents.
 
    ```
-   Agent(subagent_type: "scaffold", model: "sonnet", isolation: "worktree",
+   Agent(subagent_type: "scaffold", model: "[per config]", isolation: "worktree",
          prompt: "PRD: [prd-path]
                   Source files: [paths from Relevant Files]
                   AC (pre-extracted): [AC items from PRD]
@@ -215,7 +238,7 @@ For each parent task (independent in parallel, dependent when ready):
 
 ### 3.4 — Handle results
 
-- **Success**: merge worktree → feature branch, `flutter test` + `flutter analyze`, send status to monitor
+- **Success**: merge worktree → feature branch, `npm test` + `npm run typecheck && npm run lint`, send status to monitor
 - **Failure**: escalation ladder (below)
 - **Blocked**: notify user, continue independent tasks
 
@@ -242,7 +265,7 @@ Existing-code bugs (not agent-written code):
 ### Commit protocol
 
 Per parent task, when all sub-tasks pass:
-1. `flutter test` + `flutter analyze`
+1. `npm test` + `npm run typecheck && npm run lint`
 2. Green → merge worktree, stage specific files, commit (conventional format), mark parent `[x]`, update monitor, delete worktree branch
 3. Red → escalation ladder from L1
 
@@ -254,7 +277,7 @@ Agents do NOT add packages. On need:
 1. Agent pauses, reports to orchestrator (what, why, alternatives)
 2. Orchestrator evaluates
 3. If justified → present to user for approval
-4. Approved → `flutter pub add [package]`
+4. Approved → `npm install [package]`
 
 ### Usage limits
 
@@ -273,15 +296,36 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
 ### 4A — Wrap-up (MANDATORY — execute immediately, do not stop or ask)
 
-1. Run `flutter test` + `flutter analyze` (final full suite)
+1. Run `npm test` + `npm run typecheck && npm run lint` (final full suite)
 2. Mark ALL tasks and sub-tasks `[x]` in the task file (final sweep)
 3. Generate cycle report → `cycle_reports/[feature-name]-[YYYY-MM-DD].md`:
    - Summary (what was implemented, per parent task)
-   - Branch name, commits (hash + message), Supabase changes (or "none")
+   - Branch name, commits (hash + message), database/schema changes (or "none")
    - Bugs discovered, known limitations, blocked tasks, follow-up items
 4. Present cycle report to user inline
 5. Generate run report → `agent_tasks/reports/report-prd-[feature-name]-[YYYY-MM-DD].md` using template `.claude/skills/cycle/report-template.md`. **Agent Audit** section is required. If >10 reports exist, summarize oldest into `agent_tasks/agent_metrics.md`.
-6. Recommend: **"Run `/verify` and `/review` in separate conversations, then return here for release."**
+6. **Autonomous verify & review** — read `.claude/config.md` Optional Agents section.
+
+   If `verify` is **enabled**: spawn the `verify` agent with the PRD path, source file paths, test file paths, and pre-extracted AC:
+   ```
+   Agent(subagent_type: "verify", model: [per config Model Allocation],
+         prompt: "PRD: [prd-path]. Source files: [paths]. Test files: [paths].
+                  AC: [pre-extracted]. Branch: [branch-name].
+                  Work autonomously — no user interaction.")
+   ```
+
+   If `review` is **enabled**: spawn the `review` agent with the branch name:
+   ```
+   Agent(subagent_type: "review", model: [per config Model Allocation],
+         prompt: "Branch: [branch-name]. PRD: [prd-path].
+                  Work autonomously — no user interaction.")
+   ```
+
+   Spawn both in parallel if both are enabled. Wait for completion and collect their reports.
+
+   Include verify and review summaries in the cycle report (step 3). If either agent returns critical issues or a non-PASS verdict, note them prominently and recommend the user address them before Phase 4B.
+
+   If either agent is set to `skip` in config, do not spawn it. Instead recommend: **"Run `/verify` and/or `/review` in separate conversations, then return here for release."**
 
 **4A is not complete until steps 1–6 are done. Do not skip any step.**
 

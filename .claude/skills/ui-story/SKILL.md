@@ -9,13 +9,14 @@ Read the design context file:
 
 ## Step 2 — Load architecture context
 
-This is a Flutter app using MVVM (ChangeNotifier ViewModels + Provider). Views must:
-- Call methods on the ViewModel only — never repositories, services, or use cases directly
-- Use `Theme.of(context).textTheme` and `Theme.of(context).colorScheme` — never hardcoded styles
-- Use `const` constructors wherever possible
-- Break large `build()` methods into small, private `Widget` classes
-- Never perform network calls or heavy computation inside `build()`
-- Use `ListView.builder` / `SliverList` for any list longer than a handful of static items
+Read the **Pattern Compliance** and **Layer Boundaries** sections in `.claude/config.md` for project-specific UI architecture rules.
+
+General UI rules (apply unless config specifies otherwise):
+- Components call state management layer only — never repositories, services, or data sources directly
+- Use the project's design token / theme system — never hardcoded styles
+- Break large render methods into small, focused sub-components
+- Never perform network calls or heavy computation inside render paths
+- Use virtualized lists for any list longer than a handful of static items
 
 ## Step 3 — Understand the task
 
@@ -37,19 +38,19 @@ If no PRD exists, ask the user for the acceptance criteria before proceeding.
 ## Step 5 — Explore before building
 
 Before writing any code:
-- Find and read any existing related View or ViewModel files for this feature area
-- Check `lib/ui/core/theme/` for existing theme extensions, color tokens, and text styles in use
-- Check `lib/ui/core/widgets/` for reusable components that could be used
-- Identify whether a ViewModel already exists or needs to be created
-- Identify whether this needs a new route in `lib/router.dart`
+- Find and read any existing related UI components or state management files for this feature area
+- Check for existing theme system, design tokens, and shared styles
+- Check for reusable shared components
+- Determine whether state management (store, view model, hook, etc.) already exists or needs to be created
+- Check the routing configuration to determine if a new route is needed
 
 ## Step 6 — Propose before implementing
 
 Summarize your plan in plain language:
 - What the screen/component will look like and why (reference design principles where relevant)
-- What widgets you'll use for structure (and what you're deliberately avoiding)
-- Whether you're using a bottom sheet, modal, or in-tree collapsible — and why
-- Any new ViewModel methods or state needed
+- What components/elements you'll use for structure (and what you're deliberately avoiding)
+- Whether you're using a modal, drawer, inline expansion, or other pattern — and why
+- Any new state management methods or state needed
 - How the acceptance criteria from Step 4 will be satisfied by this UI
 
 Wait for user approval before writing code.
@@ -58,79 +59,63 @@ Wait for user approval before writing code.
 
 Follow these conventions:
 
-### ViewModel (if creating/modifying)
-- Extend `ChangeNotifier`
-- Dependencies via constructor (use cases, facades — never repos directly)
-- Expose state via getters (`isLoading`, `errorMessage`, data fields)
-- Expose actions as public methods
-- Use `Logger`, never `print`
-- Follow class member order from CLAUDE.md
+### State management (if creating/modifying)
 
-### View
-- Use `context.watch<ViewModel>()` or `context.read<ViewModel>()` from Provider
-- Use theme tokens: `Theme.of(context).textTheme`, `Theme.of(context).colorScheme`
-- Use `const` constructors wherever possible
-- Break `build()` into small private widget methods/classes when it exceeds ~40 lines
-- Use `Key` values for widgets that need to be found in tests
+Follow the project's state management pattern as declared in `.claude/config.md` (Pattern Compliance section). General conventions:
+
+- Dependencies via constructor or injection — never import data sources directly
+- Expose state via getters or observable properties (loading, error, data)
+- Expose actions as public methods
+- Use the project's logger, never `console.log` in production code
+- Follow class member order from CLAUDE.md or project conventions
+
+### UI component
+- Use the project's state consumption pattern (hooks, selectors, context, subscriptions)
+- Use the project's theme/design token system — never hardcoded styles
+- Break large render methods into small sub-components when they exceed ~40 lines
+- Use test-friendly identifiers (data-testid, aria-label, etc.) on elements that need to be found in tests
 - Handle loading and error states explicitly
 
 ### File locations
-- ViewModel: `lib/ui/<feature>/view_models/<feature>_view_model.dart`
-- View: `lib/ui/<feature>/views/<feature>_view.dart`
-- Route: `lib/router.dart`
-- DI: `lib/dependencies/di_view_models.dart`
 
-## Step 8 — Write widget tests
+Follow the project's existing directory structure. If no convention exists, use a feature-based layout:
+- State: `src/<feature>/state/` or `src/<feature>/stores/`
+- Component: `src/<feature>/components/` or `src/<feature>/views/`
+- Route: project routing config
+- DI/wiring: project DI config
 
-Every view created or significantly modified must have widget tests. Do not skip this step.
+## Step 8 — Write component tests
+
+Every component created or significantly modified must have tests. Do not skip this step.
 
 ### Required coverage
 
-For each view, write widget tests that verify:
+For each component, write tests that verify:
 
-1. **Renders correctly** — key widgets are present in the initial state (text, buttons, inputs)
-2. **Loading state** — if the view has a loading state, verify it shows the loading indicator and disables interactions
-3. **Error state** — if the view has an error state, verify the error message is displayed
-4. **User interactions** — tap buttons, enter text, toggle switches — verify the ViewModel methods are called with correct arguments
-5. **AC-driven tests** — for each UI-relevant acceptance criterion from Step 4, write a widget test that verifies the criterion through the rendered widget tree
+1. **Renders correctly** — key elements are present in the initial state (text, buttons, inputs)
+2. **Loading state** — if the component has a loading state, verify it shows the loading indicator and disables interactions
+3. **Error state** — if the component has an error state, verify the error message is displayed
+4. **User interactions** — click buttons, enter text, toggle switches — verify the correct handlers or state changes are triggered
+5. **AC-driven tests** — for each UI-relevant acceptance criterion from Step 4, write a test that verifies the criterion through the rendered output
 
-### Golden tests
+### Snapshot tests
 
-For views that have significant visual design (not simple forms), generate a golden test:
-
-```dart
-testWidgets('matches golden file', (tester) async {
-  await tester.pumpWidget(buildTestApp(viewModel));
-  await tester.pumpAndSettle();
-  await expectLater(
-    find.byType(MyView),
-    matchesGoldenFile('goldens/my_view_default.png'),
-  );
-});
-```
-
-Generate golden files for:
-- Default/empty state
-- Populated state (with representative data)
-- Error state (if visually distinct)
-
-Golden files are stored in `test/goldens/` mirroring the view path. On first run, generate with `flutter test --update-goldens <test_file>`. Present the golden update command to the user — **never auto-update goldens without user review**.
+For components with significant visual design (not simple forms), write a snapshot test. Present the update command to the user — **never auto-update snapshots without user review**.
 
 ### Test file location
 
-Widget tests for views go in the test directory mirroring lib/:
-`lib/ui/<feature>/views/<view>.dart` → `test/ui/<feature>/<view>_test.dart`
+Tests should mirror the source structure. Follow the project's existing test layout convention.
 
 ### Patterns
 
-- Wrap the widget under test with the necessary Providers (ViewModel, services) — reuse `test_helpers.dart` where possible
-- Use `tester.pumpAndSettle()` after interactions that trigger animations or async work
-- Use `find.byKey(Key(...))` for widgets that need precise selection — ensure the view sets `Key` values on testable widgets
-- Mock the ViewModel for isolated view tests; use a real ViewModel with mocked dependencies for integration-style widget tests
+- Render the component with necessary providers, stores, or context — reuse shared test helpers where possible
+- Wait for async operations to settle after interactions
+- Use test-friendly selectors (data-testid, aria roles, text content) for precise element selection
+- Mock state management for isolated component tests; use real state with mocked dependencies for integration-style tests
 
 ## Step 9 — Verify
 
-- Run `flutter analyze`
-- Run the widget tests: `flutter test <test_file_path>`
-- If golden tests were created, remind the user to review the golden images
+- Run `npm run typecheck && npm run lint`
+- Run the tests: `npm test -- <test_file_path>`
+- If snapshot tests were created, remind the user to review the snapshots
 - Confirm the acceptance criteria from Step 4 are satisfied

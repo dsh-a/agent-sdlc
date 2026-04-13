@@ -78,7 +78,7 @@ For each finding, produce a specific, actionable recommendation. Each recommenda
 scaffold row from `haiku` to `sonnet`.
 
 **Evidence**: Across 4 runs, haiku scaffold failed 3/8 times (37.5%).
-Failures were all related to Drift generic type resolution. Sonnet
+Failures were all related to complex generic type resolution. Sonnet
 succeeded on retry in all 3 cases with no rework.
 - report-login-2026-03-15.md: task 1.2 escalated
 - report-settings-2026-03-22.md: tasks 1.1, 2.3 escalated

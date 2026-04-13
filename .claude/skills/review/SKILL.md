@@ -31,11 +31,12 @@ If $ARGUMENTS is empty, ask the user for a branch name or PR number.
 
 ## Step 2 — Architecture review
 
-Check that the changes respect the project's layer boundaries:
+Read the **Layer Boundaries** table in `.claude/config.md`. For each layer defined, verify that files in that layer's path pattern only import from allowed sources and flag any import that crosses into a forbidden layer.
 
-- **Domain layer** (`lib/domain/`): no Flutter imports, no data layer imports
-- **Data layer** (`lib/data/`): no UI imports, may import domain
-- **UI layer** (`lib/ui/`): no direct data layer imports — must go through ViewModels which use use cases/facades
+If no config file exists, apply these generic defaults:
+- **Domain/core layer**: no framework imports, no data layer imports
+- **Data/infrastructure layer**: no UI imports, may import domain
+- **UI/presentation layer**: no direct data layer imports — must go through an intermediary (services, stores, hooks, view models)
 
 For each violation found, note the file, line, and which boundary is crossed.
 
@@ -55,20 +56,24 @@ Check each changed file against CLAUDE.md conventions:
 7. Private methods
 
 ### Code style
-- **Naming**: `PascalCase` classes/enums, `camelCase` members/variables, `snake_case` files
-- **Line length**: 80 characters max
+
+Read the **Convention Checks** table in `.claude/config.md` for project-specific rules. If no config file exists, apply these generic defaults:
+- **Naming**: `PascalCase` classes/types, `camelCase` functions/variables, `kebab-case` files
+- **Line length**: 100 characters max
 - **Functions**: single purpose, aim for <20 lines
-- **Logging**: uses `Logger`, never `print`
-- **Null safety**: sound null-safe, avoids `!` unless guaranteed
-- **Comments**: `///` for public API, comments explain *why* not *what*
+- **Logging**: uses project logger, never `console.log` in production code
+- **Error handling**: async functions have proper error handling at system boundaries
+- **Comments**: `/** */` for public API documentation, inline comments explain *why* not *what*
 
 ### Pattern compliance
-- ViewModels extend `ChangeNotifier`, wired via `Provider`
-- Views never call repositories, services, or use cases directly
-- Models with sync: use `Syncable` mixin, have `copyWith`
-- Adapters implement `ModelAdapter` with all required methods
-- Repositories implement `IRepository<T>` interface
-- New dependencies follow the DI load order in `dependencies.dart`
+
+Read the **Pattern Compliance** section in `.claude/config.md`. Check each changed file against the declared patterns.
+
+If no config file exists, check these generic patterns:
+- Views/components never call repositories, services, or data sources directly
+- State management follows the project's declared pattern (check CLAUDE.md or package.json for clues)
+- New dependencies follow the project's module registration / DI pattern
+- Interfaces/abstractions are used at layer boundaries
 
 ---
 
@@ -80,12 +85,12 @@ Check each changed file against CLAUDE.md conventions:
 - Flag methods with more than 3 parameters that could use a parameter object
 
 ### Duplication
-- Check if new code duplicates existing utilities in `lib/utils/`
+- Check if new code duplicates existing utilities or shared modules
 - Check if similar logic exists elsewhere that could be shared
 
 ### Error handling
 - Async methods should have proper error handling
-- Errors at system boundaries (Supabase calls, Drift operations) should be caught
+- Errors at system boundaries (database calls, API calls, external service calls) should be caught
 - Internal code between trusted layers does not need excessive defensive checks
 
 ### Security (for code touching auth, user data, or network)
@@ -142,5 +147,5 @@ For each finding, include:
 
 Present the review and ask: **"Would you like me to fix the critical issues and warnings?"**
 
-- If yes: fix them on the feature branch, run `flutter test` and `flutter analyze`, commit the fixes
+- If yes: fix them on the feature branch, run `npm test` and `npm run typecheck && npm run lint`, commit the fixes
 - If no: the review stands as documentation for the user to address

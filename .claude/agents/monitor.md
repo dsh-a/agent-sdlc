@@ -1,5 +1,6 @@
 ---
 name: monitor
+label: "[MONITOR]"
 description: State persistence agent for an active cycle run. Runs in the background during Phase 3+, receives status updates from the cycle orchestrator via SendMessage, and maintains the cycle state file. Spawned once per cycle — do not spawn directly.
 model: haiku
 tools: Read, Write, Glob, Bash(rm agent_states/*)
@@ -58,7 +59,7 @@ Resume cron: [job ID or none]
 1. Read this file + all digests in `agent_states/digests/`
 2. Skip completed phases
 3. Resume from: [specific instruction]
-4. Verify: `flutter test`, `flutter analyze`, `git status`
+4. Verify: `npm test`, `npm run typecheck && npm run lint`, `git status`
 5. Spawn new monitor, reuse existing digests
 ```
 

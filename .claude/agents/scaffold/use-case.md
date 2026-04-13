@@ -1,33 +1,71 @@
 # Use Case
 
-Use cases encapsulate a single business operation. They live in `lib/domain/`.
+> **Type**: template
 
-## File location
-`lib/domain/<feature>/use_cases/<use_case_name>_use_case.dart`
+## When to use
 
-## Pattern
-```dart
-import 'package:logging/logging.dart';
+Scaffold a use case when the task describes a single business operation as a verb phrase (e.g., "create workout", "transfer funds", "send notification"). Use cases encapsulate one action with its validation, orchestration, and error handling.
 
-class <Name>UseCase {
-  final Logger _log = Logger('<Name> Use Case');
-  final ISomeRepository _someRepository;
+## File locations
 
-  <Name>UseCase({required ISomeRepository someRepository})
-      : _someRepository = someRepository;
+| File | Path |
+|---|---|
+| Use case | `src/domain/<feature>/use-cases/<name>.use-case.ts` |
+| Interface (optional) | `src/domain/<feature>/use-cases/<name>.use-case.interface.ts` |
+| Test | `test/domain/<feature>/<name>.use-case.test.ts` |
 
-  Future<ReturnType> execute(ParamType param) async {
-    // implementation
+Adapt paths to the project's existing directory structure.
+
+## Dependencies
+
+- Repository interfaces (never implementations directly)
+- Other use cases (for composition)
+- Domain services (for shared domain logic)
+- Injected via constructor
+
+## Template
+
+```typescript
+export interface <Name>UseCaseParams {
+  // input parameters
+}
+
+export interface <Name>UseCaseResult {
+  // return type
+}
+
+export class <Name>UseCase {
+  constructor(
+    private readonly someRepository: ISomeRepository,
+    // other dependencies
+  ) {}
+
+  async execute(params: <Name>UseCaseParams): Promise<<Name>UseCaseResult> {
+    this.validate(params);
+    // orchestration logic
+  }
+
+  private validate(params: <Name>UseCaseParams): void {
+    // input validation — throw domain errors for invalid input
   }
 }
 ```
 
-## Convention
-- One public method: `execute()` (or a descriptively named method if `execute` is ambiguous)
-- Dependencies injected via constructor, stored as private final fields
-- Uses `Logger`, never `print`
-- No Flutter imports — pure Dart
-- Calls repositories/services, never adapters or database directly
+## Wiring
 
-## Wire into DI
-Add to `lib/dependencies/di_use_cases.dart` as a `Provider`.
+Register in the project's DI container or module system. The use case depends on repository interfaces, not implementations.
+
+## Conventions
+
+- One public method: `execute()` (or a descriptively named method if `execute` is ambiguous)
+- Dependencies injected via constructor, stored as private readonly fields
+- No framework imports — domain layer is pure TypeScript
+- Calls repositories/services via interfaces, never data sources directly
+- Throws domain-specific errors, not generic errors
+
+## Tests
+
+- Test happy path with expected inputs
+- Test validation (invalid inputs produce domain errors)
+- Test edge cases (empty, boundary values)
+- Mock repository dependencies at the interface level

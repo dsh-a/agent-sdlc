@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test*)",
+      "Bash(npm run *)",
+      "Bash(npm install*)",
+      "Bash(npx *)",
+      "Bash(git *)",
+      "Bash(gh pr*)",
+      "Bash(gh api*)",
+      "Bash(ls *)",
+      "Bash(rm agent_states/*)"
+    ]
+  }
+}

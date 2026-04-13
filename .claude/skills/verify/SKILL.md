@@ -53,7 +53,7 @@ For each test file found, read it and catalog what it tests. Build a map of: tes
 
 If source file paths were provided, use those directly — skip searching.
 
-Otherwise, search `lib/` for all source files relevant to this feature. Read each one to understand what was actually implemented.
+Otherwise, search `src/` (or the project's source root) for all source files relevant to this feature. Read each one to understand what was actually implemented.
 
 ---
 
@@ -106,8 +106,8 @@ Generate a report with three sections:
 
 | # | Acceptance Criterion | Test File | Test Name | Verdict |
 |---|---|---|---|---|
-| 1 | Profile inserted exactly once | upgrade_test.dart:45 | `inserts profile once on registration` | PASS |
-| 2 | isAuthenticated set to true | upgrade_test.dart:62 | `sets isAuthenticated true` | WEAK — test checks return value but not DB state |
+| 1 | Profile inserted exactly once | user.service.test.ts:45 | `inserts profile once on registration` | PASS |
+| 2 | isAuthenticated set to true | user.service.test.ts:62 | `sets isAuthenticated true` | WEAK — test checks return value but not DB state |
 | 3 | Inline error on empty email | — | — | NO TEST |
 
 Verdicts:
@@ -151,48 +151,48 @@ For each non-PASS verdict, provide a specific, actionable recommendation:
 
 If the PRD includes non-functional requirements (performance, security, observability), check:
 - Are there tests or assertions for these?
-- Does the implementation include logging (`Logger`), error handling, and appropriate null safety?
+- Does the implementation include proper logging, error handling, and null/undefined safety?
 - Are there any obvious security issues (hardcoded values, missing validation at system boundaries)?
 
 Add findings to the report under a "Non-Functional" section.
 
 ---
 
-## Step 7 — Live widget tree verification (optional)
+## Step 7 — Live application verification (if available)
 
-If the app is currently running (connected via Dart MCP), perform a live verification pass:
+If the application is running and accessible (e.g., via a dev server, browser, or connected tooling):
 
-1. Use `mcp__dart__get_widget_tree` to inspect the widget tree of each screen relevant to the PRD
-2. For each UI-facing acceptance criterion, check whether the expected widgets are present in the tree:
-   - Buttons, text fields, labels mentioned in the AC
+1. Check each UI-facing AC by inspecting the running application
+2. For each criterion, verify expected elements are present and interactive:
+   - Buttons, inputs, labels mentioned in the AC
    - Conditional UI (e.g., "share button is hidden for guests") — verify presence/absence based on state
-   - Loading indicators, error messages — trigger the relevant state and re-inspect
-3. Use `mcp__dart__get_runtime_errors` to check for any runtime errors during navigation
+   - Loading indicators, error messages — trigger the relevant state and re-check
+3. Check for runtime errors in the console or error reporting
 4. Add a "Live Verification" section to the audit report with findings
 
-**If the app is not running**, skip this step. Note in the report: "Live widget tree verification skipped — no running app connected."
+**If no running app is available**, skip this step. Note in the report: "Live verification skipped — no running app connected."
 
-This step supplements — not replaces — the test-based audit. A widget being present in the tree doesn't mean it behaves correctly; a test passing doesn't mean the widget renders. Both are needed.
+This step supplements — not replaces — the test-based audit. An element being present doesn't mean it behaves correctly; a test passing doesn't mean it renders. Both are needed.
 
 ---
 
-## Step 8 — Golden test review (if applicable)
+## Step 8 — Snapshot / visual regression test review (if applicable)
 
-Check `test/goldens/` for golden files related to the views in this feature. If they exist:
+Check for snapshot or visual regression tests related to this feature's UI components. Common locations: `__snapshots__/`, `test/snapshots/`, `test/goldens/`, or framework-specific snapshot directories. If they exist:
 
-1. Note which views have golden coverage and which don't
-2. Check whether the golden tests are included in the test suite and passing
-3. If views lack golden coverage, recommend adding them in the Recommendations section
+1. Note which views/components have snapshot coverage and which don't
+2. Check whether snapshot tests are included in the test suite and passing
+3. If components lack snapshot coverage, recommend adding them in the Recommendations section
 
-If no golden tests exist for any view in this feature, add to Recommendations: "No golden test coverage — visual regressions are not detectable. Consider adding golden tests for [specific views]."
+If no snapshot tests exist for any component in this feature and the project uses snapshot testing, add to Recommendations: "No snapshot test coverage — visual regressions are not detectable. Consider adding snapshot tests for [specific components]."
 
 ---
 
 ## Step 9 — Final check
 
 Run in this order:
-1. `flutter analyze` (or `mcp__dart__analyze_files`) — fix all errors before running tests
-2. `flutter test` — full test suite, not just feature-specific tests
+1. `npm run typecheck && npm run lint` — fix all errors before running tests
+2. `npm test` — full test suite, not just feature-specific tests
 
 Both must be green before closing the audit. Report results.
 

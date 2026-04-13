@@ -26,9 +26,9 @@ If no PRD or story exists, ask the user: "What are the acceptance criteria for t
 
 ## Step 4 — Check for existing tests and helpers
 
-- Check if a test file already exists (test path should mirror lib/ structure)
-- Read `test/test_helpers.dart` for shared mocks and utilities (e.g. `MockAuthService`, `fakeAuthResponse`, `createTestApp`)
-- Reuse existing mocks from test_helpers.dart before creating new ones
+- Check if a test file already exists (test path should mirror source structure)
+- Search for shared test helpers, fixtures, and utilities (e.g., `test/helpers/`, `test/utils/`, `test/setup.ts`, or similar)
+- Reuse existing mocks and helpers before creating new ones
 - If the test file exists, extend it rather than rewriting
 
 ## Step 5 — Plan the test cases
@@ -54,7 +54,7 @@ For each acceptance criterion from Step 2, write at least one test that:
 After all acceptance criteria are covered, add tests for:
 - Error/exception handling paths not already covered
 - Edge cases (null, empty, boundary values)
-- State changes (isLoading, errorMessage, notifyListeners)
+- State changes (loading flags, error states, event emissions)
 - Property-based tests for any critical function (see Step 6 — Property-based tests)
 
 ### Present the plan as a checklist
@@ -70,8 +70,8 @@ Wait for user approval before writing.
 Follow these conventions exactly:
 
 ### File location and naming
-- Test path mirrors `lib/` structure: `lib/ui/auth/view_models/login_view_model.dart` → `test/ui/auth/login_view_model_test.dart`
-- File name: `<class_under_test>_test.dart`
+- Test path mirrors source structure: `src/auth/services/login.service.ts` → `test/auth/login.service.test.ts` (adapt to the project's existing test layout)
+- File name: `<class_under_test>.test.ts` or `<class_under_test>.spec.ts` — match the project's existing convention
 
 ### Structure
 - Use `group()` to organize by method or behavior
@@ -80,136 +80,102 @@ Follow these conventions exactly:
 - Pattern: **Arrange → Act → Assert** — blank lines separating each phase
 
 ### Mocking
-- Use `mocktail` for mocks (`extends Mock implements <Interface>`)
-- Prefer reusing mocks from `test/test_helpers.dart` over defining new ones
-- If new mocks are needed for multiple test files, add them to `test_helpers.dart`
+- Use the project's mocking approach (e.g., `jest.mock()`, `vi.mock()`, `sinon`, manual test doubles)
+- Reuse existing mock factories and helpers before defining new ones
+- If new mocks are needed across multiple test files, add them to the shared test helpers
 - If new mocks are only for this test file, define them at the top of the file
-- Use `registerFallbackValue()` in `setUpAll` for any enum or model types passed to `any()`
+- Mock at boundaries (external services, databases, APIs) — don't mock the thing being tested
 
 ### Setup
-- Declare dependencies and the class under test as `late` variables at the group/main level
-- Instantiate everything in `setUp()` so each test starts fresh
+- Declare dependencies and the class under test at the suite/describe level
+- Instantiate everything in `beforeEach()` (or equivalent) so each test starts fresh
 
-### Widget tests — Views
+### Component / UI tests
 
-Widget tests verify that a View renders correctly and responds to user interaction. They run headlessly — no device or emulator needed.
+Component tests verify that a UI component renders correctly and responds to user interaction.
 
-**Setup pattern:**
-```dart
-Widget buildTestApp(MyViewModel viewModel) {
-  return MultiProvider(
-    providers: [
-      ChangeNotifierProvider<MyViewModel>.value(value: viewModel),
-      // Add other required providers
-    ],
-    child: const MaterialApp(home: MyView()),
-  );
-}
-```
-Reuse helpers from `test/test_helpers.dart` where possible. If creating new helpers needed by multiple test files, add them to test_helpers.dart.
+**Setup pattern:** Render the component with required providers, stores, or context wrappers. Reuse existing render helpers from shared test utilities.
 
-**What to test in a View:**
-
-| Category | What to verify | Example |
-|---|---|---|
-| **Rendering** | Key widgets present in initial state | `expect(find.byType(TextField), findsNWidgets(2))` |
-| **Loading state** | Loading indicator shown, interactions disabled | `expect(find.byType(CircularProgressIndicator), findsOneWidget)` |
-| **Error state** | Error message displayed to user | `expect(find.text('Invalid email'), findsOneWidget)` |
-| **Empty state** | Appropriate message when no data | `expect(find.text('No exercises found'), findsOneWidget)` |
-| **Interactions** | Tap/input triggers correct ViewModel method | `await tester.tap(find.byType(ElevatedButton)); verify(() => vm.login()).called(1)` |
-| **Navigation** | Correct route pushed on action | Use `MockGoRouter` or verify `GoRouter.of(context).go()` |
-| **Conditional UI** | Auth-gated elements hidden for guests | `expect(find.byKey(Key('share_button')), findsNothing)` |
-
-**Interaction testing pattern:**
-```dart
-testWidgets('tapping Save calls viewModel.save()', (tester) async {
-  await tester.pumpWidget(buildTestApp(mockViewModel));
-  await tester.tap(find.byKey(const Key('save_button')));
-  await tester.pumpAndSettle();
-  verify(() => mockViewModel.save()).called(1);
-});
-```
-
-**Text input pattern:**
-```dart
-testWidgets('entering email updates viewModel', (tester) async {
-  await tester.pumpWidget(buildTestApp(mockViewModel));
-  await tester.enterText(find.byKey(const Key('email_field')), 'test@example.com');
-  verify(() => mockViewModel.setEmail('test@example.com')).called(1);
-});
-```
-
-**State-driven rendering — test ViewModel state changes reflected in UI:**
-```dart
-testWidgets('shows error message when viewModel has error', (tester) async {
-  when(() => mockViewModel.errorMessage).thenReturn('Network error');
-  await tester.pumpWidget(buildTestApp(mockViewModel));
-  expect(find.text('Network error'), findsOneWidget);
-});
-```
-
-### Widget tests — ViewModels
-
-ViewModel tests are unit tests (no widget tree), but they verify UI-facing behavior:
+**What to test in a component:**
 
 | Category | What to verify |
 |---|---|
-| **State transitions** | `isLoading` goes true → false during async operations |
-| **Error handling** | `errorMessage` is set on failure, cleared on retry |
-| **notifyListeners** | Called after state changes (use a listener mock or count) |
-| **Input validation** | Invalid inputs produce error states before calling services |
+| **Rendering** | Key elements present in initial state |
+| **Loading state** | Loading indicator shown, interactions disabled |
+| **Error state** | Error message displayed to user |
+| **Empty state** | Appropriate message when no data |
+| **Interactions** | Click/input triggers correct handler or state change |
+| **Navigation** | Correct route pushed on action |
+| **Conditional UI** | Auth-gated elements hidden for unauthorized users |
 
-### Golden tests
-
-Golden tests capture a screenshot and compare against a blessed baseline. They catch visual regressions that widget assertions miss (wrong colors, broken layouts, clipped text).
-
-**When to write golden tests:**
-- Views with significant visual design (not simple forms or dialogs)
-- Components used across multiple screens (shared widgets)
-- Views where the design spec (DESIGN.md) specifies particular visual qualities
-
-**When NOT to write golden tests:**
-- Views that are purely data-driven with no custom styling
-- Views still in rapid iteration (goldens will need constant updating)
-
-**Pattern:**
-```dart
-testWidgets('default state matches golden', (tester) async {
-  await tester.pumpWidget(buildTestApp(viewModel));
-  await tester.pumpAndSettle();
-  await expectLater(
-    find.byType(MyView),
-    matchesGoldenFile('goldens/my_view_default.png'),
-  );
+**Interaction testing pattern:**
+```typescript
+it('clicking Save calls the save handler', async () => {
+  const onSave = jest.fn(); // or vi.fn()
+  render(<MyComponent onSave={onSave} />);
+  await userEvent.click(screen.getByRole('button', { name: /save/i }));
+  expect(onSave).toHaveBeenCalledTimes(1);
 });
 ```
 
-**Golden file location:** `test/goldens/` mirroring the view path.
+**State-driven rendering:**
+```typescript
+it('shows error message when error state is set', () => {
+  render(<MyComponent error="Network error" />);
+  expect(screen.getByText('Network error')).toBeInTheDocument();
+});
+```
 
-**Generate goldens:** `flutter test --update-goldens <test_file>`
+Adapt patterns to your project's UI framework and testing library. The principles (test rendering, interactions, state-driven UI) apply regardless of framework.
 
-**Important:** Never auto-update goldens. Always present the update command to the user and let them review the generated images. Golden updates are a visual approval gate.
+### State / view model tests
+
+State management tests are unit tests (no UI rendering) that verify state logic:
+
+| Category | What to verify |
+|---|---|
+| **State transitions** | Loading flag goes true → false during async operations |
+| **Error handling** | Error state set on failure, cleared on retry |
+| **Subscribers notified** | State changes propagate to listeners/subscribers |
+| **Input validation** | Invalid inputs produce error states before calling services |
+
+### Snapshot tests
+
+Snapshot tests capture rendered output and compare against a blessed baseline. They catch regressions that assertion-based tests miss (wrong structure, broken layouts, unexpected changes).
+
+**When to write snapshot tests:**
+- Components with significant visual design (not simple wrappers)
+- Shared components used across multiple screens
+- Components where the design spec (DESIGN.md) specifies particular visual qualities
+
+**When NOT to write snapshot tests:**
+- Components that are purely data-driven with no custom styling
+- Components still in rapid iteration (snapshots will need constant updating)
+
+**Snapshot file location:** check the project's existing pattern (e.g., `__snapshots__/`, `test/snapshots/`).
+
+**Update snapshots:** `npm test -- --updateSnapshot <test_file>` (or framework equivalent)
+
+**Important:** Never auto-update snapshots. Always present the update command to the user and let them review the changes. Snapshot updates are a visual approval gate.
 
 ### Property-based tests
 
 For any function that implements a rule that must hold across a range of inputs — validation, numeric calculation, string transformation, collection operation — write at least one property test using a loop over representative values:
 
-```dart
+```typescript
 // Example: password validation must hold for all lengths around the boundary
-for (final entry in {
-  0: false,
-  1: false,
-  5: false,
-  6: true,   // boundary — must pass
-  7: true,
-  100: true,
-}.entries) {
-  test('password of length ${entry.key} is ${entry.value ? "valid" : "invalid"}',
-      () {
-    final result = validatePassword('x' * entry.key);
-    expect(result.isValid, entry.value);
-  });
-}
+const cases: [number, boolean][] = [
+  [0, false],
+  [1, false],
+  [5, false],
+  [6, true],   // boundary — must pass
+  [7, true],
+  [100, true],
+];
+
+it.each(cases)('password of length %i is %s', (length, expected) => {
+  expect(validatePassword('x'.repeat(length)).isValid).toBe(expected);
+});
 ```
 
 **Target functions for property tests:**
@@ -235,18 +201,13 @@ Integration tests run the full app on a device or emulator and exercise end-to-e
 - During `/cycle` autonomous execution (integration tests require a running device — flag them as follow-up items in the cycle report)
 
 **Pattern:**
-```dart
-// integration_test/login_flow_test.dart
-import 'package:integration_test/integration_test.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:your_app/main.dart' as app; // Replace 'your_app' with your package name
+```typescript
+// e2e/login-flow.test.ts
+import { test, expect } from '@playwright/test'; // or your e2e framework of choice
 
-void main() {
-  IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-
-  testWidgets('user can log in and reach home', (tester) async {
-    app.main();
-    await tester.pumpAndSettle();
+test('user can log in and reach home', async ({ page }) => {
+  await page.goto('/login');
+  // ... interact with the full app
     // ... interact with the full app
   });
 }
@@ -256,20 +217,20 @@ Integration tests are **not run by the pre-commit hook or CI by default** — th
 
 ### What NOT to do
 - Do not test private methods — test them through public API
-- Do not test generated code (`.g.dart`)
-- Do not use `print` — use `expect` for assertions
+- Do not test generated code (auto-generated types, codegen output)
+- Do not use `console.log` for assertions — use `expect`
 - Do not write integration tests in unit test files
-- Do not auto-update golden files without user approval
+- Do not auto-update snapshot files without user approval
 
 ## Step 7 — Run and verify
 
 Run validation in this order:
 
 ### 1. Static analysis first
-Run `flutter analyze` (or `mcp__dart__analyze_files`). Fix all errors and warnings before running tests. A test that compiles is not the same as a test that is correct.
+Run `npm run typecheck && npm run lint`. Fix all errors and warnings before running tests. A test that compiles is not the same as a test that is correct.
 
 ### 2. Full test suite
-Run `flutter test` — not just the new test file — to catch regressions in existing tests. Fix any failures before proceeding.
+Run `npm test` — not just the new test file — to catch regressions in existing tests. Fix any failures before proceeding.
 
 ### 3. Adversarial second pass (subagent)
 

@@ -1,6 +1,6 @@
 # Process Task List (Manual Mode)
 
-> **Note:** This skill is the manual, step-by-step mode of the `/cycle` pipeline. For autonomous execution with parallel agents, state persistence, and error recovery, use `/cycle` instead.
+> **Note:** This skill is the manual, step-by-step mode of the `/cycle` pipeline. You can invoke it directly or via `/cycle --manual [task-file]`. For autonomous execution with parallel agents, state persistence, and error recovery, use `/cycle` (without `--manual`) instead.
 
 You are implementing tasks from a task list in **manual mode** — you pause after every sub-task for user approval.
 
@@ -27,7 +27,7 @@ If $ARGUMENTS is empty, ask the user to provide the path to a task file (e.g. `a
     i. When you finish a sub-task, immediately mark it as completed by changing `[ ]` to `[x]`.
 
     ii. If all sub-tasks underneath a parent task are now `[x]`, follow this sequence:
-        - **First**: Run the full test suite (`flutter test`), pause and notify the user of the results: "Tests passed" or "Tests failed" before proceeding.
+        - **First**: Run the full test suite (`npm test`), pause and notify the user of the results: "Tests passed" or "Tests failed" before proceeding.
         - **Only if all tests pass**: Stage changes (`git add` with specific files — not `git add .`)
         - **Clean up**: Remove any temporary files and temporary code before committing
         - **Commit**: Use conventional commit format (`feat:`, `fix:`, `refactor:`, etc.) that summarizes the parent task, lists key changes, and references the task number and PRD context.
