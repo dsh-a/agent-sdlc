@@ -1,5 +1,6 @@
 ---
 name: adversarial-tester
+label: "[ADVERSARIAL]"
 description: Adversarial test reviewer — finds silent failures, boundary violations, and missing negative assertions in an existing test suite. Use after a test file is written to harden coverage. Receives source file path, test file path, and spec.
 model: haiku
 tools: Read, Grep, Glob, Edit, Write, Bash(npm test*)

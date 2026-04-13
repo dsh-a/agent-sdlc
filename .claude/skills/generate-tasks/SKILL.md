@@ -51,17 +51,17 @@ If $ARGUMENTS is empty, ask the user to provide the path to a PRD file (e.g. `ag
 ## Relevant Files
 
 ### Source Files (modify)
-- `lib/path/to/file.dart` — Brief description of why this file is relevant
+- `src/path/to/file.ts` — Brief description of why this file is relevant
 
 ### Source Files (create)
-- `lib/path/to/new_file.dart` — Brief description
+- `src/path/to/new-file.ts` — Brief description
 
 ### Test Files (create)
-- `test/path/to/file_test.dart` — Tests for `file.dart`
+- `test/path/to/file.test.ts` — Tests for `file.ts`
 
 ### Notes
-- Unit tests go in `test/` mirroring the `lib/` structure
-- Widget tests go in `test/widget/` mirroring the `lib/ui/` structure
+- Unit tests go in `test/` mirroring the source structure
+- Component tests go in `test/` mirroring the UI structure
 - Use `npm test` to run tests (or `npm test -- [optional/path]` for specific files)
 
 ## Tasks

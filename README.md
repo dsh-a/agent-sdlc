@@ -16,7 +16,7 @@ A Claude Code agent team for autonomous feature development on TypeScript projec
 | Skill | `/test` | Write rigorous, anti-faking tests |
 | Skill | `/verify` | Audit whether tests genuinely satisfy acceptance criteria |
 | Skill | `/review` | Independent code review before merging |
-| Skill | `/scaffold` | Scaffold new components (modules, services, controllers, etc.) |
+| Skill | `/scaffold` | Scaffold new components (models, services, repositories, controllers, UI) |
 | Skill | `/feature-idea` | Capture a feature idea and optionally hand off to `/cycle` |
 | Skill | `/self-improve` | Analyze past cycle runs and tune agent/skill instructions |
 | Agent | `create-prd` | Spawned by `/cycle` — writes PRDs |
@@ -24,8 +24,9 @@ A Claude Code agent team for autonomous feature development on TypeScript projec
 | Agent | `scaffold` | Spawned by `/cycle` — scaffolds new components |
 | Agent | `ui-story` | Spawned by `/cycle` — implements UI components |
 | Agent | `test` | Spawned by `/cycle` — writes tests |
-| Agent | `verify` | Spawned after cycle — audits AC coverage |
-| Agent | `review` | Spawned after cycle — reviews code quality |
+| Skill | `/setup` | Interactive configuration wizard for new projects |
+| Agent | `verify` | Spawned during cycle Phase 4A — audits AC coverage |
+| Agent | `review` | Spawned during cycle Phase 4A — reviews code quality |
 | Agent | `adversarial-tester` | Spawned by `test` — finds weak assertions |
 | Agent | `self-improve` | Spawned by `/self-improve` — applies pipeline improvements |
 | Agent | `monitor` | Spawned by `/cycle` — maintains cycle state in the background |
@@ -97,6 +98,15 @@ The pipeline expects these directories (auto-created as needed):
 - `agent_states/` — ephemeral cycle state (auto-created, auto-deleted)
 - `cycle_reports/` — per-cycle summaries
 
+### 5. Configure (recommended)
+
+Run `/setup` to generate `.claude/config.md` interactively, or edit the included default directly. This file controls:
+
+- **Model allocation** — which model each agent uses, with presets (personal, team, enterprise)
+- **Architecture review rules** — your project's layer boundaries and pattern compliance checks
+- **Optional agents** — enable/disable automatic verify and review during the cycle
+- **Artifact paths** — where PRDs, tasks, reports, and state files are stored
+
 ---
 
 ## The `/cycle` skill
@@ -141,7 +151,7 @@ You interact at gates (1C and 2B). The rest runs autonomously.
 | PRD file path | Phase 1B — reviews an existing PRD |
 | Task file path | Phase 2 — reviews an existing task list |
 | State file path | Resume — picks up a paused cycle |
-| Empty | Checks `agent_states/` for active cycles |
+| Empty | Checks for active cycles, or offers ideas from `FEATURES.md` |
 
 ### Resuming a paused cycle
 
@@ -153,14 +163,14 @@ If a cycle is interrupted, the monitor agent saves state to `agent_states/`. Res
 
 ### After the cycle
 
-Once Phase 4A completes, run these in separate conversations before merging:
+Phase 4A automatically runs `/verify` and `/review` agents and includes their results in the cycle report (default behavior). If either finds critical issues, you'll be prompted to address them before Phase 4B.
+
+To disable automatic verify/review, set them to `skip` in `.claude/config.md` under Optional Agents. In that case, run them manually in separate conversations before approving Phase 4B:
 
 ```
 /verify agent_tasks/prd-[feature-name].md
 /review [branch-name]
 ```
-
-Then return to the original conversation and approve Phase 4B to push and open the PR.
 
 ---
 
@@ -173,6 +183,8 @@ Step through a task list yourself, one sub-task at a time, with Claude assisting
 ```
 /process-tasks agent_tasks/tasks-prd-feature-name.md
 ```
+
+Or invoke via `/cycle --manual agent_tasks/tasks-prd-feature-name.md`.
 
 Claude will pause after every sub-task and wait for you to say "yes" before continuing. Useful when you want to stay close to the implementation.
 
@@ -206,11 +218,20 @@ The `monitor` agent runs in the background throughout Phase 3+, maintaining a st
 
 ## Customizing
 
-The agents and skills are plain Markdown files — edit them directly to match your project's conventions. Key files to personalize:
+The primary customization point is `.claude/config.md` — run `/setup` to generate it, or edit directly. For deeper changes, agents and skills are plain Markdown files you can edit.
 
-- `.claude/agents/scaffold/*.md` — patterns for your project's component types
-- `.claude/agents/review.md` — code review rules for your architecture
-- `.claude/skills/cycle/SKILL.md` — model assignments, branch strategy, report format
+### Quick customization checklist
+
+| What to customize | Where |
+|---|---|
+| Layer boundaries (domain/data/UI rules) | `.claude/config.md` → Architecture Review Rules |
+| Code conventions (naming, line length) | `.claude/config.md` → Convention Checks |
+| Model spending (cheaper vs. smarter) | `.claude/config.md` → Model Allocation preset |
+| Auto verify/review on or off | `.claude/config.md` → Optional Agents |
+| Scaffold patterns for your project | `.claude/agents/scaffold/` (create pattern files) |
+| Test conventions (mocking, frameworks) | `.claude/agents/test.md` |
+| Branch strategy | `.claude/skills/cycle/SKILL.md` → Branch strategy |
+| npm script names | `package.json` (agents use `npm test`, `npm run lint`, etc.) |
 
 ### Customizing commands
 

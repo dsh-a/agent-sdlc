@@ -1,5 +1,6 @@
 ---
 name: self-improve
+label: "[IMPROVE]"
 description: Analyze pipeline performance from run reports and verify audits, then apply approved improvements to agent and skill files. Use after multiple cycle runs to tune model allocation, skill instructions, and pipeline efficiency.
 model: sonnet
 tools: Read, Grep, Glob, Edit, Write
