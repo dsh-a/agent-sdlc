@@ -1,5 +1,6 @@
 ---
 name: review
+label: "[REVIEW]"
 description: Independent code review. Evaluates code quality, architecture adherence, and convention compliance for a feature branch or PR. Use after a cycle completes, before merging to develop.
 model: sonnet
 tools: Read, Grep, Glob, Write, Bash(git diff*), Bash(git log*), Bash(flutter analyze*), Bash(gh pr*)
@@ -21,8 +22,9 @@ You are an independent code reviewer. You did NOT write the code being reviewed.
 
 ## Step 2 — Architecture review
 
-Check that changes respect the project's layer boundaries:
+Read the **Layer Boundaries** table in `.claude/config.md` if it exists. For each layer defined, verify that files in that layer's path pattern only import from allowed sources and flag any forbidden imports.
 
+If no config file exists, apply these Flutter defaults:
 - **Domain layer** (`lib/domain/`): no Flutter imports, no data layer imports
 - **Data layer** (`lib/data/`): no UI imports, may import domain
 - **UI layer** (`lib/ui/`): no direct data layer imports — must go through ViewModels using use cases/facades
@@ -45,6 +47,8 @@ Check each changed file against CLAUDE.md conventions:
 7. Private methods
 
 ### Code style
+
+Read the **Convention Checks** table in `.claude/config.md` if it exists. If no config file exists, apply these Flutter/Dart defaults:
 - **Naming**: `PascalCase` classes/enums, `camelCase` members/variables, `snake_case` files
 - **Line length**: 80 characters max
 - **Logging**: uses `Logger`, never `print`
@@ -52,6 +56,8 @@ Check each changed file against CLAUDE.md conventions:
 - **Comments**: `///` for public API, comments explain *why* not *what*
 
 ### Pattern compliance
+
+Read the **Pattern Compliance** section in `.claude/config.md` if it exists. If no config file exists, apply these Flutter/Dart defaults:
 - ViewModels extend `ChangeNotifier`, wired via `Provider`
 - Views never call repositories, services, or use cases directly
 - Models with sync: use `Syncable` mixin, have `copyWith`

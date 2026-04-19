@@ -1,5 +1,6 @@
 ---
 name: test
+label: "[TEST]"
 description: Write unit, widget, and integration tests. Use when the cycle pipeline needs tests written or fixed for a specific class, ViewModel, View, or feature. Receives a task context describing what to test and relevant acceptance criteria.
 model: sonnet
 tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*)
