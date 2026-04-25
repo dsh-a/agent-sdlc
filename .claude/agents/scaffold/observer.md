@@ -1,82 +1,113 @@
 # Observer Pattern
 
 > **Type**: template
-> **Note**: Code examples and file paths are shown in TypeScript — adapt to your project's language and conventions.
 
 ## When to use
 
-Scaffold an observer when the task requires a publish-subscribe mechanism — reacting to state changes, domain events, lifecycle hooks, or decoupling producers from consumers. Common in event-driven architectures, notification systems, and reactive state management.
+Scaffold an observer when the task requires a publish-subscribe mechanism — reacting to state changes, domain events, lifecycle hooks, or decoupling producers from consumers. In Dart, this is typically expressed via `Stream`s, `StreamController`s, or domain event buses.
 
 ## File locations
 
 | File | Path |
 |---|---|
-| Event / subject interface | `src/domain/events/event-emitter.interface.ts` (shared, create once) |
-| Event definition | `src/domain/<feature>/events/<name>.event.ts` |
-| Handler / listener | `src/domain/<feature>/events/<name>.handler.ts` |
-| Test | `test/domain/<feature>/events/<name>.handler.test.ts` |
+| Event base class | `lib/domain/events/domain_event.dart` (shared, create once) |
+| Event definition | `lib/domain/<feature>/events/<name>_event.dart` |
+| Handler / listener | `lib/domain/<feature>/events/<name>_handler.dart` |
+| Test | `test/domain/<feature>/events/<name>_handler_test.dart` |
 
 Adapt paths to the project's existing directory structure.
 
 ## Dependencies
 
-- Event: none (pure data object)
-- Handler: repositories, services, or other dependencies needed to react to the event
-- Event emitter/bus: shared infrastructure
+- Event: none (immutable data object, no Flutter imports)
+- Handler: repositories, services, or other dependencies injected via constructor
+- Event bus / stream: shared infrastructure (e.g., `StreamController`, a custom `EventBus` class)
 
 ## Template
 
-```typescript
-// --- Shared event interface (create once) ---
+```dart
+// --- Shared domain event base class (create once) ---
 
-export interface IDomainEvent {
-  readonly type: string;
-  readonly occurredAt: Date;
+abstract class DomainEvent {
+  const DomainEvent({required this.occurredAt});
+
+  final DateTime occurredAt;
 }
 
-export interface IEventHandler<TEvent extends IDomainEvent> {
-  handle(event: TEvent): Promise<void>;
+abstract class DomainEventHandler<TEvent extends DomainEvent> {
+  Future<void> handle(TEvent event);
 }
 
 // --- Specific event ---
 
-export class <Name>Event implements IDomainEvent {
-  readonly type = '<feature>.<name>';
-  readonly occurredAt = new Date();
-
-  constructor(
-    public readonly entityId: string,
+class <Name>Event extends DomainEvent {
+  const <Name>Event({
+    required this.entityId,
+    required super.occurredAt,
     // event payload — what happened
-  ) {}
+  });
+
+  final String entityId;
 }
 
 // --- Handler / listener ---
 
-export class On<Name>Handler implements IEventHandler<<Name>Event> {
-  constructor(
-    private readonly someService: ISomeService,
-  ) {}
+class On<Name>Handler implements DomainEventHandler<<Name>Event> {
+  On<Name>Handler({
+    required ISomeService someService,
+  }) : _someService = someService;
 
-  async handle(event: <Name>Event): Promise<void> {
+  final ISomeService _someService;
+  final Logger _log = Logger('On<Name> Handler');
+
+  @override
+  Future<void> handle(<Name>Event event) async {
     // react to the event
   }
+}
+
+// --- Stream-based event bus (if project uses streams directly) ---
+
+// Publisher side
+final _controller = StreamController<<Name>Event>.broadcast();
+Stream<<Name>Event> get <name>Events => _controller.stream;
+
+void emit<Name>Event(<Name>Event event) => _controller.add(event);
+
+// Subscriber side
+late final StreamSubscription _sub;
+
+void _init() {
+  _sub = eventBus.<name>Events.listen(_onEvent);
+}
+
+Future<void> _onEvent(<Name>Event event) async {
+  // handle event
+}
+
+@override
+void dispose() {
+  _sub.cancel();
+  super.dispose();
 }
 ```
 
 ## Wiring
 
-Register event-handler mappings in the event bus/dispatcher or DI container. If using Node.js EventEmitter, typed-emitter, or a library like `eventemitter2`, adapt the registration pattern accordingly.
+Register event-handler mappings in the DI container or event bus dispatcher. If using a `StreamController`-based bus, expose the stream as a getter and inject the bus wherever events are published or consumed.
 
 ## Conventions
 
-- Events are immutable data objects describing something that already happened (past tense: `UserCreated`, `OrderShipped`)
+- Events are immutable — `const` constructor, `final` fields, no methods
+- Event names describe something that already happened (past tense: `UserCreated`, `WorkoutCompleted`)
 - Handlers are independent — one handler failing should not block others
 - Events flow one direction: producer → bus → handlers. Handlers never call back to the producer.
-- Keep event payloads minimal — include IDs and essential data, not full entity snapshots
+- No Flutter imports in domain events or handlers — pure Dart
+- Use `Logger`, never `print`
 
 ## Tests
 
 - Test each handler independently with a constructed event
 - Verify side effects (service calls, state changes)
-- Test error isolation (handler failure doesn't propagate)
-- Test with realistic event payloads
+- Test that handlers are independent (one failure doesn't affect others)
+- Test stream emissions using `expectLater` with a `StreamMatcher`
