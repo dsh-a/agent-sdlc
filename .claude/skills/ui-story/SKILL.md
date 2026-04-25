@@ -9,6 +9,8 @@ Read the design context file:
 
 ## Step 2 — Load architecture context
 
+Read the **Pattern Compliance** and **Layer Boundaries** sections in `.claude/config.md` for any project-specific overrides.
+
 This is a Flutter app using MVVM (ChangeNotifier ViewModels + Provider). Views must:
 - Call methods on the ViewModel only — never repositories, services, or use cases directly
 - Use `Theme.of(context).textTheme` and `Theme.of(context).colorScheme` — never hardcoded styles

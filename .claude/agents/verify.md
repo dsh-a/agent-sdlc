@@ -1,5 +1,6 @@
 ---
 name: verify
+label: "[VERIFY]"
 description: Independent AC coverage audit. Evaluates whether the implementation and test suite genuinely satisfy the PRD's acceptance criteria. Use after a cycle completes to produce a verification report.
 model: sonnet
 tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*), Bash(flutter test*), Bash(flutter analyze*)

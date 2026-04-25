@@ -1,5 +1,6 @@
 ---
 name: monitor
+label: "[MONITOR]"
 description: State persistence agent for an active cycle run. Runs in the background during Phase 3+, receives status updates from the cycle orchestrator via SendMessage, and maintains the cycle state file. Spawned once per cycle — do not spawn directly.
 model: haiku
 tools: Read, Write, Glob, Bash(rm agent_states/*)

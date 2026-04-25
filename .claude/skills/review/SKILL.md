@@ -31,8 +31,9 @@ If $ARGUMENTS is empty, ask the user for a branch name or PR number.
 
 ## Step 2 — Architecture review
 
-Check that the changes respect the project's layer boundaries:
+Read the **Layer Boundaries** table in `.claude/config.md`. For each layer defined, verify that files in that layer's path pattern only import from allowed sources and flag any forbidden imports.
 
+If no config file exists, apply these Flutter defaults:
 - **Domain layer** (`lib/domain/`): no Flutter imports, no data layer imports
 - **Data layer** (`lib/data/`): no UI imports, may import domain
 - **UI layer** (`lib/ui/`): no direct data layer imports — must go through ViewModels which use use cases/facades
@@ -55,6 +56,8 @@ Check each changed file against CLAUDE.md conventions:
 7. Private methods
 
 ### Code style
+
+Read the **Convention Checks** table in `.claude/config.md` if it exists. If no config file exists, apply these Flutter/Dart defaults:
 - **Naming**: `PascalCase` classes/enums, `camelCase` members/variables, `snake_case` files
 - **Line length**: 80 characters max
 - **Functions**: single purpose, aim for <20 lines
@@ -63,6 +66,8 @@ Check each changed file against CLAUDE.md conventions:
 - **Comments**: `///` for public API, comments explain *why* not *what*
 
 ### Pattern compliance
+
+Read the **Pattern Compliance** section in `.claude/config.md` if it exists. If no config file exists, apply these Flutter/Dart defaults:
 - ViewModels extend `ChangeNotifier`, wired via `Provider`
 - Views never call repositories, services, or use cases directly
 - Models with sync: use `Syncable` mixin, have `copyWith`
@@ -142,5 +147,5 @@ For each finding, include:
 
 Present the review and ask: **"Would you like me to fix the critical issues and warnings?"**
 
-- If yes: fix them on the feature branch, run `flutter test` and `flutter analyze`, commit the fixes
+- If yes: fix them on the feature branch, run `flutter test` + `flutter analyze`, commit the fixes
 - If no: the review stands as documentation for the user to address

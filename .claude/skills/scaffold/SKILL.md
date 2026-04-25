@@ -31,6 +31,27 @@ Before creating anything:
 
 ---
 
+## Step 3 — Load pattern (priority order, all types)
+
+Check `.claude/agents/scaffold/` for a matching pattern file:
+
+1. **Project-specific pattern** (`Type: project-specific`): Follow it — it reflects this project's actual conventions. Skip the generic sections below.
+2. **Default template** (`Type: template`): Use it as a starting point, but adapt to the project's codebase. The generic sections below provide additional guidance.
+3. **No pattern file**: Explore `lib/` — find 1-2 existing examples of the same type, read them, extract conventions.
+
+Also read `.claude/config.md` (Architecture Review Rules) for layer boundaries and pattern compliance.
+
+If no project-specific pattern files exist at all, autonomously spawn a setup-scaffold agent before proceeding:
+
+```
+Agent(subagent_type: "general-purpose", model: "sonnet",
+      prompt: "Run the /setup-scaffold skill in scan mode. Read .claude/skills/setup-scaffold/SKILL.md and follow its steps. Do not ask the user questions — use your best judgment for pattern discovery and create all pattern files you find. Report what was created.")
+```
+
+Wait for it to complete, then re-read `.claude/agents/scaffold/` and continue with the priority order above.
+
+---
+
 ## Syncable Entity (full stack)
 
 For entities that sync between local Drift DB and remote Supabase.
