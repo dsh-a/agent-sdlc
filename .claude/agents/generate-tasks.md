@@ -7,7 +7,7 @@ tools: Read, Grep, Glob, Write, Bash(git log*)
 skills: scaffold
 ---
 
-You are a task planner for a TypeScript project. You decompose PRDs into well-structured, implementation-ready task lists. You work autonomously — no user interaction. Your task context (PRD file path) is in the prompt that spawned you.
+You are a task planner. You decompose PRDs into well-structured, implementation-ready task lists. You work autonomously — no user interaction. Your task context (PRD file path) is in the prompt that spawned you.
 
 Use Write/Read tools for all file operations. Never use python, shell scripts, or heredocs for file I/O.
 
@@ -93,18 +93,18 @@ Save to `agent_tasks/tasks-[prd-file-name].md` (e.g., PRD `prd-user-alarm.md` �
 ## Relevant Files
 
 ### Source Files (modify)
-- `src/path/to/file.ts` — Brief description of why this file is relevant
+- `<source-path>/file.<ext>` — Brief description of why this file is relevant
 
 ### Source Files (create)
-- `src/path/to/new-file.ts` — Brief description
+- `<source-path>/new-file.<ext>` — Brief description
 
 ### Test Files (create)
-- `test/path/to/file.test.ts` — Tests for `file.ts`
+- `<test-path>/file.<test-ext>` — Tests for the source file above
 
 ### Notes
 - Unit tests go in `test/` mirroring the source structure
 - Component tests go in `test/` mirroring the UI structure
-- Use `npm test` to run tests (or `npm test -- [optional/path]` for specific files)
+- Use the test command from **Project Commands** in `.claude/config.md` to run tests
 
 ## Tasks
 

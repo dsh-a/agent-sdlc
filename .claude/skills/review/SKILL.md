@@ -147,5 +147,5 @@ For each finding, include:
 
 Present the review and ask: **"Would you like me to fix the critical issues and warnings?"**
 
-- If yes: fix them on the feature branch, run `npm test` and `npm run typecheck && npm run lint`, commit the fixes
+- If yes: fix them on the feature branch, run the test and typecheck/lint commands (from **Project Commands** in `.claude/config.md`), commit the fixes
 - If no: the review stands as documentation for the user to address

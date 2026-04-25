@@ -72,29 +72,47 @@ When enabled, these agents run autonomously during Phase 4A and their reports ar
 
 ---
 
+## Project Commands
+
+Agents run these commands to test, lint, and generate code. Update to match your project's toolchain.
+
+| Purpose | Command |
+|---|---|
+| Run all tests | `npm test` |
+| Run specific test file | `npm test -- <path>` |
+| Type check | `npm run typecheck` |
+| Lint | `npm run lint` |
+| Code generation | `npm run codegen` |
+
+The `codegen` command is optional — remove it if your project has no code generation step.
+
+---
+
 ## Architecture Review Rules
 
 These rules are used by the `review` agent (Step 2) and `verify` agent for convention checks. Customize them to match your project's architecture.
 
 ### Layer Boundaries
 
-Define your project's architectural layers and import rules. The review agent checks that files in each layer only import from allowed sources.
+Define your project's architectural layers and import rules. The review agent checks that files in each layer only import from allowed sources. Replace the path patterns below with your project's actual directory structure.
 
 | Layer | Path pattern | Allowed imports | Forbidden imports |
 |---|---|---|---|
-| Domain / Core | `src/domain/`, `src/core/` | Standard library, other domain modules | Data layer, UI layer, framework-specific imports |
-| Data / Infrastructure | `src/data/`, `src/infrastructure/` | Domain layer, external libraries | UI layer |
-| UI / Presentation | `src/ui/`, `src/components/`, `src/pages/` | Domain layer via intermediaries (services, stores, hooks) | Direct data layer imports |
+| Domain / Core | `{your-domain-layer}/` | Standard library, other domain modules | Data layer, UI layer, framework-specific imports |
+| Data / Infrastructure | `{your-data-layer}/` | Domain layer, external libraries | UI layer |
+| UI / Presentation | `{your-ui-layer}/` | Domain layer via intermediaries (services, stores, hooks) | Direct data layer imports |
 
-Adapt path patterns to your project structure. If your project uses a flat or feature-based structure, redefine these layers accordingly.
+Example path patterns: `src/domain/`, `lib/core/`, `app/models/`, `internal/domain/`.
+
+If your project uses a flat or feature-based structure, redefine these layers accordingly.
 
 ### Pattern Compliance
 
 Describe your project's architectural patterns. The review agent checks that changed files follow these patterns.
 
-- **State management**: _[describe your pattern — e.g., React hooks + Context, Zustand stores, Redux slices, MobX observables, or plain classes]_
+- **State management**: _[describe your pattern — e.g., view models, stores, hooks, or plain classes]_
 - **Views/components** never call repositories, services, or data sources directly — they go through an intermediary (view models, stores, hooks, controllers)
-- **New dependencies** follow the project's module registration / DI pattern — _[describe your DI approach, e.g., inversify, tsyringe, manual factory, or none]_
+- **New dependencies** follow the project's module registration / DI pattern — _[describe your DI approach]_
 - **Interfaces/abstractions** are used at layer boundaries
 
 ### Convention Checks
@@ -103,11 +121,11 @@ Describe your project's architectural patterns. The review agent checks that cha
 |---|---|
 | Class/type naming | `PascalCase` |
 | Function/variable naming | `camelCase` |
-| File naming | `kebab-case` |
-| Line length | 100 characters max |
-| Logging | Project logger (never `console.log` in production code) |
+| File naming | _[your project's convention — e.g., `snake_case`, `kebab-case`, `camelCase`]_ |
+| Line length | _[your project's limit — e.g., 80, 100, 120 characters]_ |
+| Logging | Project logger (never `print` / `console.log` in production code) |
 | Error handling | Async functions have proper error handling at system boundaries (database calls, API calls, external services) |
-| Comments | `/** */` for public API documentation; inline comments explain _why_, not _what_ |
+| Comments | Language-appropriate doc comment syntax for public APIs; inline comments explain _why_, not _what_ |
 
 ---
 

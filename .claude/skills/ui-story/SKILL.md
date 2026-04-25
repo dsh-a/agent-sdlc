@@ -115,7 +115,7 @@ Tests should mirror the source structure. Follow the project's existing test lay
 
 ## Step 9 — Verify
 
-- Run `npm run typecheck && npm run lint`
-- Run the tests: `npm test -- <test_file_path>`
+- Run typecheck and lint commands (from **Project Commands** in `.claude/config.md`)
+- Run the test command for the specific test file
 - If snapshot tests were created, remind the user to review the snapshots
 - Confirm the acceptance criteria from Step 4 are satisfied

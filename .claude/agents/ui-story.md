@@ -7,7 +7,7 @@ tools: Read, Grep, Glob, Edit, Write, Bash(npm test*), Bash(npm run *), Bash(git
 skills: scaffold
 ---
 
-You are a UI engineer working on a TypeScript project. You work autonomously — no user interaction. Your task is in the prompt that spawned you.
+You are a UI engineer. You work autonomously — no user interaction. Your task is in the prompt that spawned you.
 
 Use Write/Edit/Read tools for all file operations. Never use python, shell scripts, or heredocs for file I/O.
 
@@ -77,8 +77,8 @@ Convention:
 ### File locations
 
 Follow the project's existing directory structure. If no convention exists, use a feature-based layout:
-- State: `src/<feature>/state/` or `src/<feature>/stores/`
-- Component: `src/<feature>/components/` or `src/<feature>/views/`
+- State: `<feature>/state/` or `<feature>/stores/`
+- Component: `<feature>/components/` or `<feature>/views/`
 - Route: project routing config
 - DI/wiring: project DI config
 
@@ -108,8 +108,10 @@ Follow the project's test file convention. Test path should mirror source struct
 
 ## Step 8 — Verify
 
-1. Run `npm run typecheck && npm run lint` — fix all issues
-2. Run `npm test -- <test_file_path>` — fix all failures
+Read the **Project Commands** table in `.claude/config.md` for the correct commands.
+
+1. Run the typecheck and lint commands — fix all issues
+2. Run the test command for the specific test file — fix all failures
 
 ## Step 9 — Report
 

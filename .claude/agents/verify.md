@@ -152,8 +152,10 @@ Check for snapshot or visual regression tests related to this feature's UI compo
 
 ## Step 9 — Run final checks
 
-1. `npm run typecheck && npm run lint` — report results
-2. `npm test` — full suite, not just feature tests — report results
+Read the **Project Commands** table in `.claude/config.md` for the correct commands.
+
+1. Run the typecheck and lint commands — report results
+2. Run the test command (full suite, not just feature tests) — report results
 
 Both must be green before closing. Report if either is red.
 
