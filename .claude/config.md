@@ -78,13 +78,12 @@ Agents run these commands to test, lint, and generate code. Update to match your
 
 | Purpose | Command |
 |---|---|
-| Run all tests | `npm test` |
-| Run specific test file | `npm test -- <path>` |
-| Type check | `npm run typecheck` |
-| Lint | `npm run lint` |
-| Code generation | `npm run codegen` |
+| Run all tests | `flutter test` |
+| Run specific test file | `flutter test <path>` |
+| Analyze / lint | `flutter analyze` |
+| Code generation | `flutter pub run build_runner build --delete-conflicting-outputs` |
 
-The `codegen` command is optional — remove it if your project has no code generation step.
+The `Code generation` command is optional — remove it if your project has no code generation step.
 
 ---
 
@@ -94,38 +93,37 @@ These rules are used by the `review` agent (Step 2) and `verify` agent for conve
 
 ### Layer Boundaries
 
-Define your project's architectural layers and import rules. The review agent checks that files in each layer only import from allowed sources. Replace the path patterns below with your project's actual directory structure.
+Define your project's architectural layers and import rules. The review agent checks that files in each layer only import from allowed sources.
 
 | Layer | Path pattern | Allowed imports | Forbidden imports |
 |---|---|---|---|
-| Domain / Core | `{your-domain-layer}/` | Standard library, other domain modules | Data layer, UI layer, framework-specific imports |
-| Data / Infrastructure | `{your-data-layer}/` | Domain layer, external libraries | UI layer |
-| UI / Presentation | `{your-ui-layer}/` | Domain layer via intermediaries (services, stores, hooks) | Direct data layer imports |
+| Domain / Core | `lib/domain/` | Pure Dart, other domain modules | Flutter framework, data layer, `package:provider` |
+| Data / Infrastructure | `lib/data/` | Domain layer, external packages | UI layer |
+| UI / Presentation | `lib/ui/` | Domain layer via intermediaries (ViewModels, facades, use cases) | Direct data layer imports |
 
-Example path patterns: `src/domain/`, `lib/core/`, `app/models/`, `internal/domain/`.
-
-If your project uses a flat or feature-based structure, redefine these layers accordingly.
+Adapt path patterns to your project structure.
 
 ### Pattern Compliance
 
 Describe your project's architectural patterns. The review agent checks that changed files follow these patterns.
 
-- **State management**: _[describe your pattern — e.g., view models, stores, hooks, or plain classes]_
-- **Views/components** never call repositories, services, or data sources directly — they go through an intermediary (view models, stores, hooks, controllers)
-- **New dependencies** follow the project's module registration / DI pattern — _[describe your DI approach]_
-- **Interfaces/abstractions** are used at layer boundaries
+- **State management**: _[describe your pattern — e.g., MVVM with ChangeNotifier + Provider, Riverpod, BLoC, GetX]_
+- **Views** never call repositories, services, or use cases directly — they go through a ViewModel or equivalent intermediary
+- **New dependencies** follow the project's DI pattern — _[describe your DI approach, e.g., Provider/MultiProvider, get_it, manual factory]_
+- **Interfaces/abstractions** are used at layer boundaries (e.g., `IRepository`, `IService`)
 
 ### Convention Checks
 
 | Convention | Rule |
 |---|---|
-| Class/type naming | `PascalCase` |
-| Function/variable naming | `camelCase` |
-| File naming | _[your project's convention — e.g., `snake_case`, `kebab-case`, `camelCase`]_ |
-| Line length | _[your project's limit — e.g., 80, 100, 120 characters]_ |
-| Logging | Project logger (never `print` / `console.log` in production code) |
+| Class naming | `PascalCase` |
+| Method/variable naming | `camelCase` |
+| File naming | `snake_case` |
+| Private members | Leading underscore (`_field`, `_method`) |
+| Line length | 100 characters max |
+| Logging | Project logger (never `print` in production code) |
 | Error handling | Async functions have proper error handling at system boundaries (database calls, API calls, external services) |
-| Comments | Language-appropriate doc comment syntax for public APIs; inline comments explain _why_, not _what_ |
+| Comments | `///` for public API documentation; inline comments explain _why_, not _what_ |
 
 ---
 

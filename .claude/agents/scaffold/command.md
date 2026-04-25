@@ -1,60 +1,63 @@
 # Command Pattern
 
 > **Type**: template
-> **Note**: Code examples and file paths are shown in TypeScript — adapt to your project's language and conventions.
 
 ## When to use
 
-Scaffold a command when the task requires encapsulating a request as an object — enabling queuing, logging, undo/redo, or decoupling the invoker from the executor. Common in CQRS architectures, task queues, and action-based systems.
+Scaffold a command when the task requires encapsulating a request as an object — enabling queuing, logging, undo/redo, or decoupling the invoker from the executor. Common in CQRS-style architectures, task dispatchers, and action-based systems in Dart/Flutter.
 
 ## File locations
 
 | File | Path |
 |---|---|
-| Command interface | `src/domain/commands/command.interface.ts` (shared, create once) |
-| Command | `src/domain/<feature>/commands/<name>.command.ts` |
-| Handler | `src/domain/<feature>/commands/<name>.handler.ts` |
-| Test | `test/domain/<feature>/commands/<name>.handler.test.ts` |
+| Command abstract class | `lib/domain/commands/command.dart` (shared, create once) |
+| Command | `lib/domain/<feature>/commands/<name>_command.dart` |
+| Handler | `lib/domain/<feature>/commands/<name>_handler.dart` |
+| Test | `test/domain/<feature>/commands/<name>_handler_test.dart` |
 
 Adapt paths to the project's existing directory structure.
 
 ## Dependencies
 
-- Command: none (pure data object)
-- Handler: repositories, services, or other dependencies needed to execute the command
+- Command: none (pure data object, no Flutter imports)
+- Handler: repositories, services, or other dependencies injected via constructor
 
 ## Template
 
-```typescript
-// --- Shared command interface (create once) ---
+```dart
+// --- Shared command abstract class (create once) ---
 
-export interface ICommand {
-  readonly type: string;
+abstract class Command {
+  const Command();
 }
 
-export interface ICommandHandler<TCommand extends ICommand, TResult = void> {
-  execute(command: TCommand): Promise<TResult>;
+abstract class CommandHandler<TCommand extends Command, TResult> {
+  Future<TResult> execute(TCommand command);
 }
 
 // --- Specific command ---
 
-export class <Name>Command implements ICommand {
-  readonly type = '<name>';
+class <Name>Command extends Command {
+  const <Name>Command({
+    required this.someParam,
+    // command parameters — immutable
+  });
 
-  constructor(
-    public readonly someParam: string,
-    // command parameters — immutable data
-  ) {}
+  final String someParam;
 }
 
 // --- Handler ---
 
-export class <Name>Handler implements ICommandHandler<<Name>Command, ResultType> {
-  constructor(
-    private readonly someRepository: ISomeRepository,
-  ) {}
+class <Name>Handler implements CommandHandler<<Name>Command, ResultType> {
+  <Name>Handler({
+    required ISomeRepository someRepository,
+  }) : _someRepository = someRepository;
 
-  async execute(command: <Name>Command): Promise<ResultType> {
+  final ISomeRepository _someRepository;
+  final Logger _log = Logger('<Name> Handler');
+
+  @override
+  Future<ResultType> execute(<Name>Command command) async {
     // validate, execute, return result
   }
 }
@@ -62,19 +65,19 @@ export class <Name>Handler implements ICommandHandler<<Name>Command, ResultType>
 
 ## Wiring
 
-Register command-handler mappings in the DI container or a command bus/dispatcher. Invokers submit commands without knowing which handler processes them.
+Register the handler in the DI container (Provider, get_it, Riverpod, etc.). Invokers submit commands without knowing which handler processes them.
 
 ## Conventions
 
-- Commands are immutable data objects — no methods, no dependencies
+- Commands are immutable data objects — `const` constructor, `final` fields, no methods, no dependencies
 - One handler per command (Single Responsibility)
-- Handlers contain the execution logic and dependencies
-- Command names are descriptive verb phrases (e.g., `CreateUserCommand`, `TransferFundsCommand`)
-- If using CQRS, commands are writes; queries are separate
+- Handlers contain execution logic and dependencies; use `Logger`, never `print`
+- Command names are descriptive verb phrases (`CreateWorkoutCommand`, `DeleteRoutineCommand`)
+- No Flutter imports in domain layer — pure Dart
 
 ## Tests
 
 - Test the handler, not the command (commands are pure data)
-- Test validation within the handler
+- Test validation logic within the handler
 - Test side effects (repository calls, events emitted)
-- Test error cases (invalid command data, dependency failures)
+- Test error cases (invalid input, dependency failures)

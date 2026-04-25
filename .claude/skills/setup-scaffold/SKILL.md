@@ -1,3 +1,7 @@
+---
+disable-model-invocation: true
+---
+
 # Setup Scaffold — Discover and Codify Project Patterns
 
 Scan the codebase for recurring architectural patterns and generate project-specific scaffold pattern files. This eliminates repeated codebase exploration by the scaffold agent.
@@ -18,39 +22,42 @@ Read `.claude/skills/scaffold/pattern-template.md` for the required structure of
 ## Step 2 — Inventory existing pattern files
 
 Read all files in `.claude/agents/scaffold/`:
-- Files with `Type: template` are GoF templates shipped with agent-sdlc
+- Files with `Type: template` are default templates shipped with agent-sdlc
 - Files with `Type: project-specific` are previously discovered patterns
-- Note which GoF templates have been replaced by project-specific files
+- Note which default templates have been replaced by project-specific files
 
 In `update` mode: also read the project-specific files to compare against current codebase state.
 
 ## Step 3 — Scan the codebase
 
-Search the project's source directory for recurring patterns. For each pattern category below, find 2+ existing instances:
+Search `lib/` for recurring patterns. For each pattern category below, find 2+ existing instances:
 
-### Application patterns
-- **Use cases / interactors**: Classes with a single `execute()` or similarly named public method that orchestrate a business operation
-- **Services**: Classes wrapping infrastructure concerns (external APIs, auth, email, storage, caching)
+### Domain patterns
+- **Use cases / interactors**: Classes with a single `execute()` public method that orchestrate a business operation
 - **Facades**: Classes aggregating multiple repositories or services for a feature area
-- **Repositories**: Classes abstracting data access behind interfaces
+- **Models / entities**: Data classes, often with `copyWith()`, `toJson()`/`fromJson()`, and optionally a `Syncable` mixin
+
+### Data patterns
+- **Repositories**: Classes implementing an `IRepository` interface, abstracting data access (Drift, Supabase, Hive, etc.)
+- **Adapters**: Classes implementing a `ModelAdapter` interface, converting between domain models and data layer types
+- **Services**: Classes wrapping infrastructure concerns (auth, connectivity, platform APIs, external services)
 
 ### Design patterns
-- **Interfaces / contracts**: Layer boundary abstractions (repository interfaces, service contracts, port definitions)
-- **Commands**: Request objects paired with handlers (CQRS, task queues, action dispatchers)
-- **Observers / events**: Domain events, event handlers, pub/sub mechanisms
-- **Strategies**: Interchangeable algorithms behind a common interface
+- **Interfaces / contracts**: `abstract interface class` definitions at layer boundaries (repository interfaces, service contracts)
+- **Commands**: Request objects paired with handlers or dispatchers
+- **Observers / events**: Domain events, event handlers, or stream-based pub/sub mechanisms
+- **Strategies**: Interchangeable algorithms behind a common abstract class or interface
 
-### Framework-specific patterns
-- **Controllers / handlers**: Request-handling classes (Express routes, NestJS controllers, tRPC procedures, etc.)
-- **Middleware**: Request/response interceptors
-- **UI components**: Reusable UI patterns specific to this project's framework
-- **State management**: Stores, slices, view models, or hooks with a recurring structure
+### UI patterns
+- **ViewModels**: `ChangeNotifier` (or equivalent) classes exposing state and actions to views
+- **Views / screens**: Widget classes consuming a ViewModel via Provider, Riverpod, BLoC, etc.
+- **Reusable widgets**: Shared UI components with a recurring structure
 
 For each discovered pattern, extract:
 1. **Common structure**: class shape, constructor dependencies, method signatures
-2. **File location convention**: where these files live in the directory tree
-3. **Naming convention**: how files and classes are named
-4. **Wiring pattern**: how they're registered (DI, module imports, route tables)
+2. **File location convention**: where these files live in `lib/`
+3. **Naming convention**: how files and classes are named (e.g., `_view_model.dart`, `_repository.dart`)
+4. **Wiring pattern**: how they're registered (Provider, get_it, Riverpod, manual factory)
 5. **Test pattern**: where and how tests are structured for this type
 
 ## Step 4 — Present findings
@@ -59,15 +66,15 @@ Present a summary to the user:
 
 ```
 Discovered patterns:
-  - [pattern name] — [N] instances found (e.g., src/services/auth.service.ts, src/services/email.service.ts)
+  - [pattern name] — [N] instances found (e.g., lib/data/repositories/user_repository.dart)
     → Will create: .claude/agents/scaffold/[name].md
-    → Replaces GoF template: [template name] (or "new — no GoF template")
+    → Replaces default template: [template name] (or "new — no default template")
 
 Already codified:
   - [pattern name] — project-specific file exists, [matches|diverged from] current codebase
 
 No instances found:
-  - [GoF template names with no matching project patterns]
+  - [default template names with no matching project patterns]
 ```
 
 If running interactively (user invoked `/setup-scaffold`): ask **"Create pattern files for the discovered patterns? I'll skip already-codified ones."**
@@ -83,9 +90,9 @@ For each approved pattern:
 1. Read the 2+ example files identified in Step 3
 2. Extract the common template following the standard in `pattern-template.md`
 3. Write to `.claude/agents/scaffold/<pattern-name>.md`
-4. If this pattern matches a GoF template, set `Replaces: <template-name>` in the header
+4. If this pattern matches a default template, set `Replaces: <template-name>` in the header
 
-Do NOT delete GoF template files. Project-specific files take priority via the `Replaces` header.
+Do NOT delete default template files. Project-specific files take priority via the `Replaces` header.
 
 ## Step 6 — Summary
 
@@ -93,11 +100,11 @@ Present what was created:
 
 ```
 Pattern files created:
-  - .claude/agents/scaffold/<name>.md (replaces: <GoF template>)
+  - .claude/agents/scaffold/<name>.md (replaces: <default template>)
   - .claude/agents/scaffold/<name>.md (new pattern)
 
-GoF templates still active (no project equivalent found):
-  - command.md, observer.md, ...
+Default templates still active (no project equivalent found):
+  - use-case.md, facade.md, ...
 
 Next steps:
   - The scaffold agent will now use these patterns automatically
