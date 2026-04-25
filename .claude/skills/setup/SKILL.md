@@ -1,3 +1,7 @@
+---
+disable-model-invocation: true
+---
+
 # Setup — Initial Configuration
 
 You are helping a user configure the agent-sdlc pipeline for their Flutter/Dart project. Walk through each step interactively — ask questions, confirm choices, then generate the configuration.
