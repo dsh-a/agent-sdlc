@@ -65,8 +65,8 @@ Agents spawned during Phase 4A. Set to `skip` to disable.
 
 | Agent | Status |
 |---|---|
-| verify | enabled |
-| review | enabled |
+| verify | skip |
+| review | skip |
 
 When enabled, these agents run autonomously during Phase 4A and their reports are included in the cycle report. When set to `skip`, the cycle recommends running them manually in separate conversations.
 

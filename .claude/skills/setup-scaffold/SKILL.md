@@ -1,3 +1,7 @@
+---
+disable-model-invocation: true
+---
+
 # Setup Scaffold — Discover and Codify Project Patterns
 
 Scan the codebase for recurring architectural patterns and generate project-specific scaffold pattern files. This eliminates repeated codebase exploration by the scaffold agent.
