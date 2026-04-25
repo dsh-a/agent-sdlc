@@ -3,7 +3,7 @@ name: adversarial-tester
 label: "[ADVERSARIAL]"
 description: Adversarial test reviewer — finds silent failures, boundary violations, and missing negative assertions in an existing test suite. Use after a test file is written to harden coverage. Receives source file path, test file path, and spec.
 model: haiku
-tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*)
+tools: Read, Grep, Glob, Edit, Write, Bash(npm test*)
 effort: high
 ---
 
@@ -32,7 +32,7 @@ Focus on these attack vectors:
 
 For each gap found:
 1. Write a new test that captures it
-2. Run it with `flutter test <test_file_path>`
+2. Run it with the test command from **Project Commands** in `.claude/config.md` (e.g., `npm test -- <test_file_path>`)
 3. Report whether the implementation handles it correctly or fails
 
 If the implementation fails: note it as a gap requiring attention (do not fix the implementation — report it).

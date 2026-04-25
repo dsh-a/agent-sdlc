@@ -65,10 +65,25 @@ Agents spawned during Phase 4A. Set to `skip` to disable.
 
 | Agent | Status |
 |---|---|
-| verify | skip |
-| review | skip |
+| verify | enabled |
+| review | enabled |
 
 When enabled, these agents run autonomously during Phase 4A and their reports are included in the cycle report. When set to `skip`, the cycle recommends running them manually in separate conversations.
+
+---
+
+## Project Commands
+
+Agents run these commands to test, lint, and generate code. Update to match your project's toolchain.
+
+| Purpose | Command |
+|---|---|
+| Run all tests | `flutter test` |
+| Run specific test file | `flutter test <path>` |
+| Analyze / lint | `flutter analyze` |
+| Code generation | `flutter pub run build_runner build --delete-conflicting-outputs` |
+
+The `Code generation` command is optional — remove it if your project has no code generation step.
 
 ---
 

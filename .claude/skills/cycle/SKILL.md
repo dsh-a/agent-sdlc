@@ -72,7 +72,7 @@ All work on feature branches, never `develop` or `master`.
 - **Naming**: `feature/[story-number]-[short-description]`, `fix/...`, or `refactor/...`
 - **Create at Phase 2B**: `git checkout -b feature/[name] develop`
 - **Parallel tasks**: worktrees branched from feature branch — `feature/[name]/task-[N.0]`
-- **Merge order**: dependency order. Run `flutter test` + `flutter analyze` after each merge.
+- **Merge order**: dependency order. Run the test and typecheck/lint commands (from **Project Commands** in `.claude/config.md`) after each merge.
 - **Conflicts**: sonnet agent resolves. Ambiguous conflicts → escalate to user.
 - **After Phase 4**: do NOT merge into `develop`/`master`. User decides after `/verify` + `/review`.
 
@@ -238,7 +238,7 @@ For each parent task (independent in parallel, dependent when ready):
 
 ### 3.4 — Handle results
 
-- **Success**: merge worktree → feature branch, `flutter test` + `flutter analyze`, send status to monitor
+- **Success**: merge worktree → feature branch, run test + typecheck/lint commands (from **Project Commands** in `.claude/config.md`), send status to monitor
 - **Failure**: escalation ladder (below)
 - **Blocked**: notify user, continue independent tasks
 
@@ -265,7 +265,7 @@ Existing-code bugs (not agent-written code):
 ### Commit protocol
 
 Per parent task, when all sub-tasks pass:
-1. `flutter test` + `flutter analyze`
+1. Run test + typecheck/lint commands (from **Project Commands** in `.claude/config.md`)
 2. Green → merge worktree, stage specific files, commit (conventional format), mark parent `[x]`, update monitor, delete worktree branch
 3. Red → escalation ladder from L1
 
@@ -277,7 +277,7 @@ Agents do NOT add packages. On need:
 1. Agent pauses, reports to orchestrator (what, why, alternatives)
 2. Orchestrator evaluates
 3. If justified → present to user for approval
-4. Approved → `flutter pub add [package]`
+4. Approved → install the package using the project's package manager
 
 ### Usage limits
 
@@ -296,11 +296,11 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
 ### 4A — Wrap-up (MANDATORY — execute immediately, do not stop or ask)
 
-1. Run `flutter test` + `flutter analyze` (final full suite)
+1. Run test + typecheck/lint commands from **Project Commands** in `.claude/config.md` (final full suite)
 2. Mark ALL tasks and sub-tasks `[x]` in the task file (final sweep)
 3. Generate cycle report → `cycle_reports/[feature-name]-[YYYY-MM-DD].md`:
    - Summary (what was implemented, per parent task)
-   - Branch name, commits (hash + message), Supabase changes (or "none")
+   - Branch name, commits (hash + message), database/schema changes (or "none")
    - Bugs discovered, known limitations, blocked tasks, follow-up items
 4. Present cycle report to user inline
 5. Generate run report → `agent_tasks/reports/report-prd-[feature-name]-[YYYY-MM-DD].md` using template `.claude/skills/cycle/report-template.md`. **Agent Audit** section is required. If >10 reports exist, summarize oldest into `agent_tasks/agent_metrics.md`.
