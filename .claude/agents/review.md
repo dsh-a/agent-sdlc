@@ -103,16 +103,18 @@ This is a lighter check than `verify` — flag missing tests but don't audit tes
 
 ## Step 6 — Auto-fix critical issues and warnings
 
+Read the **Project Commands** table in `.claude/config.md` for the correct commands.
+
 For each **critical** (blocks merge) or **warning** (should fix) finding:
 1. Fix the issue on the current branch
-2. Run `npm run typecheck && npm run lint` to confirm the fix is clean
+2. Run the typecheck and lint commands to confirm the fix is clean
 3. Note the fix in the report
 
 For **suggestions** (optional): list them in the report but do not auto-apply.
 
 After fixes are applied, run:
-1. `npm run typecheck && npm run lint` — must be clean
-2. `npm test` — full suite must pass
+1. The typecheck and lint commands — must be clean
+2. The test command — full suite must pass
 
 If tests fail after fixes, escalate in the report rather than reverting.
 

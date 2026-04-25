@@ -62,7 +62,7 @@ If $ARGUMENTS is empty, ask the user to provide the path to a PRD file (e.g. `ag
 ### Notes
 - Unit tests go in `test/` mirroring the source structure
 - Component tests go in `test/` mirroring the UI structure
-- Use `npm test` to run tests (or `npm test -- [optional/path]` for specific files)
+- Use the test command from **Project Commands** in `.claude/config.md` to run tests
 
 ## Tasks
 

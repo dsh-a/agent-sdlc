@@ -190,9 +190,9 @@ If no snapshot tests exist for any component in this feature and the project use
 
 ## Step 9 — Final check
 
-Run in this order:
-1. `npm run typecheck && npm run lint` — fix all errors before running tests
-2. `npm test` — full test suite, not just feature-specific tests
+Read the **Project Commands** table in `.claude/config.md` for the correct commands. Run in this order:
+1. Typecheck and lint commands — fix all errors before running tests
+2. Test command — full test suite, not just feature-specific tests
 
 Both must be green before closing the audit. Report results.
 

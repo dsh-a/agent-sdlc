@@ -32,7 +32,7 @@ Focus on these attack vectors:
 
 For each gap found:
 1. Write a new test that captures it
-2. Run it with `npm test -- <test_file_path>`
+2. Run it with the test command from **Project Commands** in `.claude/config.md` (e.g., `npm test -- <test_file_path>`)
 3. Report whether the implementation handles it correctly or fails
 
 If the implementation fails: note it as a gap requiring attention (do not fix the implementation — report it).

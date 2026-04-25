@@ -1,6 +1,7 @@
 # Command Pattern
 
 > **Type**: template
+> **Note**: Code examples and file paths are shown in TypeScript — adapt to your project's language and conventions.
 
 ## When to use
 

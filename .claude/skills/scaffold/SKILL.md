@@ -79,8 +79,8 @@ Present the files to create and modify. Wait for user approval before writing co
 - Wire into DI / module registration
 
 ### Verify
-- `npm run typecheck && npm run lint`
-- Run codegen if schema was modified (`npm run codegen`)
+- Run typecheck and lint commands (from **Project Commands** in `.claude/config.md`)
+- Run the codegen command if schema was modified (if configured in **Project Commands**)
 - List remaining steps (tests, API endpoints, UI)
 
 ---
@@ -103,7 +103,7 @@ Services wrap infrastructure concerns (auth, external APIs, platform features).
 Follow the project's DI / module registration pattern.
 
 ### Verify
-- `npm run typecheck && npm run lint`
+- Run typecheck and lint commands (from **Project Commands** in `.claude/config.md`)
 - List remaining steps
 
 ---
@@ -127,7 +127,7 @@ Repositories abstract data access behind interfaces.
 Follow the project's DI / module registration pattern.
 
 ### Verify
-- `npm run typecheck && npm run lint`
+- Run typecheck and lint commands (from **Project Commands** in `.claude/config.md`)
 - List remaining steps
 
 ---
@@ -151,7 +151,7 @@ Controllers handle incoming requests and coordinate responses.
 Register routes following the project's routing pattern.
 
 ### Verify
-- `npm run typecheck && npm run lint`
+- Run typecheck and lint commands (from **Project Commands** in `.claude/config.md`)
 - List remaining steps
 
 ---
@@ -175,13 +175,13 @@ Follow the project's UI conventions (read `.claude/config.md` Pattern Compliance
 - Wire state management into DI if needed
 
 ### Verify
-- `npm run typecheck && npm run lint`
+- Run typecheck and lint commands (from **Project Commands** in `.claude/config.md`)
 - List remaining steps (tests, additional wiring)
 
 ---
 
 ## Final step (all types)
 
-- Run `npm run typecheck && npm run lint`
+- Run typecheck and lint commands (from **Project Commands** in `.claude/config.md`)
 - Confirm everything compiles cleanly
 - List remaining steps the user needs (tests, additional wiring, database migrations)

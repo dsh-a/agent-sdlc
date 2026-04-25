@@ -1,6 +1,6 @@
 # agent-sdlc
 
-A Claude Code agent team for autonomous feature development on TypeScript projects. Drop these agents and skills into your project's `.claude/` directory and get a full SDLC pipeline — from feature idea to tested, reviewed PR — driven by `/cycle`.
+A Claude Code agent team for autonomous feature development. Drop these agents and skills into your project's `.claude/` directory and get a full SDLC pipeline — from feature idea to tested, reviewed PR — driven by `/cycle`.
 
 ---
 
@@ -41,32 +41,23 @@ A Claude Code agent team for autonomous feature development on TypeScript projec
 cp -r .claude/ /path/to/your-project/.claude/
 ```
 
-### 2. Add required npm scripts
+### 2. Configure your build commands
 
-All agents use **npm scripts** as an abstraction layer — they never call test runners, linters, or type checkers directly. This means you can use any toolchain (Jest/Vitest/Mocha, ESLint/Biome, tsc/swc, etc.) by configuring your `package.json`:
+Agents run your project's tests, linter, and type checker via the commands in `.claude/config.md` → **Project Commands**. The defaults assume an npm-based JavaScript/TypeScript project — update them to match your toolchain:
 
-```json
-{
-  "scripts": {
-    "test": "jest",
-    "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
-    "codegen": "prisma generate"
-  }
-}
+```markdown
+| Purpose | Command |
+| Run all tests | `pytest` |
+| Run specific test file | `pytest <path>` |
+| Type check | `mypy src/` |
+| Lint | `ruff check .` |
 ```
 
-Agents will run these via:
-- `npm test` / `npm test -- <path>` — run tests (all or specific file)
-- `npm run lint` — run linter
-- `npm run typecheck` — run type checker
-- `npm run codegen` — run code generation (if applicable)
-
-The `codegen` script is optional — only needed if your project uses code generation (Prisma, GraphQL codegen, etc.).
+The included defaults (`npm test`, `npm run typecheck`, `npm run lint`) work out of the box for any JavaScript/TypeScript project. For other languages, update the **Project Commands** table in `.claude/config.md` and the **Bash permission patterns** in `.claude/settings.json` to match.
 
 ### 3. Review permissions
 
-The included `.claude/settings.json` pre-allows the Bash command patterns that agents need:
+The included `.claude/settings.json` pre-allows the Bash command patterns that agents need. The defaults target npm-based projects:
 
 ```json
 {
@@ -75,21 +66,16 @@ The included `.claude/settings.json` pre-allows the Bash command patterns that a
       "Bash(npm test*)",
       "Bash(npm run *)",
       "Bash(npm install*)",
-      "Bash(npx *)",
-      "Bash(git *)",
-      "Bash(gh pr*)",
-      "Bash(gh api*)",
-      "Bash(ls *)",
-      "Bash(rm agent_states/*)"
+      ...
     ]
   }
 }
 ```
 
-This means agents won't prompt you for permission every time they run tests or check types. Review and adjust these patterns to match your security preferences:
+If your project uses a different toolchain, update these patterns to match (e.g., replace `Bash(npm test*)` with `Bash(pytest*)` for Python). Review and adjust for your security preferences:
 
-- **Remove** patterns you don't want auto-allowed (e.g., `Bash(npm install*)` if you want to approve every dependency addition)
-- **Add** patterns for project-specific commands (e.g., `Bash(docker compose*)` if agents need to manage containers)
+- **Remove** patterns you don't want auto-allowed
+- **Add** patterns for project-specific commands (e.g., `Bash(docker compose*)`)
 
 ### 4. Conventions
 
@@ -231,25 +217,21 @@ The primary customization point is `.claude/config.md` — run `/setup` to gener
 | Scaffold patterns for your project | `.claude/agents/scaffold/` (create pattern files) |
 | Test conventions (mocking, frameworks) | `.claude/agents/test.md` |
 | Branch strategy | `.claude/skills/cycle/SKILL.md` → Branch strategy |
-| npm script names | `package.json` (agents use `npm test`, `npm run lint`, etc.) |
+| Build commands (test, lint, typecheck) | `.claude/config.md` → Project Commands |
 
 ### Customizing commands
 
-All agent commands use **npm scripts as an abstraction layer**. To change what tool runs under the hood:
+All agent commands read from the **Project Commands** table in `.claude/config.md`. To change what runs for tests, linting, type checking, or code generation:
 
-| To change... | Update in `package.json` | Example |
-|---|---|---|
-| Test runner | `"test"` script | `"test": "vitest"` instead of `"test": "jest"` |
-| Linter | `"lint"` script | `"lint": "biome check ."` instead of `"lint": "eslint ."` |
-| Type checker | `"typecheck"` script | `"typecheck": "swc --check"` or keep `"tsc --noEmit"` |
-| Code generator | `"codegen"` script | `"codegen": "graphql-codegen"` or remove if unused |
+1. Update the **Project Commands** table in `.claude/config.md`
+2. Update the Bash permission patterns in `.claude/settings.json` to match
 
-No agent or skill files need to change — they all call `npm test`, `npm run lint`, etc.
+No agent or skill files need to change — they all read commands from `config.md`.
 
 ### Customizing permissions
 
 Edit `.claude/settings.json` to control which commands agents can run without prompting:
 
-- Add patterns for project-specific tools: `"Bash(docker *)"`
-- Remove patterns you want to approve manually: remove `"Bash(npm install*)"`
+- Add patterns for project-specific tools: `"Bash(docker compose*)"`
+- Remove patterns you want to approve manually
 - The patterns use glob matching — `*` matches any suffix

@@ -154,7 +154,7 @@ Snapshot tests capture rendered output and compare against a blessed baseline. T
 
 **Snapshot file location:** check the project's existing pattern (e.g., `__snapshots__/`, `test/snapshots/`).
 
-**Update snapshots:** `npm test -- --updateSnapshot <test_file>` (or framework equivalent)
+**Update snapshots:** run the test command with the framework's update flag (e.g., `--updateSnapshot` for Jest/Vitest) — or the framework equivalent
 
 **Important:** Never auto-update snapshots. Always present the update command to the user and let them review the changes. Snapshot updates are a visual approval gate.
 
@@ -227,10 +227,10 @@ Integration tests are **not run by the pre-commit hook or CI by default** — th
 Run validation in this order:
 
 ### 1. Static analysis first
-Run `npm run typecheck && npm run lint`. Fix all errors and warnings before running tests. A test that compiles is not the same as a test that is correct.
+Run the typecheck and lint commands from **Project Commands** in `.claude/config.md`. Fix all errors and warnings before running tests. A test that compiles is not the same as a test that is correct.
 
 ### 2. Full test suite
-Run `npm test` — not just the new test file — to catch regressions in existing tests. Fix any failures before proceeding.
+Run the test command — not just the new test file — to catch regressions in existing tests. Fix any failures before proceeding.
 
 ### 3. Adversarial second pass (subagent)
 
