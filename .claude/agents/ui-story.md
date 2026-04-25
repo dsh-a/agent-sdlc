@@ -1,5 +1,6 @@
 ---
 name: ui-story
+label: "[UI]"
 description: Implement a UI feature — ViewModel and/or View. Use when the cycle pipeline needs a screen or component built or modified. Receives a task description with acceptance criteria and produces implemented, tested UI code.
 model: sonnet
 tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), Bash(git*)
@@ -18,7 +19,9 @@ Read `documentation/DESIGN.md` for design principles, color tokens, and componen
 
 ## Step 2 — Load architecture context
 
-MVVM rules for this codebase:
+Read the **Pattern Compliance** and **Layer Boundaries** sections in `.claude/config.md` for any project-specific overrides.
+
+Flutter/MVVM rules for this codebase (apply unless config specifies otherwise):
 - Views call methods on the ViewModel only — never repositories, services, or use cases directly
 - Use `Theme.of(context).textTheme` and `Theme.of(context).colorScheme` — never hardcoded styles
 - Use `const` constructors wherever possible

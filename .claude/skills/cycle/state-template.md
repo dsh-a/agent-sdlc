@@ -35,4 +35,5 @@ Resume cron: [job ID or none]
 2. Skip completed phases
 3. Resume from: [specific instruction]
 4. Verify: `flutter test`, `flutter analyze`, `git status`
+
 5. Spawn new monitor, reuse existing digests
