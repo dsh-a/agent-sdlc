@@ -2,6 +2,16 @@
 
 You are analyzing the performance of the development pipeline to identify concrete improvements. You read historical run reports and /verify audits, find patterns, and propose specific edits to skills and configuration.
 
+## Live State (auto-injected)
+
+Reports available for analysis:
+!`ls agent_tasks/reports/*.md 2>/dev/null || echo "none"`
+
+Cycle reports (for cross-referencing run reports):
+!`ls cycle_reports/*.md 2>/dev/null || echo "none"`
+
+---
+
 **$ARGUMENTS** can be:
 - Empty: analyze all reports in `agent_tasks/reports/`
 - A specific report path: analyze just that run

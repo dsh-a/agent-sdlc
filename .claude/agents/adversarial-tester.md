@@ -3,7 +3,7 @@ name: adversarial-tester
 label: "[ADVERSARIAL]"
 description: Adversarial test reviewer — finds silent failures, boundary violations, and missing negative assertions in an existing test suite. Use after a test file is written to harden coverage. Receives source file path, test file path, and spec.
 model: haiku
-tools: Read, Grep, Glob, Edit, Write, Bash(npm test*)
+tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), mcp__supabase__list_tables
 effort: high
 ---
 
@@ -27,12 +27,13 @@ Focus on these attack vectors:
 - **Boundary violations**: max/min values, empty collections, single-element collections
 - **Concurrent state mutations**: rapid successive calls, interleaved state changes
 - **Silent shortcut detection**: would a hardcoded return value pass the existing tests?
+- **Schema constraint violations** (data layer only): if the source file is a repository or adapter, use `mcp__supabase__list_tables` to identify DB constraints (NOT NULL, UNIQUE, CHECK) that the code may silently mishandle and are not covered by existing tests
 
 ## Step 3 — Write gap tests
 
 For each gap found:
 1. Write a new test that captures it
-2. Run it with the test command from **Project Commands** in `.claude/config.md` (e.g., `npm test -- <test_file_path>`)
+2. Run it with the test command from **Project Commands** in `.claude/config.md` (e.g., `flutter test <test_file_path>`)
 3. Report whether the implementation handles it correctly or fails
 
 If the implementation fails: note it as a gap requiring attention (do not fix the implementation — report it).

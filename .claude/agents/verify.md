@@ -3,7 +3,7 @@ name: verify
 label: "[VERIFY]"
 description: Independent AC coverage audit. Evaluates whether the implementation and test suite genuinely satisfy the PRD's acceptance criteria. Use after a cycle completes to produce a verification report.
 model: sonnet
-tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*), Bash(npm test*), Bash(npm run *)
+tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*), Bash(flutter test*), Bash(flutter analyze*), mcp__supabase__list_tables
 effort: max
 ---
 
@@ -69,11 +69,12 @@ Read the code. Does it actually do what the criterion requires, or does it take 
 
 ## Step 4b — Scope creep audit
 
-1. Run `git diff develop --name-only` to list all files changed relative to the `develop` branch
+1. Run `git diff [base_branch] --name-only` to list all files changed relative to the base branch — read `base_branch` from the **Branch Configuration** table in `.claude/config.md` (default: `main`)
 2. For each changed file, determine whether the change is:
    - **In scope**: directly required by the PRD or a necessary side effect
    - **Out of scope**: refactors, dependency additions, unrelated bug fixes
 3. Flag out-of-scope changes — they're the primary source of agent-introduced regressions
+4. If any changed files are in `lib/data/`, use `mcp__supabase__list_tables` to verify the remote schema is consistent with the local Drift table definitions. Flag any mismatch as a schema drift finding.
 
 ---
 

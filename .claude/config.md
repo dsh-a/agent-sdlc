@@ -38,7 +38,7 @@ Active preset: **personal**
 | pre-digest | haiku | haiku | haiku |
 | orchestrator (/cycle) | opus | opus | opus |
 
-To override a single agent regardless of preset, change the value in that agent's row under the active preset column. The cycle orchestrator reads this table at Phase 3.3 to determine model assignments.
+To override a single agent regardless of preset, change the value in that agent's row under the active preset column. The cycle orchestrator reads this table for all agent spawns — implementation agents at Phase 3.3, pre-digest and monitor at Phase 3 start.
 
 ---
 
@@ -136,6 +136,12 @@ Describe your project's architectural patterns. The review agent checks that cha
 | feature_idea_on_empty | `true` | When /cycle has no args and no active state, offer to pull from FEATURES.md |
 
 
-## Branch Rules
-All created branches should be created with this naming convention.
-- <my-team>/TEAM-xxxx (jira ticket ID with prefix)
+## Branch Configuration
+
+| Field | Value |
+|---|---|
+| base_branch | main |
+| feature_branch_pattern | feature/[short-description] |
+| pr_target | main |
+
+Agents and skills read `base_branch` when running git diffs and creating PRs. Update `pr_target` if your team's PR flow targets a different branch than `base_branch`.

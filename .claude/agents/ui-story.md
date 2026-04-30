@@ -3,7 +3,7 @@ name: ui-story
 label: "[UI]"
 description: Implement a UI feature — ViewModel and/or View. Use when the cycle pipeline needs a screen or component built or modified. Receives a task description with acceptance criteria and produces implemented, tested UI code.
 model: sonnet
-tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), Bash(git*)
+tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), Bash(git*), mcp__ide__getDiagnostics, mcp__dart__analyze_files
 skills: scaffold
 ---
 
@@ -142,7 +142,7 @@ Golden files: `test/goldens/` mirroring the view path.
 
 ## Step 8 — Verify
 
-1. Run `flutter analyze` — fix all issues
+1. Run `flutter analyze` for the final suite check. For per-edit inline checks during implementation, prefer `mcp__ide__getDiagnostics` or `mcp__dart__analyze_files`. Fix all issues before proceeding.
 2. Run `flutter test <test_file_path>` — fix all failures
 
 ## Step 9 — Report

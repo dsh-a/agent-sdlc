@@ -33,10 +33,8 @@ Before creating anything:
 
 ## Step 3 — Load pattern (priority order, all types)
 
-Check `.claude/agents/scaffold/` for a matching pattern file:
-
-1. **Project-specific pattern** (`Type: project-specific`): Follow it — it reflects this project's actual conventions. Skip the generic sections below.
-2. **Default template** (`Type: template`): Use it as a starting point, but adapt to the project's codebase. The generic sections below provide additional guidance.
+1. **Project-specific pattern** (`Type: project-specific`): Check `.claude/agents/scaffold/` (excluding `templates/`) for a matching file. If found, follow it — it reflects this project's actual conventions. Skip the generic sections below.
+2. **Default template** (`Type: template`): Check `.claude/agents/scaffold/templates/` for a matching file. Use it as a starting point, but adapt to the project's codebase. The generic sections below provide additional guidance.
 3. **No pattern file**: Explore `lib/` — find 1-2 existing examples of the same type, read them, extract conventions.
 
 Also read `.claude/config.md` (Architecture Review Rules) for layer boundaries and pattern compliance.
