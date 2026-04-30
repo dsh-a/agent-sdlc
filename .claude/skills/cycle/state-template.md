@@ -15,7 +15,6 @@ Status: [active | paused | finished]
 - [ ] Phase 2 — Tasks ready, Gate 2 approved
 - [ ] Phase 3 — Implementation
 - [ ] Phase 4 — Completion
-- [ ] Phase 5 — Run report
 
 ## Parent task status
 | Task | Status | Model | Notes |
