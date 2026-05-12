@@ -40,6 +40,16 @@ Active preset: **personal**
 
 To override a single agent regardless of preset, change the value in that agent's row under the active preset column. The cycle orchestrator reads this table at Phase 3.3 to determine model assignments.
 
+### Model Versions
+
+Maps abstract model labels to specific model IDs. When the orchestrator spawns an agent with a label from the allocation table, it uses the version specified here.
+
+| Label | Model ID |
+|---|---|
+| opus | claude-opus-4-6 |
+| sonnet | claude-sonnet-4-6 |
+| haiku | claude-haiku-4-5-20251001 |
+
 ---
 
 ## Effort Allocation
