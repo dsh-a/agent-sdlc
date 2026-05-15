@@ -21,10 +21,11 @@ Read `.claude/skills/scaffold/pattern-template.md` for the required structure of
 
 ## Step 2 — Inventory existing pattern files
 
-Read all files in `.claude/agents/scaffold/`:
-- Files with `Type: template` are default templates shipped with agent-sdlc
-- Files with `Type: project-specific` are previously discovered patterns
-- Note which default templates have been replaced by project-specific files
+Read files in two locations:
+- `.claude/agents/scaffold/` (excluding `templates/`) — files with `Type: project-specific` are previously discovered patterns for this project
+- `.claude/agents/scaffold/templates/` — files with `Type: template` are default templates shipped with agent-sdlc
+
+Note which default templates have been superseded by a project-specific file (matched via the `Replaces` header).
 
 In `update` mode: also read the project-specific files to compare against current codebase state.
 
@@ -89,10 +90,10 @@ For each approved pattern:
 
 1. Read the 2+ example files identified in Step 3
 2. Extract the common template following the standard in `pattern-template.md`
-3. Write to `.claude/agents/scaffold/<pattern-name>.md`
+3. Write to `.claude/agents/scaffold/<pattern-name>.md` (never write into `templates/`)
 4. If this pattern matches a default template, set `Replaces: <template-name>` in the header
 
-Do NOT delete default template files. Project-specific files take priority via the `Replaces` header.
+Do NOT modify files in `.claude/agents/scaffold/templates/` — that directory is a symlink to the framework repo and is read-only. Project-specific files in the parent directory take priority via the `Replaces` header.
 
 ## Step 6 — Summary
 

@@ -17,7 +17,7 @@ Before anything else, check if this feature already has a story in `documentatio
 2. If a matching story exists (by number or title):
    - Read the full story section from ROADMAP.md
    - Present to the user: "This matches **Story [X.Y]: [title]** (status: [status]). It already has acceptance criteria and context. Would you like to use the roadmap story as the basis for this PRD, or start fresh?"
-   - If the user chooses roadmap basis: **pre-populate** the PRD with the roadmap story's AC, Supabase notes, special considerations, and dependencies. Ask the user to review and augment rather than re-derive everything from scratch.
+   - If the user chooses roadmap basis: **pre-populate** the PRD with the roadmap story's AC, technical notes, special considerations, and dependencies. Ask the user to review and augment rather than re-derive everything from scratch.
    - If the user chooses fresh: proceed normally but note the roadmap story as a reference in Technical Considerations.
 3. If no matching story exists: proceed normally.
 
@@ -75,7 +75,7 @@ Based on the initial prompt, answers, and any roadmap context, generate a PRD us
 5. **Acceptance Criteria** — See AC format rules below. This is the most important section — it drives tests, verification, and implementation quality.
 6. **Non-Goals (Out of Scope)** — What this feature will *not* include
 7. **Design Considerations** (optional) — Mockups, UI/UX requirements, relevant components/styles
-8. **Technical Considerations** (optional) — Known constraints, dependencies, Supabase schema notes, suggestions
+8. **Technical Considerations** (optional) — Known constraints, dependencies, database/schema notes, suggestions
 9. **Success Metrics** — How success will be measured
 10. **Open Questions** — Remaining questions or areas needing clarification
 

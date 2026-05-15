@@ -2,6 +2,16 @@
 
 You are analyzing the performance of the development pipeline to identify concrete improvements. You read historical run reports and /verify audits, find patterns, and propose specific edits to skills and configuration.
 
+## Live State (auto-injected)
+
+Reports available for analysis:
+!`ls agent_tasks/reports/*.md 2>/dev/null || echo "none"`
+
+Cycle reports (for cross-referencing run reports):
+!`ls cycle_reports/*.md 2>/dev/null || echo "none"`
+
+---
+
 **$ARGUMENTS** can be:
 - Empty: analyze all reports in `agent_tasks/reports/`
 - A specific report path: analyze just that run
@@ -78,7 +88,7 @@ For each finding, produce a specific, actionable recommendation. Each recommenda
 scaffold row from `haiku` to `sonnet`.
 
 **Evidence**: Across 4 runs, haiku scaffold failed 3/8 times (37.5%).
-Failures were all related to Drift generic type resolution. Sonnet
+Failures were all related to complex generic type resolution. Sonnet
 succeeded on retry in all 3 cases with no rework.
 - report-login-2026-03-15.md: task 1.2 escalated
 - report-settings-2026-03-22.md: tasks 1.1, 2.3 escalated

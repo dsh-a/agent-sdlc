@@ -38,5 +38,5 @@ Add the entry to FEATURES.md in the confirmed location and format. Do not alter 
 Ask the user: "Would you like to start the development cycle for this feature?"
 
 - **If yes (full cycle)**: suggest the user run `/cycle [feature description]` in a new conversation, using what you've captured here as the starting context. `/cycle` will handle PRD creation, task generation, and implementation.
-- **If yes (PRD only)**: follow the process in `.claude/skills/create-prd.md` using what you've already captured — do not ask questions already answered.
+- **If yes (PRD only)**: follow the process in `.claude/skills/create-prd/SKILL.md` using what you've already captured — do not ask questions already answered.
 - **If no**: confirm the idea has been saved and stop.

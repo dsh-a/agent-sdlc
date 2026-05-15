@@ -3,7 +3,7 @@ name: scaffold
 label: "[SCAFFOLD]"
 description: Scaffold new components — syncable entities, local-only entities, use cases, facades, services, or ViewModel+View pairs. Use when the cycle pipeline needs a new component created end-to-end including DI wiring and codegen.
 model: sonnet
-tools: Read, Grep, Glob, Edit, Write, Bash(flutter pub run build_runner*), Bash(flutter analyze*)
+tools: Read, Grep, Glob, Edit, Write, Bash(flutter pub run build_runner*), Bash(flutter analyze*), mcp__ide__getDiagnostics, mcp__dart__analyze_files
 effort: medium
 ---
 
@@ -21,9 +21,9 @@ Inspect your task context for what to scaffold:
 |---|---|---|
 | **Syncable entity** | "entity", "model", or a noun implying a data object | `.claude/agents/scaffold/syncable-entity.md` |
 | **Local-only entity** | "local entity", "local model", or explicitly no sync | `.claude/agents/scaffold/local-entity.md` |
-| **Use case** | "use case" or a verb phrase | `.claude/agents/scaffold/use-case.md` |
-| **Facade** | "facade" | `.claude/agents/scaffold/facade.md` |
-| **Service** | "service" | `.claude/agents/scaffold/service.md` |
+| **Use case** | "use case" or a verb phrase | `.claude/agents/scaffold/templates/use-case.md` |
+| **Facade** | "facade" | `.claude/agents/scaffold/templates/facade.md` |
+| **Service** | "service" | `.claude/agents/scaffold/templates/service.md` |
 | **ViewModel + View** | "view", "screen", "page" | `.claude/agents/scaffold/view-model-view.md` |
 
 ## Step 2 — Check for conflicts
@@ -34,8 +34,8 @@ Before creating anything:
 
 ## Step 3 — Load pattern (priority order)
 
-1. **Project-specific pattern**: Check `.claude/agents/scaffold/` for a file with `Type: project-specific` matching the scaffold type. If found, use it — it reflects this project's actual conventions.
-2. **Default pattern**: If no project-specific pattern exists, use the default pattern file from the table in Step 1.
+1. **Project-specific pattern**: Check `.claude/agents/scaffold/` (excluding `templates/`) for a file with `Type: project-specific` matching the scaffold type. If found, use it — it reflects this project's actual conventions.
+2. **Default template**: If no project-specific pattern exists, check `.claude/agents/scaffold/templates/` for the default pattern file from the table in Step 1.
 3. **Codebase exploration**: If no pattern file matches, explore `lib/` for 1–2 existing examples of the same component type and extract conventions.
 
 Also read the **Architecture Review Rules** in `.claude/config.md` for layer boundaries and pattern compliance.
@@ -55,11 +55,10 @@ Follow all instructions in the loaded pattern file exactly.
 
 After completing all steps in the pattern file:
 
-1. Run `flutter analyze` and fix all issues
+1. Run `flutter analyze` for the final suite check. For per-edit inline checks during scaffolding, prefer `mcp__ide__getDiagnostics` or `mcp__dart__analyze_files`. Fix all issues before reporting.
 2. Run `flutter pub run build_runner build --delete-conflicting-outputs` if Drift tables were modified
 3. Return a report covering:
    - Files created and modified
    - DI wiring added
    - Codegen status
-   - Any Supabase SQL that requires user approval (paste full SQL)
    - Remaining steps (tests, route wiring, etc.)

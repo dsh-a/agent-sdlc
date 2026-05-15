@@ -13,8 +13,8 @@ The feature branch or PR to review: **$ARGUMENTS**
 Current branch:
 !`git branch --show-current`
 
-Changed files vs master:
-!`git diff --name-only master...HEAD 2>/dev/null | head -20`
+Changed files vs base branch:
+!`git diff --name-only $(grep '| base_branch |' .claude/config.md 2>/dev/null | awk -F'|' '{gsub(/ /,"",$3); print $3}' | head -1 || echo main)...HEAD 2>/dev/null | head -20`
 
 If $ARGUMENTS is empty, ask the user for a branch name or PR number.
 
@@ -22,7 +22,7 @@ If $ARGUMENTS is empty, ask the user for a branch name or PR number.
 
 ## Step 1 — Gather the changeset
 
-- If given a branch: `git diff develop...[branch]` to see all changes
+- If given a branch: `git diff [base_branch]...[branch]` — read `base_branch` from the **Branch Configuration** table in `.claude/config.md`
 - If given a PR number: use `gh pr diff [number]`
 - Catalog every file changed, added, or deleted
 - Read the associated PRD (search `agent_tasks/` by feature name) for context on what was intended

@@ -40,7 +40,6 @@ Status: [active | paused | finished]
 - [ ] Phase 2 — Tasks ready, Gate 2 approved
 - [ ] Phase 3 — Implementation
 - [ ] Phase 4 — Completion
-- [ ] Phase 5 — Run report
 
 ## Parent task status
 | Task | Status | Model | Notes |
@@ -59,7 +58,7 @@ Resume cron: [job ID or none]
 1. Read this file + all digests in `agent_states/digests/`
 2. Skip completed phases
 3. Resume from: [specific instruction]
-4. Verify: `flutter test`, `flutter analyze`, `git status`
+4. Verify: run test and typecheck/lint commands from **Project Commands** in `.claude/config.md`, then `git status`
 5. Spawn new monitor, reuse existing digests
 ```
 
