@@ -38,7 +38,7 @@ Active preset: **personal**
 | pre-digest | haiku | haiku | haiku |
 | orchestrator (/cycle) | opus | opus | opus |
 
-To override a single agent regardless of preset, change the value in that agent's row under the active preset column. The cycle orchestrator reads this table at Phase 3.3 to determine model assignments.
+To override a single agent regardless of preset, change the value in that agent's row under the active preset column. The cycle orchestrator reads this table for all agent spawns — implementation agents at Phase 3.3, pre-digest and monitor at Phase 3 start.
 
 ### Model Versions
 
@@ -75,10 +75,25 @@ Agents spawned during Phase 4A. Set to `skip` to disable.
 
 | Agent | Status |
 |---|---|
-| verify | skip |
-| review | skip |
+| verify | enabled |
+| review | enabled |
 
 When enabled, these agents run autonomously during Phase 4A and their reports are included in the cycle report. When set to `skip`, the cycle recommends running them manually in separate conversations.
+
+---
+
+## Project Commands
+
+Agents run these commands to test, lint, and generate code. Update to match your project's toolchain.
+
+| Purpose | Command |
+|---|---|
+| Run all tests | `flutter test` |
+| Run specific test file | `flutter test <path>` |
+| Analyze / lint | `flutter analyze` |
+| Code generation | `flutter pub run build_runner build --delete-conflicting-outputs` |
+
+The `Code generation` command is optional — remove it if your project has no code generation step.
 
 ---
 
@@ -131,6 +146,12 @@ Describe your project's architectural patterns. The review agent checks that cha
 | feature_idea_on_empty | `true` | When /cycle has no args and no active state, offer to pull from FEATURES.md |
 
 
-## Branch Rules
-All created branches should be created with this naming convention.
-- <my-team>/TEAM-xxxx (jira ticket ID with prefix)
+## Branch Configuration
+
+| Field | Value |
+|---|---|
+| base_branch | main |
+| feature_branch_pattern | feature/[short-description] |
+| pr_target | main |
+
+Agents and skills read `base_branch` when running git diffs and creating PRs. Update `pr_target` if your team's PR flow targets a different branch than `base_branch`.

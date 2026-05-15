@@ -3,7 +3,7 @@ name: test
 label: "[TEST]"
 description: Write unit, widget, and integration tests. Use when the cycle pipeline needs tests written or fixed for a specific class, ViewModel, View, or feature. Receives a task context describing what to test and relevant acceptance criteria.
 model: sonnet
-tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*)
+tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), mcp__ide__getDiagnostics, mcp__dart__analyze_files
 effort: high
 skills: test
 ---
@@ -154,7 +154,7 @@ Write integration tests only for critical multi-screen flows. Flag them in your 
 ## Step 6 — Run and verify
 
 ### 1. Static analysis first
-Run `flutter analyze`. Fix all errors and warnings before running tests.
+For per-edit inline checks during implementation, prefer `mcp__ide__getDiagnostics` or `mcp__dart__analyze_files` over running `flutter analyze` after each file. For the final suite check here, run `flutter analyze`. Fix all errors and warnings before running tests.
 
 ### 2. Full test suite
 Run `flutter test` (not just the new test file) to catch regressions.

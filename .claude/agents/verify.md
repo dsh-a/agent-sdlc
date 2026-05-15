@@ -3,7 +3,7 @@ name: verify
 label: "[VERIFY]"
 description: Independent AC coverage audit. Evaluates whether the implementation and test suite genuinely satisfy the PRD's acceptance criteria. Use after a cycle completes to produce a verification report.
 model: sonnet
-tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*), Bash(flutter test*), Bash(flutter analyze*)
+tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*), Bash(flutter test*), Bash(flutter analyze*), mcp__supabase__list_tables
 effort: max
 ---
 
@@ -69,11 +69,12 @@ Read the code. Does it actually do what the criterion requires, or does it take 
 
 ## Step 4b — Scope creep audit
 
-1. Run `git diff develop --name-only` to list all files changed relative to the `develop` branch
+1. Run `git diff [base_branch] --name-only` to list all files changed relative to the base branch — read `base_branch` from the **Branch Configuration** table in `.claude/config.md` (default: `main`)
 2. For each changed file, determine whether the change is:
    - **In scope**: directly required by the PRD or a necessary side effect
    - **Out of scope**: refactors, dependency additions, unrelated bug fixes
 3. Flag out-of-scope changes — they're the primary source of agent-introduced regressions
+4. If any changed files are in `lib/data/`, use `mcp__supabase__list_tables` to verify the remote schema is consistent with the local Drift table definitions. Flag any mismatch as a schema drift finding.
 
 ---
 
@@ -83,7 +84,7 @@ Read the code. Does it actually do what the criterion requires, or does it take 
 
 | # | Acceptance Criterion | Test File | Test Name | Verdict |
 |---|---|---|---|---|
-| 1 | [criterion] | file.dart:45 | `test name` | PASS |
+| 1 | [criterion] | file.test.ts:45 | `test name` | PASS |
 
 Verdicts:
 - **PASS** — criterion is tested and the test is robust
@@ -121,38 +122,41 @@ For each non-PASS verdict, provide a specific actionable fix:
 
 If the PRD includes non-functional requirements (performance, security, observability):
 - Are there tests or assertions for these?
-- Does the implementation use `Logger`, proper error handling, and null safety?
+- Does the implementation use proper logging, error handling, and null/undefined safety?
 - Any obvious security issues (hardcoded values, missing validation at system boundaries)?
 
 Add findings under a "Non-Functional" section.
 
 ---
 
-## Step 7 — Live widget tree verification (if app is running)
+## Step 7 — Live application verification (if available)
 
-If the app is connected via Dart MCP tools:
+If the application is running and accessible (e.g., via a dev server, browser, or connected tooling):
 
-1. Use `mcp__dart__get_widget_tree` to inspect each relevant screen
-2. For each UI-facing AC, check whether expected widgets are present
-3. Use `mcp__dart__get_runtime_errors` to check for runtime errors
+1. Check each UI-facing AC by inspecting the running application
+2. Verify expected elements are present and interactive
+3. Check for runtime errors in the console or error reporting
 
-Add a "Live Verification" section with findings. If no app is running, note: "Live widget tree verification skipped — no running app connected."
+Add a "Live Verification" section with findings. If no running app is available, note: "Live verification skipped — no running app connected."
 
 ---
 
-## Step 8 — Golden test review
+## Step 8 — Snapshot / visual regression test review
 
-Check `test/goldens/` for golden files related to this feature's views:
-- Note which views have golden coverage and which don't
-- Check whether golden tests are passing
-- If missing, add to Recommendations
+Check for snapshot or visual regression tests related to this feature's UI components. Common locations: `__snapshots__/`, `test/snapshots/`, `test/goldens/`, or framework-specific snapshot directories.
+
+- Note which views/components have snapshot coverage and which don't
+- Check whether snapshot tests are passing
+- If missing and the project uses snapshot testing, add to Recommendations
 
 ---
 
 ## Step 9 — Run final checks
 
-1. `flutter analyze` — report results
-2. `flutter test` — full suite, not just feature tests — report results
+Read the **Project Commands** table in `.claude/config.md` for the correct commands.
+
+1. Run the typecheck and lint commands — report results
+2. Run the test command (full suite, not just feature tests) — report results
 
 Both must be green before closing. Report if either is red.
 

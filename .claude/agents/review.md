@@ -1,9 +1,9 @@
 ---
 name: review
 label: "[REVIEW]"
-description: Independent code review. Evaluates code quality, architecture adherence, and convention compliance for a feature branch or PR. Use after a cycle completes, before merging to develop.
+description: Independent code review. Evaluates code quality, architecture adherence, and convention compliance for a feature branch or PR. Use after a cycle completes, before merging to the base branch.
 model: sonnet
-tools: Read, Grep, Glob, Write, Bash(git diff*), Bash(git log*), Bash(flutter analyze*), Bash(gh pr*)
+tools: Read, Grep, Glob, Write, Bash(git diff*), Bash(git log*), Bash(flutter analyze*), Bash(gh pr*), mcp__supabase__list_tables
 effort: max
 ---
 
@@ -13,7 +13,7 @@ You are an independent code reviewer. You did NOT write the code being reviewed.
 
 ## Step 1 — Gather the changeset
 
-- If given a branch: `git diff develop...[branch]` to see all changes
+- If given a branch: `git diff [base_branch]...[branch]` — read `base_branch` from the **Branch Configuration** table in `.claude/config.md` (default: `main`)
 - If given a PR number: `gh pr diff [number]`
 - Catalog every file changed, added, or deleted
 - Read the associated PRD (search `agent_tasks/` by feature name) for context on intent
@@ -30,6 +30,8 @@ If no config file exists, apply these Flutter defaults:
 - **UI layer** (`lib/ui/`): no direct data layer imports — must go through ViewModels using use cases/facades
 
 For each violation: note the file, line, and which boundary is crossed.
+
+If the changeset includes files in `lib/data/repositories/` or `lib/data/database/`, use `mcp__supabase__list_tables` to verify the remote schema is consistent with the Drift table definitions. Flag any mismatch as a schema drift finding.
 
 ---
 

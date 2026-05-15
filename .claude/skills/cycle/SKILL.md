@@ -19,6 +19,8 @@ When passing `model:` to Agent calls, resolve the label (opus/sonnet/haiku) thro
 Active cycle states:
 !`ls agent_states/cycle-state-*.md 2>/dev/null || echo "none"`
 
+**Janitor check**: for each state file listed above, check whether a matching cycle report already exists in `cycle_reports/` (match by feature name substring). If a match exists, the cycle completed without sending `FINALIZE` — delete the state file now and do not offer to resume it.
+
 Recent cycle reports:
 !`ls cycle_reports/*.md 2>/dev/null | tail -5 || echo "none"`
 
@@ -69,14 +71,14 @@ Before spawning a named implementation agent, optionally spawn a **haiku** agent
 
 ## Branch strategy
 
-All work on feature branches, never `develop` or `master`.
+All work on feature branches, never directly on the base branch.
 
-- **Naming**: `feature/[story-number]-[short-description]`, `fix/...`, or `refactor/...`
-- **Create at Phase 2B**: `git checkout -b feature/[name] develop`
+- **Naming**: read `feature_branch_pattern` from the **Branch Configuration** table in `.claude/config.md`. Default: `feature/[short-description]`, `fix/...`, or `refactor/...`
+- **Create at Phase 2B**: `git checkout -b feature/[name] [base_branch]` — where `[base_branch]` is the `base_branch` value from `.claude/config.md`
 - **Parallel tasks**: worktrees branched from feature branch — `feature/[name]/task-[N.0]`
-- **Merge order**: dependency order. Run `flutter test` + `flutter analyze` after each merge.
+- **Merge order**: dependency order. Run the test and typecheck/lint commands (from **Project Commands** in `.claude/config.md`) after each merge.
 - **Conflicts**: sonnet agent resolves. Ambiguous conflicts → escalate to user.
-- **After Phase 4**: do NOT merge into `develop`/`master`. User decides after `/verify` + `/review`.
+- **After Phase 4**: do NOT merge into the base branch. User decides after `/verify` + `/review`.
 
 ---
 
@@ -180,7 +182,7 @@ Agent(subagent_type: "general-purpose", model: "sonnet", run_in_background: true
 
 Run this in the background — it does not block Phase 3 from continuing. Scaffold agents spawned later will pick up the pattern files once they exist.
 
-Spawn monitor agent (haiku, background) with feature name and state file path.
+Spawn monitor agent (model: monitor row from **Model Allocation** table in `.claude/config.md`, background) with feature name and state file path.
 
 ### 3.2 — Dependency analysis
 
@@ -201,7 +203,7 @@ For each parent task (independent in parallel, dependent when ready):
 1. **Pre-digest** (haiku, background) — **default for any task touching ≥ 2 existing files**. Reads relevant source files and returns a ~150-line structured summary (public API, constructor deps, key patterns). Skip only if the task creates all-new files or a digest was already saved.
 
    ```
-   Agent(model: "haiku", run_in_background: true,
+   Agent(model: "[pre-digest model from Model Allocation table in .claude/config.md]", run_in_background: true,
          prompt: "Read these files and return a ~150-line structured summary
                   covering: public API (class names, method signatures, constructor
                   deps), key patterns, and anything an implementer needs to know.
@@ -240,7 +242,7 @@ For each parent task (independent in parallel, dependent when ready):
 
 ### 3.4 — Handle results
 
-- **Success**: merge worktree → feature branch, `flutter test` + `flutter analyze`, send status to monitor
+- **Success**: merge worktree → feature branch, run test + typecheck/lint commands (from **Project Commands** in `.claude/config.md`), send status to monitor
 - **Failure**: escalation ladder (below)
 - **Blocked**: notify user, continue independent tasks
 
@@ -267,7 +269,7 @@ Existing-code bugs (not agent-written code):
 ### Commit protocol
 
 Per parent task, when all sub-tasks pass:
-1. `flutter test` + `flutter analyze`
+1. Run test + typecheck/lint commands (from **Project Commands** in `.claude/config.md`)
 2. Green → merge worktree, stage specific files, commit (conventional format), mark parent `[x]`, update monitor, delete worktree branch
 3. Red → escalation ladder from L1
 
@@ -279,7 +281,7 @@ Agents do NOT add packages. On need:
 1. Agent pauses, reports to orchestrator (what, why, alternatives)
 2. Orchestrator evaluates
 3. If justified → present to user for approval
-4. Approved → `flutter pub add [package]`
+4. Approved → install the package using the project's package manager
 
 ### Usage limits
 
@@ -296,13 +298,13 @@ Signals: explicit warnings, tool failures, truncation, very long session.
 
 Two parts: **4A** runs immediately with no user interaction. **4B** runs when the user returns after verify/review (or says to proceed now).
 
-### 4A — Wrap-up (MANDATORY — execute immediately, do not stop or ask)
+### 4A — Wrap-up (MANDATORY — execute immediately, do not stop or ask; step 7 MUST execute even if the user skips 4B)
 
-1. Run `flutter test` + `flutter analyze` (final full suite)
+1. Run test + typecheck/lint commands from **Project Commands** in `.claude/config.md` (final full suite)
 2. Mark ALL tasks and sub-tasks `[x]` in the task file (final sweep)
 3. Generate cycle report → `cycle_reports/[feature-name]-[YYYY-MM-DD].md`:
    - Summary (what was implemented, per parent task)
-   - Branch name, commits (hash + message), Supabase changes (or "none")
+   - Branch name, commits (hash + message), database/schema changes (or "none")
    - Bugs discovered, known limitations, blocked tasks, follow-up items
 4. Present cycle report to user inline
 5. Generate run report → `agent_tasks/reports/report-prd-[feature-name]-[YYYY-MM-DD].md` using template `.claude/skills/cycle/report-template.md`. **Agent Audit** section is required. If >10 reports exist, summarize oldest into `agent_tasks/agent_metrics.md`.
@@ -325,18 +327,28 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    Spawn both in parallel if both are enabled. Wait for completion and collect their reports.
 
-   Include verify and review summaries in the cycle report (step 3). If either agent returns critical issues or a non-PASS verdict, note them prominently and recommend the user address them before Phase 4B.
+   Include verify and review summaries in the cycle report (step 3). Then apply this gate before allowing 4B:
+
+   | Verify verdict | NO IMPL count | 4B gate |
+   |---|---|---|
+   | PASS | 0 | Proceed to 4B automatically |
+   | PARTIAL | 0 | Proceed — but present gaps and ask user to confirm before 4B |
+   | PARTIAL | > 0 | Block 4B — present unimplemented criteria, require user to fix or explicitly accept the gaps |
+   | FAIL | any | Block 4B — present failures, require fixes before release |
+
+   If `verify` was skipped, the gate does not apply — proceed to 4B but note: **"Verify was skipped — run `/verify` before merging."**
 
    If either agent is set to `skip` in config, do not spawn it. Instead recommend: **"Run `/verify` and/or `/review` in separate conversations, then return here for release."**
 
-**4A is not complete until steps 1–6 are done. Do not skip any step.**
+7. Tell monitor: `FINALIZE report:[path]` — this deletes the state file. **Do not skip.** The cycle may end here if the user handles the PR manually.
 
-### 4B — Release (after user returns or approves)
+**4A is not complete until steps 1–7 are done. Do not skip any step.**
 
-7. Push branch, `gh pr create` targeting `develop`
-8. Update roadmap (skip if cycle didn't originate from a roadmap story):
+### 4B — Release (after gate passes; user confirmation required for PARTIAL)
+
+8. Push branch, `gh pr create` targeting the `pr_target` from `.claude/config.md`
+9. Update roadmap (skip if cycle didn't originate from a roadmap story):
    - `documentation/ROADMAP.md`: set story Status to `DONE` in Story Index
    - Move story's full section to `documentation/roadmap_completed.md` under the appropriate Phase heading. Mark all AC `[x]`.
-9. Append changelog entry to `documentation/CHANGELOG.md`
-10. Tell monitor: `FINALIZE report:[path]`
+10. Append changelog entry to `documentation/CHANGELOG.md`
 
