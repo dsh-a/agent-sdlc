@@ -12,6 +12,8 @@ Feature or PRD: **$ARGUMENTS**
 
 Read `.claude/config.md` at startup for model allocation, effort settings, artifact paths, optional agent settings, and cycle options. Use these values throughout — do not use hardcoded defaults when the config file exists. If no config file exists, fall back to: sonnet for implementation agents, haiku for pre-digest and monitor, opus for orchestrator.
 
+When passing `model:` to Agent calls, resolve the label (opus/sonnet/haiku) through the **Model Versions** table in config.md. Pass the specific model ID (e.g. `claude-opus-4-6`) rather than the alias label. If no Model Versions table exists, pass the alias label as-is.
+
 ## Live Environment (auto-injected)
 
 Active cycle states:
