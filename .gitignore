@@ -416,5 +416,6 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+.DS_Store
 .claude/improvements.md
 improvements-plan.md
