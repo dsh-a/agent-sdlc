@@ -69,6 +69,8 @@ Separate worktree directories already give full isolation — each has its own w
 
 The orchestrator rewrites the task's "Relevant Files" paths to the worktree root before injecting them, so the agent is never handed a main-checkout path.
 
+**On `WORKTREE MISMATCH`** — if an agent aborts with this signal, the orchestrator sends `RESCUE worktree-mismatch [agent-id]: [short description] | resolution: [retry|escalate] | artifact: none` to monitor before proceeding via the escalation ladder.
+
 Named agents (`scaffold`, `ui-story`, `test`, etc.) have their model set in their definition. Pass `model:` only to override or for generic haiku agents (monitor, pre-digest).
 
 ### Agent labels
@@ -183,7 +185,7 @@ Approved → create feature branch, update state, Phase 3. Changes → apply, re
 
 ## Phase 3 — Implementation
 
-You delegate and track. You do not write code.
+You delegate and track. You do not write code. If you ever complete work that should have gone through an agent (e.g., applying a trivial fix to the feature branch yourself), emit `RESCUE manual-completion [task-id]: [what you did] | resolution: [why] | artifact: [commit hash or path]` to monitor — silent substitutions destroy the audit trail.
 
 ### 3.1 — Pre-flight
 
@@ -293,7 +295,7 @@ Agent(subagent_type: "general-purpose",
                Return the artifact path.")
 ```
 
-Record the stall as a rescue event in the cycle state and cycle report. Then: for a stalled `verify`/`review`, the `PARTIAL` report feeds the 4A gate; for a stalled implementation agent, proceed via the escalation ladder with the salvage assessment as the "what was attempted" context.
+Send `RESCUE stall [agent-id]: [agent role] stalled before finishing | resolution: ran Haiku salvage | artifact: [salvage report path]` to monitor. Then: for a stalled `verify`/`review`, the `PARTIAL` report feeds the 4A gate; for a stalled implementation agent, proceed via the escalation ladder with the salvage assessment as the "what was attempted" context.
 
 ### Bug tracking
 
@@ -344,7 +346,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    - Branch name, commits (hash + message), database/schema changes (or "none")
    - Bugs discovered, known limitations, blocked tasks, follow-up items
 4. Present cycle report to user inline
-5. Generate run report → `agent_tasks/reports/report-prd-[feature-name]-[YYYY-MM-DD].md` using template `.claude/skills/cycle/report-template.md`. **Agent Audit** and **Agent Telemetry** sections are required. For Agent Telemetry, read all files in `agent_states/events/` and aggregate one row per `agent_id` — fields: `agent_type`, tool-call count, breakdown by `tool`, error count (`exit:error`), wallclock (last `ts` − first), and `stop_reason` from any `subagent_stop` line. If `agent_states/events/` is empty or missing, write *"Telemetry not collected — enable hooks per README."* in place of the table. If >10 reports exist, summarize oldest into `agent_tasks/agent_metrics.md`.
+5. Generate run report → `agent_tasks/reports/report-prd-[feature-name]-[YYYY-MM-DD].md` using template `.claude/skills/cycle/report-template.md`. **Agent Audit**, **Rescues**, and **Agent Telemetry** sections are required. Copy the **Rescues** list from the cycle state file verbatim into the run report's `## Rescues` section (write "None" if cycle state has no rescues). For Agent Telemetry, read all files in `agent_states/events/` and aggregate one row per `agent_id` — fields: `agent_type`, tool-call count, breakdown by `tool`, error count (`exit:error`), wallclock (last `ts` − first), and `stop_reason` from any `subagent_stop` line. If `agent_states/events/` is empty or missing, write *"Telemetry not collected — enable hooks per README."* in place of the table. If >10 reports exist, summarize oldest into `agent_tasks/agent_metrics.md`.
 6. **Autonomous verify & review** — read `.claude/config.md` Optional Agents section. If both are enabled, issue the two `Agent` calls in a **single message** so they run concurrently — verify and review share no state and must not gate each other.
 
    If `verify` is **enabled**: spawn the `verify` agent with the PRD path, source file paths, test file paths, and pre-extracted AC:

@@ -49,6 +49,10 @@ Status: [active | paused | finished]
 ## Blockers
 - [task-id]: [description] — status: [waiting/resolved]
 
+## Rescues
+- ts: [YYYY-MM-DDTHH:MM:SSZ] | type: [enum] | agent: [task-id or agent-id] | description: [short] | resolution: [text] | artifact: [path or none]
+- (or "None")
+
 ## Pause info
 Paused: [YYYY-MM-DD HH:MM or n/a]
 Reason: [API limit | user pause | n/a]
@@ -75,6 +79,7 @@ The orchestrator sends brief 1–2 sentence updates:
 - `ESCALATION [task-id] L[1-4]: [model used] [brief reason]` — log in state file for run report
 - `BLOCKER [task-id]: [description]` — add to blockers section
 - `BLOCKER RESOLVED [task-id]` — remove from blockers
+- `RESCUE [type] [agent-id]: [description] | resolution: [text] | artifact: [path or none]` — append to **Rescues** section. `[type]` enum: `worktree-mismatch`, `watchdog-timeout`, `stall`, `contradiction-loop`, `supervisor-stall`, `supervisor-disabled`, `manual-completion`
 - `PAUSE reason:[reason] resume:[time or unknown]` — set status to paused, write resume instructions
 - `FINALIZE report:[path]` — archive, then delete all `agent_states/` files for this cycle (`rm agent_states/*`)
 

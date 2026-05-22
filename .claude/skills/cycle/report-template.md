@@ -26,6 +26,12 @@ Every agent spawned during this cycle. **Model param set?** confirms the Agent t
 |---|---|---|---|---|---|---|---|
 | 1 | — | — | — | — | — | — | — |
 
+## Rescues
+
+Silent substitutions and recoveries during the cycle (copied verbatim from cycle state). Each line: `ts | type | agent | description | resolution | artifact`. Empty = clean cycle.
+
+- (or "None")
+
 ## Agent Telemetry
 
 Aggregated from `agent_states/events/*.jsonl` (PostToolUse + SubagentStop hooks). One row per `agent_id`. If `agent_states/events/` is empty or missing, write: *"Telemetry not collected — enable hooks per README."*

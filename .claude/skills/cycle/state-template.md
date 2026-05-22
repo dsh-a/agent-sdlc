@@ -24,6 +24,10 @@ Status: [active | paused | finished]
 ## Blockers
 - [task-id]: [description] — status: [waiting/resolved]
 
+## Rescues
+- ts: [YYYY-MM-DDTHH:MM:SSZ] | type: [enum] | agent: [task-id or agent-id] | description: [short] | resolution: [text] | artifact: [path or none]
+- (or "None")
+
 ## Pause info
 Paused: [YYYY-MM-DD HH:MM or n/a]
 Reason: [API limit | user pause | n/a]
