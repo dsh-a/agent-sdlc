@@ -259,6 +259,7 @@ For each parent task (independent in parallel, dependent when ready), first **cr
 
 - **Success**: run the **Commit protocol** below (clean-check → test → merge task worktree into feature branch → teardown), send status to monitor
 - **Failure**: escalation ladder (below)
+- **Stalled** (agent killed by the harness watchdog, or returns no clean result): run **Stall salvage** (below), then the escalation ladder using the salvage assessment as context
 - **Blocked**: notify user, continue independent tasks
 
 ### Escalation ladder
@@ -273,6 +274,26 @@ Max 3 attempts per sub-task, 5 total per parent task.
 | L4 | All auto-recovery failed | Block, report to user, continue independent tasks |
 
 Send every escalation to monitor: `ESCALATION [task-id] L[1-4]: [model] [reason]`
+
+### Stall salvage
+
+A stalled agent — one the harness watchdog kills before it returns cleanly, or one that exits with its expected artifact missing or still `IN PROGRESS` — must leave an audit trail, not be silently replaced by manual work.
+
+On detecting a stall, spawn one inline Haiku salvage pass — do not analyze the stall yourself:
+
+```
+Agent(subagent_type: "general-purpose",
+      model: "[salvage model from Model Allocation table in .claude/config.md]",
+      prompt: "The [agent role] agent for [task/feature] stalled before finishing.
+               Salvage only what is recoverable — do NOT redo its work.
+               Inputs: [partial report path if any] and the git state of [worktree or branch]
+               (run `git diff [base]` and `git log`).
+               Produce a `PARTIAL — agent stalled` artifact at [path]: record what
+               completed, mark what is missing, assess whether the result is coherent.
+               Return the artifact path.")
+```
+
+Record the stall as a rescue event in the cycle state and cycle report. Then: for a stalled `verify`/`review`, the `PARTIAL` report feeds the 4A gate; for a stalled implementation agent, proceed via the escalation ladder with the salvage assessment as the "what was attempted" context.
 
 ### Bug tracking
 
@@ -345,7 +366,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    Spawn both in parallel if both are enabled. Wait for completion.
 
-   **Report-file check** — for each agent spawned, confirm its report file exists at the dictated path and its header `Verdict:` is no longer `IN PROGRESS`. A missing file or a still-`IN PROGRESS` verdict means the agent stalled before finishing — treat it as a failed agent and report the stall to the user.
+   **Report-file check** — for each agent spawned, confirm its report file exists at the dictated path and its header `Verdict:` is no longer `IN PROGRESS`. A missing file or a still-`IN PROGRESS` verdict means the agent stalled before finishing — run **Stall salvage** (§3.4); its `PARTIAL — agent stalled` report then feeds the gate below.
 
    Include verify and review summaries in the cycle report (step 3). Then apply this gate before allowing 4B:
 

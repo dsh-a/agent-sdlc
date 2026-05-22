@@ -36,6 +36,7 @@ Active preset: **personal**
 | self-improve | sonnet | sonnet | opus |
 | monitor | haiku | haiku | haiku |
 | pre-digest | haiku | haiku | haiku |
+| salvage | haiku | haiku | haiku |
 | orchestrator (/cycle) | opus | opus | opus |
 
 To override a single agent regardless of preset, change the value in that agent's row under the active preset column. The cycle orchestrator reads this table for all agent spawns — implementation agents at Phase 3.3, pre-digest and monitor at Phase 3 start.
