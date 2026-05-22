@@ -83,6 +83,10 @@ Before spawning a named implementation agent, optionally spawn a **haiku** agent
 
 **Prompt budget**: haiku prompts <200 words (single task, no background). Implementation agent prompts: task context + digest only — no instructions, those live in the agent definition.
 
+### Handoff validation
+
+At every agent handoff, the orchestrator confirms the agent's frontmatter `produces:` file exists at the expected path. Missing = agent failure: re-spawn (Phase 1A / 2), escalate (Phase 3), or run **Stall salvage** (Phase 4A — already wired).
+
 ---
 
 ## Branch strategy
@@ -145,6 +149,8 @@ Agent(subagent_type: "create-prd", model: "sonnet",
       prompt: "Feature: [description]. [Any roadmap story number or context].")
 ```
 
+Confirm the PRD file exists at the agent's `produces:` path. Missing = re-spawn or escalate.
+
 Review the returned PRD for completeness, then proceed to Phase 1C.
 
 Update state → Phase 1C.
@@ -172,6 +178,8 @@ Spawn the `generate-tasks` agent (model: sonnet) with the PRD file path. The age
 Agent(subagent_type: "generate-tasks", model: "sonnet",
       prompt: "PRD: [prd-file-path]")
 ```
+
+Confirm the task file exists at the agent's `produces:` path. Missing = re-spawn or escalate.
 
 Existing task file → present for review instead of re-generating.
 
