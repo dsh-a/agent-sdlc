@@ -71,6 +71,8 @@ The orchestrator rewrites the task's "Relevant Files" paths to the worktree root
 
 **On `WORKTREE MISMATCH`** — if an agent aborts with this signal, the orchestrator sends `RESCUE worktree-mismatch [agent-id]: [short description] | resolution: [retry|escalate] | artifact: none` to monitor before proceeding via the escalation ladder.
 
+**Handoff format** — every Phase-3 implementation agent's final response must include a `## Deviations` section. Each item: `task: [task-id] | ac: [AC ref] | implemented: [what] | reason: [why]`. Write `None` if the implementation matches PRD AC literally. The orchestrator forwards each deviation to monitor via a `DEVIATIONS` message (see §3.4 Success).
+
 Named agents (`scaffold`, `ui-story`, `test`, etc.) have their model set in their definition. Pass `model:` only to override or for generic haiku agents (monitor, pre-digest).
 
 ### Agent labels
@@ -267,7 +269,7 @@ For each parent task (independent in parallel, dependent when ready), first **cr
 
 ### 3.4 — Handle results
 
-- **Success**: run the **Commit protocol** below (clean-check → test → merge task worktree into feature branch → teardown), send status to monitor
+- **Success**: capture the agent's `## Deviations` section — forward each to monitor (`DEVIATIONS [task-id] AC [ac-id]: [what] | reason: [why]`); then run the **Commit protocol** below (clean-check → test → merge task worktree into feature branch → teardown), send status to monitor
 - **Failure**: escalation ladder (below)
 - **Stalled** (agent killed by the harness watchdog, or returns no clean result): run **Stall salvage** (below), then the escalation ladder using the salvage assessment as context
 - **Blocked**: notify user, continue independent tasks
@@ -353,6 +355,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    - Summary (what was implemented, per parent task)
    - Branch name, commits (hash + message), database/schema changes (or "none")
    - Bugs discovered, known limitations, blocked tasks, follow-up items
+   - Deviations from PRD AC (copy the cycle state's **Deviations** section verbatim; write "None" if empty)
 4. Present cycle report to user inline
 5. Generate run report → `agent_tasks/reports/report-prd-[feature-name]-[YYYY-MM-DD].md` using template `.claude/skills/cycle/report-template.md`. **Agent Audit**, **Rescues**, and **Agent Telemetry** sections are required. Copy the **Rescues** list from the cycle state file verbatim into the run report's `## Rescues` section (write "None" if cycle state has no rescues). For Agent Telemetry, read all files in `agent_states/events/` and aggregate one row per `agent_id` — fields: `agent_type`, tool-call count, breakdown by `tool`, error count (`exit:error`), wallclock (last `ts` − first), and `stop_reason` from any `subagent_stop` line. If `agent_states/events/` is empty or missing, write *"Telemetry not collected — enable hooks per README."* in place of the table. If >10 reports exist, summarize oldest into `agent_tasks/agent_metrics.md`.
 6. **Autonomous verify & review** — read `.claude/config.md` Optional Agents section. If both are enabled, issue the two `Agent` calls in a **single message** so they run concurrently — verify and review share no state and must not gate each other.
