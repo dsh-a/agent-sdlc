@@ -331,6 +331,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    Agent(subagent_type: "verify", model: [per config Model Allocation],
          prompt: "PRD: [prd-path]. Source files: [paths]. Test files: [paths].
                   AC: [pre-extracted]. Branch: [branch-name].
+                  Report path: agent_tasks/reports/verify-[prd-stem]-[date].md — write your report there.
                   Work autonomously — no user interaction.")
    ```
 
@@ -338,10 +339,13 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    ```
    Agent(subagent_type: "review", model: [per config Model Allocation],
          prompt: "Branch: [branch-name]. PRD: [prd-path].
+                  Report path: agent_tasks/reports/review-[feature]-[date].md — write your report there.
                   Work autonomously — no user interaction.")
    ```
 
-   Spawn both in parallel if both are enabled. Wait for completion and collect their reports.
+   Spawn both in parallel if both are enabled. Wait for completion.
+
+   **Report-file check** — for each agent spawned, confirm its report file exists at the dictated path and its header `Verdict:` is no longer `IN PROGRESS`. A missing file or a still-`IN PROGRESS` verdict means the agent stalled before finishing — treat it as a failed agent and report the stall to the user.
 
    Include verify and review summaries in the cycle report (step 3). Then apply this gate before allowing 4B:
 
