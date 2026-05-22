@@ -12,5 +12,23 @@
       "Bash(ls *)",
       "Bash(rm agent_states/*)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"}
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"}
+        ]
+      }
+    ]
   }
 }
