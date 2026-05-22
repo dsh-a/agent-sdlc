@@ -21,6 +21,8 @@ Active cycle states:
 
 **Janitor check**: for each state file listed above, check whether a matching cycle report already exists in `cycle_reports/` (match by feature name substring). If a match exists, the cycle completed without sending `FINALIZE` — delete the state file now and do not offer to resume it.
 
+**Worktree janitor**: run `git worktree list`. For any worktree under `.claude/worktrees/` on a `cycle/*` branch whose cycle is not among the active state files above, prune it — `git worktree remove --force <path>` then `git branch -D <branch>`. Orphaned Phase-3 worktrees otherwise accumulate indefinitely.
+
 Recent cycle reports:
 !`ls cycle_reports/*.md 2>/dev/null | tail -5 || echo "none"`
 
@@ -47,13 +49,25 @@ Dry-run ends with: **"Ready to execute? `/cycle --exe` to begin, or adjust first
 
 ## Agent spawn rules
 
-### MANDATORY spawn parameters
+### Phase-3 worktree protocol (MANDATORY)
 
-Every `Agent` tool call for implementation MUST include `isolation: "worktree"`. Without this, parallel agents share the working directory and corrupt each other's changes.
+The orchestrator creates and owns every Phase-3 worktree. Implementation agents do **not** use `isolation: "worktree"` — worktrees created by that harness flag branch from a stale base instead of the feature branch HEAD. The orchestrator avoids the bug by creating worktrees itself.
 
-```
-Agent(subagent_type: "scaffold", model: "sonnet", isolation: "worktree", prompt: "...")
-```
+**One worktree per parent task** — the implementer and the test agent for that task share it.
+
+For each parent task, before spawning its agents:
+
+1. **Create the worktree** from the current feature-branch HEAD: `git worktree add -b cycle/[story]/task-[N.0] .claude/worktrees/[story]-task-[N.0] feature/[name]`. The base is `feature/[name]` HEAD *at creation time* — create it immediately before spawning, so a dependent task forks from the post-merge HEAD that already contains its prerequisite.
+2. **Spawn the agent non-isolated** — no `isolation:` parameter — with the worktree-startup preamble (below) prepended to its prompt.
+3. The agent works entirely inside its worktree; the orchestrator merges and tears it down (see **Commit protocol**).
+
+Separate worktree directories already give full isolation — each has its own working tree, index, and build artifacts; the shared git object store is concurrency-safe. The `isolation:` flag is unnecessary once the orchestrator owns worktree creation.
+
+**Worktree-startup preamble** — prepend to EVERY Phase-3 implementation agent prompt, with `[path]` and `[branch]` filled in:
+
+> Before any other action: run `cd [path]`, then verify `git rev-parse --show-toplevel` equals `[path]` AND `git branch --show-current` equals `[branch]`. If either check fails, do NOT proceed — stop immediately and report `WORKTREE MISMATCH`. Every file path in this prompt is absolute and inside your worktree; never Read, Edit, or Write a path outside `[path]`.
+
+The orchestrator rewrites the task's "Relevant Files" paths to the worktree root before injecting them, so the agent is never handed a main-checkout path.
 
 Named agents (`scaffold`, `ui-story`, `test`, etc.) have their model set in their definition. Pass `model:` only to override or for generic haiku agents (monitor, pre-digest).
 
@@ -75,7 +89,7 @@ All work on feature branches, never directly on the base branch.
 
 - **Naming**: read `feature_branch_pattern` from the **Branch Configuration** table in `.claude/config.md`. Default: `feature/[short-description]`, `fix/...`, or `refactor/...`
 - **Create at Phase 2B**: `git checkout -b feature/[name] [base_branch]` — where `[base_branch]` is the `base_branch` value from `.claude/config.md`
-- **Parallel tasks**: worktrees branched from feature branch — `feature/[name]/task-[N.0]`
+- **Parallel tasks**: the orchestrator creates one git worktree per parent task, branched from `feature/[name]` HEAD — branch `cycle/[story]/task-[N.0]`, path `.claude/worktrees/[story]-task-[N.0]`. See **Phase-3 worktree protocol**. (`feature/[name]/task-N` cannot be used as a branch name — it collides with the `feature/[name]` ref.)
 - **Merge order**: dependency order. Run the test and typecheck/lint commands (from **Project Commands** in `.claude/config.md`) after each merge.
 - **Conflicts**: sonnet agent resolves. Ambiguous conflicts → escalate to user.
 - **After Phase 4**: do NOT merge into the base branch. User decides after `/verify` + `/review`.
@@ -198,7 +212,7 @@ Before spawning any implementation agent:
 1. **Extract file paths** from the task file's "Relevant Files" section — pass these explicitly in every agent prompt. This eliminates discovery round-trips.
 2. **Extract AC** from the PRD's Acceptance Criteria section — pass directly to test and verify agents so they skip PRD search.
 
-For each parent task (independent in parallel, dependent when ready):
+For each parent task (independent in parallel, dependent when ready), first **create the task worktree** per the **Phase-3 worktree protocol** (`git worktree add` from `feature/[name]` HEAD), then:
 
 1. **Pre-digest** (haiku, background) — **default for any task touching ≥ 2 existing files**. Reads relevant source files and returns a ~150-line structured summary (public API, constructor deps, key patterns). Skip only if the task creates all-new files or a digest was already saved.
 
@@ -213,7 +227,7 @@ For each parent task (independent in parallel, dependent when ready):
 
    Wait for the digest before spawning the implementation agent. Pass digest content in the implementation agent's prompt.
 
-2. **Implement** (`isolation: "worktree"`) — use the agent matching the task type:
+2. **Implement** — use the agent matching the task type (the agent runs in the task worktree; no `isolation:` parameter):
 
    | Sub-task type | subagent_type | Model |
    |---|---|---|
@@ -225,9 +239,10 @@ For each parent task (independent in parallel, dependent when ready):
    Read the **Model Allocation** table in `.claude/config.md` for each agent's assigned model under the active preset. If no config file exists, default to sonnet for all implementation agents.
 
    ```
-   Agent(subagent_type: "scaffold", model: "[per config]", isolation: "worktree",
-         prompt: "PRD: [prd-path]
-                  Source files: [paths from Relevant Files]
+   Agent(subagent_type: "scaffold", model: "[per config]",
+         prompt: "[worktree-startup preamble — Phase-3 worktree protocol]
+                  PRD: [prd-path]
+                  Source files: [paths from Relevant Files, rooted at the worktree]
                   AC (pre-extracted): [AC items from PRD]
                   Task: [sub-task list]
                   Digest: [digest content if available]")
@@ -236,13 +251,13 @@ For each parent task (independent in parallel, dependent when ready):
    - Agent marks sub-tasks `[x]` as it completes them
    - On failure/ambiguity: report to orchestrator, continue independent sub-tasks
 
-3. **Test** (separate agent from implementer):
-   - **Write** (sonnet): `Agent(subagent_type: "test", model: "sonnet", isolation: "worktree", prompt: "PRD: [prd-path]\nSource files: [paths]\nTest files: [paths]\nAC (pre-extracted): [AC items]\nTask: [task description]")`
+3. **Test** (separate agent from implementer; runs in the **same task worktree** as the implementer, after it — so it sees the implemented code; no `isolation:` parameter):
+   - **Write** (sonnet): `Agent(subagent_type: "test", model: "sonnet", prompt: "[worktree-startup preamble] PRD: [prd-path]\nSource files: [paths]\nTest files: [paths]\nAC (pre-extracted): [AC items]\nTask: [task description]")`
    - **Fix** (sonnet): re-spawn `test` agent with failure output and source paths
 
 ### 3.4 — Handle results
 
-- **Success**: merge worktree → feature branch, run test + typecheck/lint commands (from **Project Commands** in `.claude/config.md`), send status to monitor
+- **Success**: run the **Commit protocol** below (clean-check → test → merge task worktree into feature branch → teardown), send status to monitor
 - **Failure**: escalation ladder (below)
 - **Blocked**: notify user, continue independent tasks
 
@@ -269,9 +284,10 @@ Existing-code bugs (not agent-written code):
 ### Commit protocol
 
 Per parent task, when all sub-tasks pass:
-1. Run test + typecheck/lint commands (from **Project Commands** in `.claude/config.md`)
-2. Green → merge worktree, stage specific files, commit (conventional format), mark parent `[x]`, update monitor, delete worktree branch
-3. Red → escalation ladder from L1
+1. **Clean-check** — assert `git status --porcelain` in the **main checkout** is empty. The orchestrator writes no implementation code, so a dirty main checkout means an agent leaked outside its worktree: abort the merge, report to the user, do not proceed.
+2. Run test + typecheck/lint commands (from **Project Commands** in `.claude/config.md`) in the task worktree.
+3. Green → ensure the task work is committed on `cycle/[story]/task-[N.0]` (conventional format), merge that branch into `feature/[name]`, mark parent `[x]`, update monitor, then **tear down the worktree**: `git worktree remove --force .claude/worktrees/[story]-task-[N.0]` and `git branch -D cycle/[story]/task-[N.0]`.
+4. Red → escalation ladder from L1
 
 Never auto-revert commits. Report to user with options.
 
