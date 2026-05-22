@@ -26,6 +26,21 @@ Every agent spawned during this cycle. **Model param set?** confirms the Agent t
 |---|---|---|---|---|---|---|---|
 | 1 | — | — | — | — | — | — | — |
 
+## Agent Telemetry
+
+Aggregated from `agent_states/events/*.jsonl` (PostToolUse + SubagentStop hooks). One row per `agent_id`. If `agent_states/events/` is empty or missing, write: *"Telemetry not collected — enable hooks per README."*
+
+| Agent ID | Type | Tool calls | Breakdown | Errors | Wallclock | Stop reason |
+|---|---|---|---|---|---|---|
+| — | — | — | — | — | — | — |
+
+### Phase-3 totals
+| Metric | Value |
+|---|---|
+| Total tool calls | [n] |
+| Total errors | [n] |
+| Phase-3 wallclock (first→last event) | [duration] |
+
 ## Economy — Agent usage
 
 | Phase | Task | Model | Est. tokens | Rework? |
