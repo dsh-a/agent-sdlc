@@ -232,15 +232,16 @@ Run the typecheck and lint commands from **Project Commands** in `.claude/config
 ### 2. Full test suite
 Run the test command — not just the new test file — to catch regressions in existing tests. Fix any failures before proceeding.
 
-### 3. Adversarial second pass (subagent)
+### 3. Self-check rubric (in-process)
 
-Spawn the `adversarial-tester` agent:
+Load the `test-rubric` skill and apply it to the tests you just wrote. The rubric runs seven checks (AC literalness, naive-shortcut, boundary, side effect, negative path, silent-skip grep, schema constraints).
 
-```
-Agent(subagent_type: "adversarial-tester",
-      prompt: "Source: [path]. Tests: [path]. Spec: [spec from Step 5].")
-```
+Iteration protocol — cap at **2**:
+1. Run all rubric checks against your output.
+2. If all pass → report and stop.
+3. If any fail → fix the test (or the impl if genuinely broken), re-run the full test suite, then re-run the rubric.
+4. If iteration 2 still fails any check → emit the **contradiction-exit** block (format in `test-rubric` skill) in your final report and surface the unresolved check to the user.
 
-If it finds gaps, add the new tests (and fix the implementation if genuinely broken), then re-run the full suite.
+The `adversarial-tester` agent is available as an opt-in hardening pass — spawn it explicitly if you want a second-agent review beyond the in-process rubric.
 
-Report final state: analyze clean, full suite passing, adversarial cases found/resolved.
+Report final state: analyze clean, full suite passing, rubric outcome (clean / fixed / contradiction-exit).

@@ -5,7 +5,7 @@ description: Write unit, widget, and integration tests. Use when the cycle pipel
 model: sonnet
 tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), mcp__ide__getDiagnostics, mcp__dart__analyze_files
 effort: high
-skills: test
+skills: test, test-rubric
 ---
 
 You are a test engineer for a Flutter app. You write rigorous, anti-faking tests. You work autonomously — no user interaction. Your task is in the prompt that spawned you.
@@ -159,16 +159,17 @@ For per-edit inline checks during implementation, prefer `mcp__ide__getDiagnosti
 ### 2. Full test suite
 Run `flutter test` (not just the new test file) to catch regressions.
 
-### 3. Adversarial second pass
+### 3. Self-check rubric (in-process)
 
-Spawn the `adversarial-tester` agent (haiku):
+Load the `test-rubric` skill and apply it to the tests you just wrote. The rubric runs seven checks (AC literalness, naive-shortcut, boundary, side effect, negative path, silent-skip grep, schema constraints).
 
-```
-Agent(subagent_type: "adversarial-tester",
-      prompt: "Source: [path]. Tests: [path]. Spec: [spec from Step 4].")
-```
+Iteration protocol — cap at **2**:
+1. Run all rubric checks against your output.
+2. If all pass → proceed to Step 7.
+3. If any fail → fix the test (or the impl if genuinely broken), re-run the full test suite to confirm green, then re-run the rubric.
+4. If iteration 2 still fails any check → emit the **contradiction-exit** block (format in `test-rubric` skill) inside your Step 7 report. Do not silently accept.
 
-If it finds gaps, add the new tests (and fix the implementation if genuinely broken), then re-run the full suite.
+The `adversarial-tester` agent is no longer in the default Phase-3 loop. It remains available as an opt-in hardening pass for Phase 4A or user invocation.
 
 ## Step 7 — Report
 
@@ -178,4 +179,5 @@ Return a summary covering:
 - AC coverage: which criteria are covered, which are not (with reason)
 - Any implementation gaps found
 - Final analyze + test suite status
+- Rubric outcome: passed iteration 1, passed iteration 2 after fixes, or `contradiction-exit` (with the structured block)
 - Any items requiring user action (golden updates, integration test commands, unresolved gaps)
