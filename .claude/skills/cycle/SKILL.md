@@ -345,7 +345,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    - Bugs discovered, known limitations, blocked tasks, follow-up items
 4. Present cycle report to user inline
 5. Generate run report → `agent_tasks/reports/report-prd-[feature-name]-[YYYY-MM-DD].md` using template `.claude/skills/cycle/report-template.md`. **Agent Audit** section is required. If >10 reports exist, summarize oldest into `agent_tasks/agent_metrics.md`.
-6. **Autonomous verify & review** — read `.claude/config.md` Optional Agents section.
+6. **Autonomous verify & review** — read `.claude/config.md` Optional Agents section. If both are enabled, issue the two `Agent` calls in a **single message** so they run concurrently — verify and review share no state and must not gate each other.
 
    If `verify` is **enabled**: spawn the `verify` agent with the PRD path, source file paths, test file paths, and pre-extracted AC:
    ```
@@ -364,7 +364,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
                   Work autonomously — no user interaction.")
    ```
 
-   Spawn both in parallel if both are enabled. Wait for completion.
+   Wait for both to complete.
 
    **Report-file check** — for each agent spawned, confirm its report file exists at the dictated path and its header `Verdict:` is no longer `IN PROGRESS`. A missing file or a still-`IN PROGRESS` verdict means the agent stalled before finishing — run **Stall salvage** (§3.4); its `PARTIAL — agent stalled` report then feeds the gate below.
 
