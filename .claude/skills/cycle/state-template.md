@@ -32,6 +32,10 @@ Status: [active | paused | finished]
 - task: [task-id] | ac: [AC id or short ref] | implemented: [what] | reason: [why]
 - (or "None")
 
+## Scope changes
+- ts: [YYYY-MM-DDTHH:MM:SSZ] | type: [added|removed|modified] | ac: [ac-id] | text: [AC text] | reason: [why]
+- (or "None")
+
 ## Pause info
 Paused: [YYYY-MM-DD HH:MM or n/a]
 Reason: [API limit | user pause | n/a]

@@ -42,6 +42,8 @@ Otherwise, read the PRD file and extract every testable criterion from:
 
 Produce a numbered checklist. Each entry is a single, specific, testable statement. Split multi-condition requirements into separate items.
 
+**Apply mid-cycle scope changes.** Read `agent_states/cycle-state-*.md` if present, and look for its `## Scope changes` section. For each entry: `added` → add the AC to your checklist; `removed` → drop the matching AC; `modified` → replace the AC text with the new version. The PRD captures the cycle's *original* intent; cycle state captures the *current* truth at audit time.
+
 ---
 
 ## Step 2 — Locate the test suite

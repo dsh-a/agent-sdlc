@@ -197,6 +197,8 @@ Approved → create feature branch, update state, Phase 3. Changes → apply, re
 
 You delegate and track. You do not write code. If you ever complete work that should have gone through an agent (e.g., applying a trivial fix to the feature branch yourself), emit `RESCUE manual-completion [task-id]: [what you did] | resolution: [why] | artifact: [commit hash or path]` to monitor — silent substitutions destroy the audit trail.
 
+**Mid-cycle scope changes.** If after Gate 2 you add, remove, or modify an acceptance criterion (e.g., the PRD missed a case discovered during implementation), emit `SCOPE_CHANGE [added|removed|modified] AC [ac-id]: [text] | reason: [why]` to monitor. `verify` reads this list and audits against the current truth, not the frozen PRD.
+
 ### 3.1 — Pre-flight
 
 Check `.claude/agents/scaffold/` for project-specific pattern files (files with `Type: project-specific`). If none exist and the task list includes scaffold-type work, autonomously spawn a setup-scaffold agent:
@@ -356,6 +358,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    - Branch name, commits (hash + message), database/schema changes (or "none")
    - Bugs discovered, known limitations, blocked tasks, follow-up items
    - Deviations from PRD AC (copy the cycle state's **Deviations** section verbatim; write "None" if empty)
+   - Scope changes (copy the cycle state's **Scope changes** section verbatim; write "None" if empty)
 4. Present cycle report to user inline
 5. Generate run report → `agent_tasks/reports/report-prd-[feature-name]-[YYYY-MM-DD].md` using template `.claude/skills/cycle/report-template.md`. **Agent Audit**, **Rescues**, and **Agent Telemetry** sections are required. Copy the **Rescues** list from the cycle state file verbatim into the run report's `## Rescues` section (write "None" if cycle state has no rescues). For Agent Telemetry, read all files in `agent_states/events/` and aggregate one row per `agent_id` — fields: `agent_type`, tool-call count, breakdown by `tool`, error count (`exit:error`), wallclock (last `ts` − first), and `stop_reason` from any `subagent_stop` line. If `agent_states/events/` is empty or missing, write *"Telemetry not collected — enable hooks per README."* in place of the table. If >10 reports exist, summarize oldest into `agent_tasks/agent_metrics.md`.
 6. **Autonomous verify & review** — read `.claude/config.md` Optional Agents section. If both are enabled, issue the two `Agent` calls in a **single message** so they run concurrently — verify and review share no state and must not gate each other.
