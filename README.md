@@ -77,6 +77,12 @@ If your project uses a different toolchain, update these patterns to match (e.g.
 - **Remove** patterns you don't want auto-allowed
 - **Add** patterns for project-specific commands (e.g., `Bash(docker compose*)`)
 
+### Enable per-agent telemetry (recommended)
+
+`.claude/settings.json.sample` ships a `hooks` block (`PostToolUse` + `SubagentStop`) that appends one JSONL line per tool call to `agent_states/events/<agent_id>.jsonl`. The cycle's run-report telemetry, the supervisor, and stall salvage all consume this log.
+
+To enable, **merge** the `hooks` block from `.claude/settings.json.sample` into your `.claude/settings.json` (don't overwrite — preserve your existing `permissions`). Requires `python3` on PATH (built-in on macOS).
+
 ### 4. Conventions
 
 The pipeline expects these directories (auto-created as needed):
