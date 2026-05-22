@@ -241,14 +241,16 @@ For each parent task (independent in parallel, dependent when ready), first **cr
 
    Wait for the digest before spawning the implementation agent. Pass digest content in the implementation agent's prompt.
 
-2. **Implement** — use the agent matching the task type (the agent runs in the task worktree; no `isolation:` parameter):
+2. **Implement** — dispatch by the parent task's `[kind: …]` tag (set by `generate-tasks`). If the tag is missing on an existing task file, fall back to inferring from the prose. The agent runs in the task worktree; no `isolation:` parameter.
 
-   | Sub-task type | subagent_type | Model |
+   | `kind` value | subagent_type | Model |
    |---|---|---|
-   | New entity/model end-to-end | `scaffold` | per config |
-   | UI screen or component | `ui-story` | per config |
-   | DI wiring or use case | `scaffold` | per config |
-   | Multi-file implementation (3+ files) | general-purpose | per config |
+   | `scaffold` or `scaffold-*` | `scaffold` | per config |
+   | `ui-story` | `ui-story` | per config |
+   | `test` | `test` | per config |
+   | `general-purpose` | general-purpose | per config |
+
+   For `scaffold-*` kinds (e.g., `scaffold-facade`), pass the pattern name in the agent's prompt so it loads the matching `.claude/agents/scaffold/<pattern>.md`.
 
    Read the **Model Allocation** table in `.claude/config.md` for each agent's assigned model under the active preset. If no config file exists, default to sonnet for all implementation agents.
 

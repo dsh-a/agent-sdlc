@@ -48,6 +48,16 @@ Create 4–6 parent tasks representing the major implementation units. Each pare
 
 Adjust based on the PRD scope — smaller features may only need 2–3 parent tasks.
 
+**Tag each parent task with a `kind:`** — the orchestrator uses this to dispatch directly to the right agent (no prose inference). Valid kinds:
+
+- `ui-story` — UI screen or component
+- `test` — test-only tasks
+- `general-purpose` — multi-file fallback
+- `scaffold` — generic; the scaffold agent picks its pattern
+- `scaffold-syncable-entity`, `scaffold-facade`, `scaffold-service`, `scaffold-use-case`, `scaffold-command`, `scaffold-strategy`, `scaffold-observer`, `scaffold-interface` — explicit scaffold pattern (matches `.claude/agents/scaffold/*.md`)
+
+Pick the most specific kind that matches. If a parent task spans kinds (e.g., a use case + tests), split it into two parent tasks.
+
 ---
 
 ## Step 4 — Generate sub-tasks
@@ -109,10 +119,10 @@ Save to `agent_tasks/tasks-[prd-file-name].md` (e.g., PRD `prd-user-alarm.md` �
 
 ## Tasks
 
-- [ ] 1.0 Parent Task Title
+- [ ] 1.0 [kind: scaffold-syncable-entity] Parent Task Title
     - [ ] 1.1 Sub-task description
     - [ ] 1.2 Sub-task description
-- [ ] 2.0 Parent Task Title
+- [ ] 2.0 [kind: ui-story] Parent Task Title
     - [ ] 2.1 Sub-task description
 ```
 
