@@ -365,6 +365,54 @@ All new extracted skills are context sandwiches: dense, focused, no preamble.
 
 ---
 
+## 5.9 Orca synergy — optional enhancement tier (P3)
+
+**Full plan:** `docs/orca-synergy-plan.md`. This is the slot-in stub.
+
+`agent-sdlc` deploys as a portable `.claude/` folder and must keep working without
+Orca. When the host environment *is* Orca (an agentic dev environment managing
+repos, worktrees, terminals, and orchestration), the framework can detect it and
+augment several baseline mechanisms.
+
+**Framing.** Orca support is an *augment layer*, never a dependency. §5.1–§5.8 stay
+Orca-agnostic and always-on; Orca behavior sits behind a ports-and-adapters seam
+with file-based default adapters and Orca adapters selected once per cycle by
+detection (`config.md`: `orca: auto|on|off`).
+
+**Two altitudes (load-bearing).** Orca orchestration operates at the *feature* level
+(one ROADMAP story = one `/cycle` = one Orca worktree); `/cycle`'s own orchestrator
++ the §5.5 supervisor operate at the *sub-task* level. They do not merge. The §5.5
+inner control loop stays file-based and Orca-agnostic — Orca's
+`escalation`/`worker_done`/circuit-breaker vocabulary is a coincidental name
+collision, not a shared mechanism.
+
+**Headline items** (each sequenced after the core seam it augments):
+- *Status / lineage* — publish cycle status to the worktree `--comment`; adopt
+  nested Phase-3 worktrees into Orca's `parentWorktree` lineage so the UI groups
+  them under one feature node.
+- *Gates* — route Gates 1C/2B/4B through Orca decision gates (async, UI-resolvable);
+  enables unattended/scheduled cycles.
+- *Fan-out* — multi-feature parallelism as N independent `/cycle` runs in N Orca
+  worktrees; delivers the §9-deferred capability without a god-orchestrator.
+- *Entry* — `/cycle --next` reads a `documentation/stories/` index; an Orca
+  automation schedules it.
+
+**Annotations to §5.1–§5.8.** To keep the Orca adapters drop-in, the core plan
+should route gate presentation, status emission, stall detection, and
+whisper/escalation appends through *named ports* rather than inline transports, and
+audit that all `agent_states/` / `agent_tasks/` / `cycle_reports/` writes are
+worktree-local. New core (Orca-agnostic) tasks introduced by the synergy plan:
+a `max_parallel_agents` knob (ships `off` — today's behavior), `/cycle --next`, and
+story-file slug naming. See `orca-synergy-plan.md` §7.
+
+**Cross-reference to §5.5.** The synergy plan (§2.5) raises a synthesis-side
+question: once the §5.5 supervisor exists, `monitor` and the supervisor are two
+cheap Haiku background observers, each needing health monitoring. Consider folding
+them into one Phase 3–4 "cycle sidecar." Revisit §5.5.1's agent boundary when §5.5
+is scoped (tracked as SQ-9 in the synergy plan).
+
+---
+
 ## 6. Dependency graph
 
 ```
