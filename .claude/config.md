@@ -86,6 +86,40 @@ Agents spawned during Phase 4A. Set to `skip` to disable.
 
 ---
 
+## Hygiene flags (§5.8)
+
+Long-tail policy knobs. All default to conservative behavior.
+
+### Analyzer baseline (5.8.1)
+
+| Flag | Default | Behavior |
+|---|---|---|
+| `analyzer_baseline` | `soft_warn` | `off` — no baseline tracking. `soft_warn` — record analyzer warnings at Phase 3 start; Phase 4A surfaces any new warnings introduced during the cycle but does not block. `hard_fail_if_exceeded` — same recording, but new warnings flip review verdict to REQUEST CHANGES. |
+
+Baseline is recorded into `cycle_reports/<feature>/analyzer-baseline.txt` at Phase 3 start by capturing `flutter analyze` (or the project's typecheck/lint command) output. Phase 4A re-runs and diffs.
+
+### Compact at phase boundaries (5.8.2)
+
+| Flag | Default | Behavior |
+|---|---|---|
+| `auto_compact_at_boundaries` | `off` | When `on`, the orchestrator invokes `/compact` at Phase 2→3 and Phase 3→4A transitions to reclaim context. Off by default because compaction can cost orchestrator decision-continuity; enable once your cycles have telemetry showing the trade-off is favorable. |
+
+### Known-pitfalls loop (5.8.3)
+
+| Flag | Default | Behavior |
+|---|---|---|
+| `known_pitfalls_path` | `documentation/known-pitfalls.md` | Path to the project's known-pitfalls file. If the file exists, the orchestrator pre-attaches matching entries to implementation-agent prompts (matched by file globs). Set to empty string to disable. |
+
+See cycle SKILL § Known pitfalls for the file format.
+
+### Bug-triage (5.8.4)
+
+| Flag | Default | Behavior |
+|---|---|---|
+| `aggregate_bugs_into` | `documentation/bugs.md` | Path the `self-improve` agent appends new "Bugs discovered" entries to (dedup by title hash). Set to empty string to disable. |
+
+---
+
 ## Per-phase skip flags (5.6.2)
 
 Conservative defaults. Flags act as **additional** skip conditions on top of the active `--mode`. Set a flag to `0` or `false` to disable that specific skip.

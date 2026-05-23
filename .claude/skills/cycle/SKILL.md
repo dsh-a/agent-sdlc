@@ -255,6 +255,40 @@ You delegate and track. You do not write code. If you ever complete work that sh
 
 **Mid-cycle scope changes.** If after Gate 2 you add, remove, or modify an acceptance criterion (e.g., the PRD missed a case discovered during implementation), emit `SCOPE_CHANGE [added|removed|modified] AC [ac-id]: [text] | reason: [why]` to monitor. `verify` reads this list and audits against the current truth, not the frozen PRD.
 
+### Analyzer baseline (5.8.1)
+
+If `analyzer_baseline` in `.claude/config.md` § Hygiene flags is `soft_warn` or `hard_fail_if_exceeded`, capture the baseline at Phase 3 start:
+
+```
+flutter analyze > cycle_reports/<feature>/analyzer-baseline.txt 2>&1 || true
+```
+
+(Adapt the command to the project's typecheck/lint from `.claude/config.md` § Project Commands.) Phase 4A re-runs the same command and diffs. New warnings in the diff:
+- `soft_warn` → flagged in the run report under a new "Analyzer drift" section; cycle proceeds.
+- `hard_fail_if_exceeded` → review verdict flips to REQUEST CHANGES regardless of other findings; the diff is included in the review report.
+
+### Known pitfalls (5.8.3)
+
+If `known_pitfalls_path` in `.claude/config.md` § Hygiene flags points at an existing file, read it once at Phase 3.3 (before spawning implementation agents). File format:
+
+```markdown
+## <Short title>
+Globs: lib/data/**/*.dart, test/data/**
+Severity: warn | hard
+Body:
+[One paragraph describing the pitfall and how to avoid it. Cite a real incident if available.]
+```
+
+For each parent task, match the task's "Relevant Files" paths against each entry's `Globs:` line. For every match, append the entry's `Body:` to the agent's spawn prompt under a `## Known pitfalls for files you'll touch` section. Severity `hard` entries get a "Read this carefully — the same bug has happened before:" preface. The framework provides the matching mechanism; the project owns the file content.
+
+### Compact at phase boundaries (5.8.2)
+
+If `auto_compact_at_boundaries` in `.claude/config.md` § Hygiene flags is `on`, invoke `/compact` at:
+- **Phase 2→3 transition** — after Gate 2 is approved, before any Phase 3 spawn.
+- **Phase 3→4A transition** — after the last parent task merges, before the Phase 4A wrap-up runs.
+
+Compaction reclaims context but can cost orchestrator decision-continuity; keep `off` until telemetry shows the trade-off is favorable for your cycles.
+
 ### 3.1 — Pre-flight
 
 Check `.claude/agents/scaffold/` for project-specific pattern files (files with `Type: project-specific`). If none exist and the task list includes scaffold-type work, autonomously spawn a setup-scaffold agent:
@@ -504,7 +538,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
 ### 4A — Wrap-up (MANDATORY — execute immediately, do not stop or ask; step 7 MUST execute even if the user skips 4B)
 
-1. Run test + typecheck/lint commands from **Project Commands** in `.claude/config.md` (final full suite)
+1. Run test + typecheck/lint commands from **Project Commands** in `.claude/config.md` (final full suite). **Analyzer drift check (5.8.1):** if `analyzer_baseline` is `soft_warn` or `hard_fail_if_exceeded`, diff the current analyze output against `cycle_reports/<feature>/analyzer-baseline.txt` recorded at Phase 3 start. Append the diff (or "None") to the run report's `## Analyzer drift` section. Under `hard_fail_if_exceeded`, force the review verdict to REQUEST CHANGES if the diff is non-empty.
 2. Mark ALL tasks and sub-tasks `[x]` in the task file (final sweep)
 3. Generate cycle report → `cycle_reports/[feature-name]-[YYYY-MM-DD].md`:
    - Summary (what was implemented, per parent task)

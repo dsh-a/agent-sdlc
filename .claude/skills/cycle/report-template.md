@@ -65,6 +65,12 @@ Every `depth-recommendation` the supervisor emitted, with the orchestrator's dec
 |---|---|---|---|
 | — | — | — | — |
 
+## Analyzer drift (5.8.1)
+
+When `analyzer_baseline` is enabled, this section captures any new analyzer warnings introduced during the cycle (diff of Phase 4A analyze output vs. `cycle_reports/<feature>/analyzer-baseline.txt`). Empty = clean.
+
+- (or "None" / "Baseline tracking disabled")
+
 ## Economy — Agent usage
 
 | Phase | Task | Model | Est. tokens | Rework? |
