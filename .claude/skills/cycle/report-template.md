@@ -57,6 +57,14 @@ Aggregated from `agent_states/events/*.jsonl` (PostToolUse + SubagentStop hooks)
 | Uptime % | [(spawns - stalls) / spawns × 100, or "n/a" if spawns = 0] |
 | Cycle classification | [normal / **degraded** — uptime <90% or status=disabled] |
 
+## Supervisor recommendations (5.5.6)
+
+Every `depth-recommendation` the supervisor emitted, with the orchestrator's decision. Copied verbatim from cycle state's `## Supervisor recommendations` section. Empty = no recommendations this cycle.
+
+| ts | Suggestion | Accepted? | Rationale |
+|---|---|---|---|
+| — | — | — | — |
+
 ## Economy — Agent usage
 
 | Phase | Task | Model | Est. tokens | Rework? |

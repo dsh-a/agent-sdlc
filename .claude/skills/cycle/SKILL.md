@@ -342,6 +342,16 @@ Six layered mechanisms, all run at your watchdog tick (which fires alongside the
 5. **Run-report uptime %.** When you build the cycle run report at Phase 4A, populate the **Supervisor health** subsection of the Agent Telemetry block from cycle state. Classify the cycle as **degraded** if uptime % < 90 or status is `disabled`.
 6. **`self-improve` hook.** Documented in `.claude/agents/self-improve.md` Step 2 (Effectiveness patterns → Supervisor health). When `supervisor-stall` or `supervisor-disabled` appears in ≥ 3 of the last 5 cycles, `self-improve` raises a P0 recommendation.
 
+### Plan-revision flow (5.5.6)
+
+When you process a `depth-recommendation` escalation, you decide — the supervisor only *recommends*. Three rules:
+
+1. **Decide accept or reject** with a one-line rationale grounded in current cycle context (task progress, AC scope, escalation ladder state, time pressure). Examples: "accepted — task 2.0 has 3 unrelated sub-tasks per Relevant Files," "rejected — split would create cross-cutting test dependencies," "rejected — too late in Phase 3 to re-shape."
+2. **Emit `SUPERVISOR_REC suggestion:[text] accepted:[true|false] rationale:[text]` to monitor** for every recommendation — accepted *and* rejected. Silent drops destroy the audit trail and starve `self-improve` of tuning data.
+3. **If accepted, apply the change** within your existing primitives — re-spawn a task with a different model, split a parent task into two task-file entries, insert a verify pass, etc. The recommendation is not a pipeline-design override; the orchestrator still owns pipeline shape.
+
+If a recommendation conflicts with a recommendation you accepted earlier (or with mid-cycle scope changes), prefer the later signal but record both decisions.
+
 ### Supervisor escalation polling
 
 The orchestrator polls `agent_states/escalations.jsonl` at three moments only (item 5.5.2):
