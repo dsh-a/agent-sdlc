@@ -97,6 +97,7 @@ Read the code. Does it actually do what the criterion requires, or does it take 
    - **Out of scope**: refactors, dependency additions, unrelated bug fixes
 3. Flag out-of-scope changes — they're the primary source of agent-introduced regressions
 4. If any changed files are in `lib/data/`, use `mcp__supabase__list_tables` to verify the remote schema is consistent with the local Drift table definitions. Flag any mismatch as a schema drift finding.
+5. **Pattern-divergence check** (item 5.4.5): for each directory in the diff that touches `test/`, scan whether the diff introduces a new mocking library, setup style, or async/pump style alongside an existing one. If yes, look for a matching `deviation:` entry (`migrated …` or `kept directory's pattern …`). No matching deviation → flag as a silent split and mark the relevant ACs INCOMPLETE.
 
 ---
 
