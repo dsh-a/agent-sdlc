@@ -212,6 +212,32 @@ Run this in the background — it does not block Phase 3 from continuing. Scaffo
 
 Spawn monitor agent (model: monitor row from **Model Allocation** table in `.claude/config.md`, background) with feature name and state file path.
 
+**Spawn supervisor** (item 5.5.1) alongside monitor — they have distinct jobs (monitor: deterministic state archival; supervisor: heuristic observation). OQ-9 (consolidation) is deferred pending real telemetry.
+
+```
+Agent(subagent_type: "supervisor", model: "[supervisor row from Model Allocation]",
+      run_in_background: true,
+      prompt: "Feature: [name]. Cycle state: agent_states/cycle-state-[name].md.
+               Agent ID convention: <role>-<task-number>.
+               Initialize per supervisor.md; wait for CHECK <agent-id> messages
+               from the orchestrator. Detectors and cadence ship in 5.5.4 —
+               for now emit heartbeat + state.md only.")
+```
+
+The supervisor writes to `agent_states/whispers/`, `agent_states/escalations.jsonl`, and `agent_states/supervisor/` (heartbeat + state.md). It reads from `agent_states/events/*.jsonl` (the per-agent telemetry from 5.2.1) and `agent_states/cycle-state-*.md`. Do not poll the supervisor mid-tool-call; the cadence ladder in 5.5.4 defines when to check escalations.
+
+**Artifact layout (Phase 3):**
+
+```
+agent_states/
+  cycle-state-<feature>.md       # monitor writes
+  events/<agent-id>.jsonl        # PostToolUse hook writes
+  whispers/<agent-id>.md         # supervisor writes
+  escalations.jsonl              # supervisor writes
+  supervisor/state.md            # supervisor writes
+  supervisor/heartbeat           # supervisor touches
+```
+
 ### 3.2 — Dependency analysis
 
 Classify parent tasks: **independent** (start now) or **dependent** (wait for prerequisite).

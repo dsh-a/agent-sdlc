@@ -38,6 +38,7 @@ Active preset: **personal**
 | pre-digest | haiku | haiku | haiku |
 | salvage | haiku | haiku | haiku |
 | test-preflight | haiku | haiku | haiku |
+| supervisor | haiku | haiku | haiku |
 | orchestrator (/cycle) | opus | opus | opus |
 
 To override a single agent regardless of preset, change the value in that agent's row under the active preset column. The cycle orchestrator reads this table for all agent spawns — implementation agents at Phase 3.3, pre-digest and monitor at Phase 3 start.
@@ -69,6 +70,7 @@ Maps abstract model labels to specific model IDs. When the orchestrator spawns a
 | self-improve | high |
 | monitor | low |
 | test-preflight | low |
+| supervisor | low |
 
 ---
 
@@ -80,6 +82,7 @@ Agents spawned during Phase 4A. Set to `skip` to disable.
 |---|---|
 | verify | enabled |
 | review | enabled |
+| supervisor | enabled |
 
 When enabled, these agents run autonomously during Phase 4A and their reports are included in the cycle report. When set to `skip`, the cycle recommends running them manually in separate conversations.
 

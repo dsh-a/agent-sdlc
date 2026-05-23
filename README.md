@@ -31,6 +31,7 @@ A Claude Code agent team for autonomous feature development. Drop these agents a
 | Agent | `adversarial-tester` | Opt-in (no longer in default loop) — Phase 4A hardening or manual second-pass review |
 | Agent | `self-improve` | Spawned by `/self-improve` — applies pipeline improvements |
 | Agent | `monitor` | Spawned by `/cycle` — maintains cycle state in the background |
+| Agent | `supervisor` | Spawned by `/cycle` — Phase-3 sidecar that observes event logs and emits whispers/escalations |
 
 ---
 
