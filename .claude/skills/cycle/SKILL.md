@@ -247,6 +247,8 @@ Spawn monitor agent (model: monitor row from **Model Allocation** table in `.cla
 
 **Spawn supervisor** (item 5.5.1) alongside monitor — they have distinct jobs (monitor: deterministic state archival; supervisor: heuristic observation). OQ-9 (consolidation) is deferred pending real telemetry.
 
+**Skip the supervisor entirely** when the task file has fewer than `skip_supervisor_if_total_subtasks_lt` sub-tasks (Per-phase skip flags in `.claude/config.md`, default 3) — observation overhead exceeds value on small task lists. Log the skip as `SUPERVISOR_HEALTH status:disabled spawns:0 stalls:0 heartbeat:none disabled_at:[ts] reason:skip-flag` so the run report reflects it.
+
 ```
 Agent(subagent_type: "supervisor", model: "[supervisor row from Model Allocation]",
       run_in_background: true,
@@ -287,7 +289,7 @@ Before spawning any implementation agent:
 
 For each parent task (independent in parallel, dependent when ready), first **create the task worktree** per the **Phase-3 worktree protocol** (`git worktree add` from `feature/[name]` HEAD), then:
 
-1. **Pre-digest** (haiku, background) — **default for any task touching ≥ 2 existing files**. Reads relevant source files and returns a ~150-line structured summary (public API, constructor deps, key patterns). Skip only if the task creates all-new files or a digest was already saved.
+1. **Pre-digest** (haiku, background) — default for any task touching ≥ `skip_predigest_if_files_lt` existing files (Per-phase skip flags in `.claude/config.md`, default 2). Reads relevant source files and returns a ~150-line structured summary (public API, constructor deps, key patterns). Skip when below threshold, when the task creates all-new files, or when a digest was already saved.
 
    ```
    Agent(model: "[pre-digest model from Model Allocation table in .claude/config.md]", run_in_background: true,
@@ -326,7 +328,7 @@ For each parent task (independent in parallel, dependent when ready), first **cr
    - Agent marks sub-tasks `[x]` as it completes them
    - On failure/ambiguity: report to orchestrator, continue independent sub-tasks
 
-3. **Pre-flight contradiction classifier** (haiku, runs in the same task worktree after implementer commits, before test agent). Skip when grep of `test/` for any public symbol the implementer touched returns no hits — true greenfield needs no classification.
+3. **Pre-flight contradiction classifier** (haiku, runs in the same task worktree after implementer commits, before test agent). Skip when `skip_preflight_if_no_existing_tests` is `true` (Per-phase skip flags in `.claude/config.md`, default true) **and** grep of `test/` for any public symbol the implementer touched returns no hits — true greenfield needs no classification.
 
    ```
    Agent(subagent_type: "test-preflight", model: "haiku",
@@ -492,6 +494,8 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 6. **Autonomous verify & review** — read `.claude/config.md` Optional Agents section.
 
    **Mode override:** in `--mode hotfix`, **skip the review spawn entirely** and spawn only `verify` at **lite** depth (see 5.6.6). In `--mode lean` and `--mode full`, behave as below.
+
+   **Skip flag:** when `skip_review_if_files_lt` (Per-phase skip flags in `.claude/config.md`, default 0/off) is > 0 and `git diff [base] --name-only | wc -l` is below it, also skip review. Note the skip in the run report's Agent Audit (`review: skipped — files changed N < threshold M`).
 
    If both are enabled, issue the two `Agent` calls in a **single message** so they run concurrently — verify and review share no state and must not gate each other.
 

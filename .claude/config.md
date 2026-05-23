@@ -86,6 +86,21 @@ Agents spawned during Phase 4A. Set to `skip` to disable.
 
 ---
 
+## Per-phase skip flags (5.6.2)
+
+Conservative defaults. Flags act as **additional** skip conditions on top of the active `--mode`. Set a flag to `0` or `false` to disable that specific skip.
+
+| Flag | Default | Skips |
+|---|---|---|
+| `skip_predigest_if_files_lt` | 2 | Pre-digest spawn when the parent task's "Relevant Files" count is below this. (Codifies existing inline rule — small tasks don't need digestion.) |
+| `skip_preflight_if_no_existing_tests` | true | `test-preflight` spawn when grep of `test/` for the touched symbols returns no hits. (Codifies the greenfield short-circuit from 5.4.3.) |
+| `skip_review_if_files_lt` | 0 | Review spawn when changed files below this threshold. `0` = always run review. |
+| `skip_supervisor_if_total_subtasks_lt` | 3 | Supervisor spawn for the cycle when the task list is small enough that observation overhead exceeds value. |
+
+After ≥ 20 cycles of telemetry, `self-improve` proposes new values based on observed correlations between skipping and downstream rework.
+
+---
+
 ## Supervisor Thresholds
 
 Item 5.5.4 placeholders. **All values are best guesses — `self-improve` tunes from real cycle telemetry once enough cycles have run.** Edit here to override.
