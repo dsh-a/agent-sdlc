@@ -84,6 +84,32 @@ Agents spawned during Phase 4A. Set to `skip` to disable.
 | review | enabled |
 | supervisor | enabled |
 
+---
+
+## Supervisor Thresholds
+
+Item 5.5.4 placeholders. **All values are best guesses — `self-improve` tunes from real cycle telemetry once enough cycles have run.** Edit here to override.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `cadence_n` | 5 | Run a supervisor check after every N tool calls per agent |
+| `window_k` | 20 | Read the last K events of an agent on each check |
+| `stall_seconds` | 300 | An agent with no events for ≥ this duration triggers `stall` |
+| `spiral_edits` | 3 | Same file edited this many times without an intervening Read → `spiral` |
+| `spiral_errors` | 3 | This many consecutive `exit:error` events → `spiral` |
+
+### Detector states
+
+| Detector | Default | Notes |
+|---|---|---|
+| `spiral` | enabled | Repeat-edit / repeat-error pattern detection |
+| `drift` | enabled | File touches outside the agent's parent-task scope |
+| `stall` | enabled | Idle agent above the stall threshold |
+| `shallow` | enabled | Edit/Write before any Read of that file |
+| `contradiction` | enabled | Cycle-state RESCUE contradiction-loop newer than last check |
+
+Set a detector to `disabled` to silence it without removing the supervisor entirely.
+
 When enabled, these agents run autonomously during Phase 4A and their reports are included in the cycle report. When set to `skip`, the cycle recommends running them manually in separate conversations.
 
 ---

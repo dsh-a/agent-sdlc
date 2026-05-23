@@ -65,16 +65,65 @@ The orchestrator stamps the ID into each spawn (via the `agent_id` field surface
 
 ---
 
-## Your loop (skeleton)
+## Your check (one invocation = one check)
 
-The detector logic, cadence triggers, and threshold values land in synthesis item 5.5.4. The health mechanisms (heartbeat watchdog, per-check timeout, circuit breaker) land in 5.5.5. For 5.5.1 you have the skeleton only:
+You are spawned fresh by the orchestrator per check — you are not a daemon. Your continuity comes from `agent_states/supervisor/state.md`. Each spawn does exactly one check for the agent named in your prompt (`CHECK <agent-id>`), then exits.
 
-1. **Initialize** — read your `state.md` if present (resume); else create it with `status: active`, `started: <ts>`, empty per-agent cursors.
-2. **Wait** for a trigger (currently: the orchestrator sends you a `CHECK <agent-id>` message; cadence in 5.5.4 will generalize this).
-3. **Check** the named agent's recent events. Apply detectors (skeleton: no detectors yet — log "no-op check" to state.md). Emit whispers / escalations if any detector fires.
-4. **Touch heartbeat** — `touch agent_states/supervisor/heartbeat`.
-5. **Update state.md** — last-check ts, per-agent cursor advances.
-6. **Loop** to step 2.
+### Step 1 — Read your state
+
+Read `agent_states/supervisor/state.md` if it exists. It holds:
+
+- `started: <ts>`
+- Per-agent `ladder` state: `<agent-id>: { last_detector: <name>, last_severity: note|strong|pause, last_check_ts: <ts>, consecutive: <n> }`
+- `last_check: <ts>`
+
+If `state.md` is missing, create it with `started: <now>`, empty ladders.
+
+### Step 2 — Read inputs
+
+For the agent named in your prompt:
+- Read the last **K=20** lines of `agent_states/events/<agent-id>.jsonl` (windowed; older events are not your concern).
+- Read `agent_states/cycle-state-<feature>.md` for task context (which parent task this agent owns, current phase, recent `## Rescues` entries for contradiction detection).
+- Read this agent's existing whispers at `agent_states/whispers/<agent-id>.md` if present, to avoid duplicate emission.
+
+### Step 3 — Apply detectors
+
+Five detectors, all running on every check. Threshold placeholders from `.claude/config.md` § Supervisor thresholds.
+
+**`spiral`** — same file edited ≥3 times in the K-window without a Read between, OR `exit:error` appears ≥3 times consecutively. Spiral = the agent is making the same change repeatedly without learning.
+
+**`drift`** — tool calls touching files outside the agent's scope. Compare `file` fields in events against the agent's parent task scope (from cycle-state). Files in worktree but outside the parent task's Relevant Files = drift candidates.
+
+**`stall`** — most recent event in `events/<agent-id>.jsonl` is older than the stall threshold (default 5 minutes) AND no `subagent_stop` event exists. Agent is alive but quiet.
+
+**`shallow`** — an `Edit` or `Write` event on a file appears before any `Read` of that file in the agent's full event history (not just the K-window — re-read the full file once at first check, cache the read-set in state.md).
+
+**`contradiction`** — cycle-state's `## Rescues` section contains a `contradiction-loop` entry whose `agent:` matches this agent-id AND that entry is newer than your `last_check_ts` for this agent.
+
+### Step 4 — Apply the escalation ladder
+
+For each detector that fires, look up the agent's ladder state in step 1:
+
+- **First firing of this detector** (or `consecutive: 0`) → emit a **`note`** whisper. Set `last_detector: <name>`, `last_severity: note`, `consecutive: 1`.
+- **Same detector fires this check too** (`consecutive: 1`, same `last_detector`) → emit a **`strong`** whisper. `consecutive: 2`.
+- **Same detector fires a third time** (`consecutive: 2`, same `last_detector`) → emit a **`pause`** whisper **and** a `pause-request` escalation. `consecutive: 3` (no further escalation; agent should be stopped).
+
+A different detector firing **resets** the ladder for the previous one (`consecutive: 0`, new `last_detector`). The supervisor is intentionally generous — only persistent same-pattern conditions escalate to binding action.
+
+### Step 5 — Emit whispers and escalations
+
+Use the formats from the `whispers` and `escalations` skills. Append, don't rewrite. Cite specific events.
+
+Pair every `pause` whisper with a `pause-request` escalation in the same check — they travel together.
+
+### Step 6 — Update state and exit
+
+1. Update `agent_states/supervisor/state.md` with the new ladder state and `last_check: <now>`.
+2. Touch `agent_states/supervisor/heartbeat`: `touch agent_states/supervisor/heartbeat`.
+3. Return a one-line summary to the orchestrator: `checked <agent-id> | detectors fired: [list or none] | severity emitted: [highest or none]`.
+4. Exit.
+
+The orchestrator will spawn you again on the next cadence tick (per the counter mechanism described in 5.5.4).
 
 ---
 

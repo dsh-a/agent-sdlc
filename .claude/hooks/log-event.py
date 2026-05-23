@@ -81,6 +81,24 @@ def main():
     except Exception:
         return
 
+    # Supervisor cadence counter (item 5.5.4). Per-agent integer file at
+    # agent_states/counters/<agent_id>. Incremented on every PostToolUse event.
+    # The orchestrator's watchdog reads + resets these when it decides to
+    # spawn a supervisor check. Pure best-effort — never fails the caller.
+    if event == "PostToolUse" and agent_id != "orchestrator":
+        try:
+            counters_dir = os.path.join(main_root, "agent_states", "counters")
+            os.makedirs(counters_dir, exist_ok=True)
+            counter_path = os.path.join(counters_dir, agent_id)
+            current = 0
+            if os.path.exists(counter_path):
+                with open(counter_path) as f:
+                    current = int(f.read().strip() or "0")
+            with open(counter_path, "w") as f:
+                f.write(str(current + 1))
+        except Exception:
+            pass
+
 
 if __name__ == "__main__":
     try:

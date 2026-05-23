@@ -317,6 +317,19 @@ For each parent task (independent in parallel, dependent when ready), first **cr
 - **Stalled** (agent killed by the harness watchdog, or returns no clean result): run **Stall salvage** (below), then the escalation ladder using the salvage assessment as context
 - **Blocked**: notify user, continue independent tasks
 
+### Supervisor cadence (5.5.4)
+
+The PostToolUse hook increments a per-agent counter at `agent_states/counters/<agent-id>` on every tool call. At your watchdog tick (and at each sub-task boundary), read all counter files:
+
+- For each agent-id whose counter ≥ `cadence_n` (Supervisor Thresholds in `.claude/config.md`, default 5), spawn a supervisor check:
+  ```
+  Agent(subagent_type: "supervisor", model: "[supervisor row from Model Allocation]",
+        prompt: "CHECK <agent-id>. Feature: [name].")
+  ```
+- After spawn returns (or on a separate completion signal), reset that agent's counter to `0` by overwriting the file.
+
+Supervisor spawns are fresh per check — continuity lives in `agent_states/supervisor/state.md`. The escalation channel below is how the supervisor signals back to you.
+
 ### Supervisor escalation polling
 
 The orchestrator polls `agent_states/escalations.jsonl` at three moments only (item 5.5.2):
