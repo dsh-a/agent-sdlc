@@ -327,8 +327,20 @@ The PostToolUse hook increments a per-agent counter at `agent_states/counters/<a
         prompt: "CHECK <agent-id>. Feature: [name].")
   ```
 - After spawn returns (or on a separate completion signal), reset that agent's counter to `0` by overwriting the file.
+- **Skip cadence checks entirely if supervisor health Status is `disabled`** (degraded mode — see below).
 
 Supervisor spawns are fresh per check — continuity lives in `agent_states/supervisor/state.md`. The escalation channel below is how the supervisor signals back to you.
+
+### Supervisor health (5.5.5)
+
+Six layered mechanisms, all run at your watchdog tick (which fires alongside the cadence check above):
+
+1. **Heartbeat watchdog.** Read mtime of `agent_states/supervisor/heartbeat`. If now − mtime > 60s **and** the supervisor has been spawned at least once this cycle, declare the supervisor offline this tick. Emit `RESCUE supervisor-stall [supervisor]: heartbeat stale [N]s | resolution: respawn-or-degrade | artifact: agent_states/supervisor/state.md` to monitor and forward `SUPERVISOR_HEALTH status:active spawns:[n] stalls:[n+1] heartbeat:[ts] disabled_at:n/a reason:n/a`.
+2. **Per-check spawn watchdog.** When you spawn the supervisor for a `CHECK <agent-id>`, treat the spawn as stalled if it does not return within 30s. Same `supervisor-stall` rescue + heartbeat path as (1).
+3. **Rescue logging on outage.** Already provided by (1)/(2) — `supervisor-stall` is in the rescue type enum.
+4. **Circuit breaker.** Maintain the **Supervisor health** section in cycle state (via monitor's `SUPERVISOR_HEALTH` verb). If `stalls` increments 3 times within a 5-minute window, **disable** the supervisor for the rest of the cycle: emit `RESCUE supervisor-disabled [supervisor]: 3 stalls in 5m | resolution: degraded mode | artifact: cycle-state` and forward `SUPERVISOR_HEALTH status:disabled spawns:[n] stalls:[n] heartbeat:[last] disabled_at:[now] reason:circuit-breaker`. Stop spawning supervisor checks; the cycle continues in degraded mode (no whispers, no escalations — falls back to today's behavior).
+5. **Run-report uptime %.** When you build the cycle run report at Phase 4A, populate the **Supervisor health** subsection of the Agent Telemetry block from cycle state. Classify the cycle as **degraded** if uptime % < 90 or status is `disabled`.
+6. **`self-improve` hook.** Documented in `.claude/agents/self-improve.md` Step 2 (Effectiveness patterns → Supervisor health). When `supervisor-stall` or `supervisor-disabled` appears in ≥ 3 of the last 5 cycles, `self-improve` raises a P0 recommendation.
 
 ### Supervisor escalation polling
 

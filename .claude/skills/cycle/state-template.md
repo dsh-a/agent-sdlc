@@ -40,6 +40,14 @@ Status: [active | paused | finished]
 - ts: [YYYY-MM-DDTHH:MM:SSZ] | pattern: [text] | agents: [comma-separated ids]
 - (or "None")
 
+## Supervisor health
+Status: [active | disabled]
+Spawns: [n]
+Stalls: [n]
+Last heartbeat: [YYYY-MM-DDTHH:MM:SSZ or none]
+Disabled at: [ts or n/a]
+Disabled reason: [text or n/a]
+
 ## Escalation cursor
 Last processed line in agent_states/escalations.jsonl: [n or 0]
 

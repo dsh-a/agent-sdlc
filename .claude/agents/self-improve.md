@@ -58,6 +58,12 @@ Look across runs for recurring patterns, organized by the 3Es:
 - **Anti-faking performance**: Are WEAK verdicts decreasing?
 - **Coverage gaps**: Are NO TEST verdicts concentrated in a specific layer?
 
+### Supervisor health patterns (item 5.5.5)
+- **Stall / disable frequency**: Tally `supervisor-stall` and `supervisor-disabled` rescue types across the last 5 cycles. If ≥3 of 5 cycles contain either, raise a **P0** recommendation — the supervisor's reliability is a critical-path issue.
+- **Uptime trend**: Read the Agent Telemetry section of each run report. Cycles flagged "degraded" (<90% uptime) recurring → P0.
+- **Whisper precision (OQ-4 stub)**: When agent return summaries include a "Whispers seen and response" line, sample these post-hoc and grade whether each whisper was correct. Feed grades back as a recommendation if a detector is consistently noisy (e.g., `shallow` firing on legitimate first-pass writes).
+- **Threshold tuning**: If the same detector fires `pause` (3-strike) in <5% of cycles, threshold may be too lax (raise sensitivity). If >50%, threshold is too aggressive (lower sensitivity). Edit `.claude/config.md` § Supervisor Thresholds.
+
 ---
 
 ## Step 3 — Generate recommendations

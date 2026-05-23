@@ -48,6 +48,15 @@ Aggregated from `agent_states/events/*.jsonl` (PostToolUse + SubagentStop hooks)
 | Contradiction-exits | [n — count of `RESCUE contradiction-loop` events] |
 | Phase-3 wallclock (first→last event) | [duration] |
 
+### Supervisor health (5.5.5)
+| Metric | Value |
+|---|---|
+| Status at cycle end | [active / disabled] |
+| Spawns | [n] |
+| Stalls | [n] |
+| Uptime % | [(spawns - stalls) / spawns × 100, or "n/a" if spawns = 0] |
+| Cycle classification | [normal / **degraded** — uptime <90% or status=disabled] |
+
 ## Economy — Agent usage
 
 | Phase | Task | Model | Est. tokens | Rework? |

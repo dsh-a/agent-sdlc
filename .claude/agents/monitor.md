@@ -66,6 +66,14 @@ Status: [active | paused | finished]
 - ts: [YYYY-MM-DDTHH:MM:SSZ] | pattern: [text] | agents: [comma-separated ids]
 - (or "None")
 
+## Supervisor health
+Status: [active | disabled]
+Spawns: [n]
+Stalls: [n]
+Last heartbeat: [YYYY-MM-DDTHH:MM:SSZ or none]
+Disabled at: [ts or n/a]
+Disabled reason: [text or n/a]
+
 ## Escalation cursor
 Last processed line in agent_states/escalations.jsonl: [n or 0]
 
@@ -105,6 +113,7 @@ The orchestrator sends brief 1–2 sentence updates:
 - `SUPERVISOR_REC suggestion:[text] accepted:[true|false] rationale:[text]` — append to **Supervisor recommendations** section
 - `BUG_PATTERN pattern:[text] agents:[ids]` — append to **Bug patterns** section
 - `ESC_CURSOR [n]` — overwrite the line under **Escalation cursor**
+- `SUPERVISOR_HEALTH status:[active|disabled] spawns:[n] stalls:[n] heartbeat:[ts] disabled_at:[ts or n/a] reason:[text or n/a]` — overwrite the **Supervisor health** section
 - `PAUSE reason:[reason] resume:[time or unknown]` — set status to paused, write resume instructions
 - `FINALIZE report:[path]` — archive, then delete all `agent_states/` files for this cycle (`rm agent_states/*`)
 
