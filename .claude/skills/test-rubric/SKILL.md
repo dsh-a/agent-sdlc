@@ -85,17 +85,22 @@ loop:
 
 ## Contradiction-exit signal
 
-If iteration 2 still fails the rubric, **do not silently accept**. Include this block in your final report, verbatim:
+If iteration 2 still fails the rubric, **do not silently accept**. Emit a `contradiction-exit` block per the **contradiction-exit** skill (item 5.4.4). Use `trigger: rubric-vs-impl` and append two rubric-specific fields:
 
 ```
 status: contradiction-exit
+trigger: rubric-vs-impl
+sources:
+  - [source file:line of impl that resists the check]
+  - [test file:line that cannot be made to pass]
+detail: [one-paragraph description of why the check could not be satisfied — e.g., "AC #3 requires a boundary at length 6, but the impl rejects all inputs regardless of length; can't add a passing length-6 test without changing impl."]
+attempted: Rewrote test twice; both iterations failed.
+recommendation: [what a human should decide — "AC is ambiguous", "impl is wrong", "test infrastructure missing fake clock", etc.]
 rubric_check: [which numbered check kept failing — 1 through 7]
 iterations: 2
-detail: [one-paragraph description of why the check could not be satisfied — e.g., "AC #3 requires a boundary at length 6, but the impl rejects all inputs regardless of length; can't add a passing length-6 test without changing impl."]
-recommendation: [what a human should decide — "AC is ambiguous", "impl is wrong", "test infrastructure missing fake clock", etc.]
 ```
 
-The orchestrator routes contradiction-exit reports to Stall salvage or human escalation rather than treating the task as done.
+The orchestrator routes contradiction-exit reports directly to L4 (block + surface to user) — no auto-retry.
 
 ---
 

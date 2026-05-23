@@ -287,6 +287,7 @@ For each parent task (independent in parallel, dependent when ready), first **cr
 
 - **Success**: capture the agent's `## Deviations` section — forward each to monitor (`DEVIATIONS [task-id] AC [ac-id]: [what] | reason: [why]`); then run the **Commit protocol** below (clean-check → test → merge task worktree into feature branch → teardown), send status to monitor
 - **Failure**: escalation ladder (below)
+- **Contradiction-exit** (agent's return contains `status: contradiction-exit` per the `contradiction-exit` skill — item 5.4.4): emit `RESCUE contradiction-loop [task-id]: [trigger value] | resolution: human escalation | artifact: [report path or "agent return"]` to monitor, then jump to **L4** immediately. Do **not** run the escalation ladder for L1–L3 — the agent already exhausted its retries by construction. Preserve the structured block verbatim in the user-facing message.
 - **Stalled** (agent killed by the harness watchdog, or returns no clean result): run **Stall salvage** (below), then the escalation ladder using the salvage assessment as context
 - **Blocked**: notify user, continue independent tasks
 

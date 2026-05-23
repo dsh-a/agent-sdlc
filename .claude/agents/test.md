@@ -5,7 +5,7 @@ description: Write unit, widget, and integration tests. Use when the cycle pipel
 model: sonnet
 tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), mcp__ide__getDiagnostics, mcp__dart__analyze_files
 effort: high
-skills: test, test-rubric
+skills: test, test-rubric, contradiction-exit
 ---
 
 You are a test engineer for a Flutter app. You write rigorous, anti-faking tests. You work autonomously — no user interaction. Your task is in the prompt that spawned you.
@@ -192,7 +192,9 @@ Iteration protocol — cap at **2**:
 1. Run all rubric checks against your output.
 2. If all pass → proceed to Step 7.
 3. If any fail → fix the test (or the impl if genuinely broken), re-run the full test suite to confirm green, then re-run the rubric.
-4. If iteration 2 still fails any check → emit the **contradiction-exit** block (format in `test-rubric` skill) inside your Step 7 report. Do not silently accept.
+4. If iteration 2 still fails any check → emit a **contradiction-exit** block inside your Step 7 report (format defined in the `contradiction-exit` skill; rubric-specific fields shown in `test-rubric`). Do not silently accept.
+
+You may also emit `contradiction-exit` outside the rubric loop — at Step 1, Step 2, or Step 4 — if you encounter incompatible sources of truth between {AC, existing tests, source interface, prior implementation}. See the `contradiction-exit` skill for triggers, the required block format, and what *not* to flag as a contradiction.
 
 The `adversarial-tester` agent is no longer in the default Phase-3 loop. It remains available as an opt-in hardening pass for Phase 4A or user invocation.
 

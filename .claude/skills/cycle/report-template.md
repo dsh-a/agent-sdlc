@@ -45,6 +45,7 @@ Aggregated from `agent_states/events/*.jsonl` (PostToolUse + SubagentStop hooks)
 |---|---|
 | Total tool calls | [n] |
 | Total errors | [n] |
+| Contradiction-exits | [n — count of `RESCUE contradiction-loop` events] |
 | Phase-3 wallclock (first→last event) | [duration] |
 
 ## Economy — Agent usage
