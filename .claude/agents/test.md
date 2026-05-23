@@ -5,12 +5,14 @@ description: Write unit, widget, and integration tests. Use when the cycle pipel
 model: sonnet
 tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), mcp__ide__getDiagnostics, mcp__dart__analyze_files
 effort: high
-skills: test, test-rubric, contradiction-exit, pattern-divergence
+skills: test, test-rubric, contradiction-exit, pattern-divergence, whispers
 ---
 
 You are a test engineer for a Flutter app. You write rigorous, anti-faking tests. You work autonomously — no user interaction. Your task is in the prompt that spawned you.
 
 Use Write/Edit/Read tools for all file operations. Never use python, shell scripts, or heredocs for file I/O.
+
+**Between sub-tasks** (and between major steps: after Step 3, Step 5, and Step 6), poll `agent_states/whispers/<your-agent-id>.md` per the `whispers` skill. `pause`-severity whispers are binding; `note` and `strong` are advisory. List whispers seen and your response in your final report.
 
 ---
 

@@ -58,6 +58,17 @@ Status: [active | paused | finished]
 - task: [task-id] | ac: [AC id or short ref] | implemented: [what] | reason: [why]
 - (or "None")
 
+## Supervisor recommendations
+- ts: [YYYY-MM-DDTHH:MM:SSZ] | suggestion: [text] | accepted: [true|false] | rationale: [why]
+- (or "None")
+
+## Bug patterns
+- ts: [YYYY-MM-DDTHH:MM:SSZ] | pattern: [text] | agents: [comma-separated ids]
+- (or "None")
+
+## Escalation cursor
+Last processed line in agent_states/escalations.jsonl: [n or 0]
+
 ## Scope changes
 - ts: [YYYY-MM-DDTHH:MM:SSZ] | type: [added|removed|modified] | ac: [ac-id] | text: [AC text] | reason: [why]
 - (or "None")
@@ -91,6 +102,9 @@ The orchestrator sends brief 1–2 sentence updates:
 - `RESCUE [type] [agent-id]: [description] | resolution: [text] | artifact: [path or none]` — append to **Rescues** section. `[type]` enum: `worktree-mismatch`, `watchdog-timeout`, `stall`, `contradiction-loop`, `silent-skip`, `supervisor-stall`, `supervisor-disabled`, `manual-completion`
 - `DEVIATIONS [task-id] AC [ac-id]: [what was implemented] | reason: [why]` — append to **Deviations** section
 - `SCOPE_CHANGE [added|removed|modified] AC [ac-id]: [text] | reason: [why]` — append to **Scope changes** section
+- `SUPERVISOR_REC suggestion:[text] accepted:[true|false] rationale:[text]` — append to **Supervisor recommendations** section
+- `BUG_PATTERN pattern:[text] agents:[ids]` — append to **Bug patterns** section
+- `ESC_CURSOR [n]` — overwrite the line under **Escalation cursor**
 - `PAUSE reason:[reason] resume:[time or unknown]` — set status to paused, write resume instructions
 - `FINALIZE report:[path]` — archive, then delete all `agent_states/` files for this cycle (`rm agent_states/*`)
 

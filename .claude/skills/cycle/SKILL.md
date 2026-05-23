@@ -317,6 +317,17 @@ For each parent task (independent in parallel, dependent when ready), first **cr
 - **Stalled** (agent killed by the harness watchdog, or returns no clean result): run **Stall salvage** (below), then the escalation ladder using the salvage assessment as context
 - **Blocked**: notify user, continue independent tasks
 
+### Supervisor escalation polling
+
+The orchestrator polls `agent_states/escalations.jsonl` at three moments only (item 5.5.2):
+1. **Phase transition** — end of Phase 3, before spawning verify/review.
+2. **Sub-task boundary** — after each parent task's Commit protocol, before spawning the next.
+3. **Watchdog tick** — see 5.5.5 (heartbeat + circuit breaker).
+
+Use a per-cycle `escalation_cursor:` field in cycle state to track the last processed line. See the `escalations` skill for per-type handling (`pause-request` → recovery decision + `RESCUE`; `depth-recommendation` → log decision in cycle state; `bug-pattern` → log + surface in run report). Never poll mid-tool-call.
+
+**Agent-ID stamp.** Every Phase-3 implementation agent must be spawned with an `agent_id` of the form `<role>-<task-number>` (e.g., `test-3.0`, `ui-story-2.1`). The PostToolUse hook routes events into `agent_states/events/<agent-id>.jsonl` and the supervisor writes whispers to `agent_states/whispers/<agent-id>.md` keyed on this ID. Include the agent-id explicitly in the spawn prompt so the agent knows which whisper file to poll.
+
 ### Escalation ladder
 
 Max 3 attempts per sub-task, 5 total per parent task.

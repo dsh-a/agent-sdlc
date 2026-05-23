@@ -32,6 +32,17 @@ Status: [active | paused | finished]
 - task: [task-id] | ac: [AC id or short ref] | implemented: [what] | reason: [why]
 - (or "None")
 
+## Supervisor recommendations
+- ts: [YYYY-MM-DDTHH:MM:SSZ] | suggestion: [text] | accepted: [true|false] | rationale: [why]
+- (or "None")
+
+## Bug patterns
+- ts: [YYYY-MM-DDTHH:MM:SSZ] | pattern: [text] | agents: [comma-separated ids]
+- (or "None")
+
+## Escalation cursor
+Last processed line in agent_states/escalations.jsonl: [n or 0]
+
 ## Scope changes
 - ts: [YYYY-MM-DDTHH:MM:SSZ] | type: [added|removed|modified] | ac: [ac-id] | text: [AC text] | reason: [why]
 - (or "None")
