@@ -30,6 +30,7 @@ Status: [active | paused | finished]
 
 ## References
 - Mode: [full | lean | hotfix]
+- Mode suggestion: [suggested mode or "n/a (user passed --mode)"] | accepted: [true | false | n/a]
 - PRD: [path or "not yet created" or "inline (lean)"]
 - AC summary (lean only): [bullet list or n/a]
 - Task file: [path or "not yet created"]

@@ -64,6 +64,7 @@ Look across runs for recurring patterns, organized by the 3Es:
 - **Whisper precision (OQ-4 stub)**: When agent return summaries include a "Whispers seen and response" line, sample these post-hoc and grade whether each whisper was correct. Feed grades back as a recommendation if a detector is consistently noisy (e.g., `shallow` firing on legitimate first-pass writes).
 - **Threshold tuning**: If the same detector fires `pause` (3-strike) in <5% of cycles, threshold may be too lax (raise sensitivity). If >50%, threshold is too aggressive (lower sensitivity). Edit `.claude/config.md` § Supervisor Thresholds.
 - **Recommendation accept ratio (5.5.6)**: Group the `## Supervisor recommendations` rows in each run report by detector (parse the `suggestion:` text). If any detector's accept ratio is <20% across the last 5 cycles, the detector is noisy or the threshold is wrong — raise a recommendation to adjust thresholds or disable the detector.
+- **Mode-suggestion accuracy (5.6.4)**: Read each cycle's `Mode suggestion: ... | accepted: ...` field. If users override the suggestion >40% of the time across the last 5 cycles, the heuristics in `.claude/skills/cycle/SKILL.md` § Mode auto-suggestion are mis-calibrated — propose adjusted keyword lists or word-count thresholds.
 
 ---
 

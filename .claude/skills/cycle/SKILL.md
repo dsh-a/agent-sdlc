@@ -65,6 +65,29 @@ Pass `--manual` to use manual mode: `/cycle --manual agent_tasks/tasks-prd-featu
 
 **Mode is recorded** in cycle state's `## References` section as `Mode: full|lean|hotfix` for the run report and `self-improve` aggregation.
 
+### Mode auto-suggestion at dry-run (5.6.4)
+
+If the user did **not** pass `--mode`, apply these heuristics on the feature description and surface a suggestion at dry-run. **Never pick silently** — the user always confirms or overrides.
+
+**Suggest `hotfix`** when ALL of:
+- Description contains any of: `fix`, `bug`, `hotfix`, `patch`, `regression`, or matches `^fix:` style.
+- Description is ≤ 20 words.
+- Description contains NONE of: `migration`, `schema`, `refactor`, `redesign`, `new feature`, `epic`.
+
+**Suggest `lean`** when ALL of (and hotfix-eligibility is false):
+- Description is ≤ 40 words.
+- Description contains NONE of: `migration`, `schema`, `multi-screen`, `epic`, `refactor`.
+
+**Else suggest `full`.**
+
+At dry-run, print exactly:
+```
+Suggested mode: <suggestion>. Reason: <short trace of the heuristic that fired>.
+Override with --mode full|lean|hotfix.
+```
+
+If the user passed `--mode` explicitly, **suppress the suggestion entirely** — their declaration wins. Record the suggestion-vs-actual outcome in cycle state's `## References` as `Mode suggestion: <suggested> | accepted: true|false` so `self-improve` can later calibrate the heuristics from observed acceptance rates.
+
 Dry-run ends with: **"Ready to execute? `/cycle --exe` to begin, or adjust first."**
 
 ---
