@@ -35,6 +35,7 @@ Status: [active | paused | finished]
 - AC summary (lean only): [bullet list or n/a]
 - Task file: [path or "not yet created"]
 - Branch: [branch name or "not yet created"]
+- Verify depth: [lite | standard | deep or "not yet computed"] | inputs: [key:value pairs or n/a]
 
 ## Current phase
 [e.g., "3.2 — implementation"]

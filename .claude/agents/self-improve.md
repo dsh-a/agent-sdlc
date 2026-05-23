@@ -65,6 +65,7 @@ Look across runs for recurring patterns, organized by the 3Es:
 - **Threshold tuning**: If the same detector fires `pause` (3-strike) in <5% of cycles, threshold may be too lax (raise sensitivity). If >50%, threshold is too aggressive (lower sensitivity). Edit `.claude/config.md` § Supervisor Thresholds.
 - **Recommendation accept ratio (5.5.6)**: Group the `## Supervisor recommendations` rows in each run report by detector (parse the `suggestion:` text). If any detector's accept ratio is <20% across the last 5 cycles, the detector is noisy or the threshold is wrong — raise a recommendation to adjust thresholds or disable the detector.
 - **Mode-suggestion accuracy (5.6.4)**: Read each cycle's `Mode suggestion: ... | accepted: ...` field. If users override the suggestion >40% of the time across the last 5 cycles, the heuristics in `.claude/skills/cycle/SKILL.md` § Mode auto-suggestion are mis-calibrated — propose adjusted keyword lists or word-count thresholds.
+- **Verify depth distribution + find-rate (5.6.6)**: Read each cycle's `Verify depth: ...` field and the verify report's verdict statistics (PASS / WEAK / INCOMPLETE / NO TEST / NO IMPL). Group by depth tier. If `lite` cycles have a higher non-PASS rate than `standard` (by ≥10 percentage points), the lite predicate is too permissive — propose tightening (raise `files_changed` threshold, add a condition). If `deep` cycles never find more issues than `standard`, the deep predicate is wastefully aggressive — propose loosening.
 
 ---
 

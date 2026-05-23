@@ -522,11 +522,28 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    If both are enabled, issue the two `Agent` calls in a **single message** so they run concurrently — verify and review share no state and must not gate each other.
 
-   If `verify` is **enabled**: spawn the `verify` agent with the PRD path, source file paths, test file paths, and pre-extracted AC:
+   **Compute verify depth (5.6.6).** Before spawning verify, gather the inputs from cycle state and the git diff:
+   - `files_changed_count` = `git diff [base] --name-only | wc -l`
+   - `test_files_touched` = any changed path starts with `test/`
+   - `domain_or_migration_files_touched` = any changed path under `lib/data/`, `lib/domain/`, or matches `**/migrations/**`
+   - `deviations_non_empty` = cycle state `## Deviations` has entries
+   - `phase3_retry_count` = count of `ESCALATION` lines (any level) in cycle state
+   - `phase3_contradiction_exits` = count of `RESCUE contradiction-loop` entries in cycle state's `## Rescues`
+   - `mid_cycle_scope_expansion` = cycle state `## Scope changes` has any `added` or `modified` entry
+
+   Apply the rule:
+   - **`--mode hotfix` forces `lite`** (overrides everything else).
+   - **`deep`** when ANY of: `phase3_retry_count > 3` OR `phase3_contradiction_exits >= 1` OR `mid_cycle_scope_expansion`. Deep wins over lite if both conditions fire.
+   - **`lite`** when ALL of: `files_changed_count < 3` AND NOT `test_files_touched` AND NOT `domain_or_migration_files_touched` AND NOT `deviations_non_empty`.
+   - Otherwise **`standard`**.
+
+   Record the chosen depth and its inputs in cycle state under `## References` → `Verify depth: <tier> | inputs: <key:value pairs>` for `self-improve` calibration.
+
+   If `verify` is **enabled**: spawn the `verify` agent with the PRD path, source file paths, test file paths, pre-extracted AC, **and the computed depth**:
    ```
    Agent(subagent_type: "verify", model: [per config Model Allocation],
          prompt: "PRD: [prd-path]. Source files: [paths]. Test files: [paths].
-                  AC: [pre-extracted]. Branch: [branch-name].
+                  AC: [pre-extracted]. Branch: [branch-name]. Depth: <lite|standard|deep>.
                   Report path: agent_tasks/reports/verify-[prd-stem]-[date].md — write your report there.
                   Work autonomously — no user interaction.")
    ```

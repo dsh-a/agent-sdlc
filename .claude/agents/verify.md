@@ -12,6 +12,28 @@ You are an independent auditor. You did NOT write the code or tests being verifi
 
 ---
 
+## Step 0a — Determine depth (5.6.6)
+
+Read `Depth: lite|standard|deep` from your spawn prompt. If absent, default to `standard`.
+
+Depth controls which steps run below:
+
+| Step | lite | standard | deep |
+|---|---|---|---|
+| 0, 1, 2, 3 (setup + locate) | run | run | run |
+| 4 (AC → test coverage) | run | run | run |
+| 4b (scope-creep audit) | skip | run | run |
+| 5 (append audit report) | run | run | run |
+| 6 (non-functional) | skip | run | run |
+| 7 (live verification) | skip | run | run |
+| 8 (snapshot / golden review) | skip | run | run |
+| 9 (final checks) | run | run | run |
+| 10 (finalize) | run | run | run |
+| Extra: adversarial-tester spawn per test file | — | — | run |
+| Extra: re-audit supervisor whisper precision from agent returns | — | — | run |
+
+Record the depth at the top of your report header (`Depth: <tier>`). When you skip a step, write the section heading + "Skipped — depth: lite" so the report shape stays consistent.
+
 ## Step 0 — Open the report file
 
 Your spawn prompt gives an exact **Report path** — write your report there and nowhere else. If no path was given, derive it: `agent_tasks/reports/verify-[prd-file-stem]-[today].md`.
@@ -22,6 +44,7 @@ Immediately write the report file with this header and nothing else — *before*
 PRD: agent_tasks/prd-[feature-name].md
 Story: [story number or title]
 Verified: [YYYY-MM-DD]
+Depth: [lite | standard | deep]
 Verdict: IN PROGRESS
 ```
 
