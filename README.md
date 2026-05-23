@@ -27,7 +27,8 @@ A Claude Code agent team for autonomous feature development. Drop these agents a
 | Skill | `/setup` | Interactive configuration wizard for new projects |
 | Agent | `verify` | Spawned during cycle Phase 4A — audits AC coverage |
 | Agent | `review` | Spawned during cycle Phase 4A — reviews code quality |
-| Agent | `adversarial-tester` | Spawned by `test` — finds weak assertions |
+| Agent | `test-preflight` | Spawned by `/cycle` — classifies existing tests (keep/update/delete) before the test agent runs |
+| Agent | `adversarial-tester` | Opt-in (no longer in default loop) — Phase 4A hardening or manual second-pass review |
 | Agent | `self-improve` | Spawned by `/self-improve` — applies pipeline improvements |
 | Agent | `monitor` | Spawned by `/cycle` — maintains cycle state in the background |
 

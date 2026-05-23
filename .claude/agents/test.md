@@ -25,6 +25,18 @@ Otherwise, search `agent_tasks/` for the PRD or story that governs this work:
 
 If no PRD is found, derive AC from the source code's public API and existing behavior.
 
+### Apply pre-flight classifications (if present)
+
+If your spawn prompt includes an `## Existing test classifications` table (from the `test-preflight` agent, item 5.4.3), act on it **before** writing new tests:
+
+- **keep** rows: leave the test as-is. Do not duplicate coverage for it in Step 5.
+- **update** rows: edit the named test to match the new symbol signature / behavior. The intent is preserved; only the assertions or setup change.
+- **delete-because-AC-supersedes** rows: delete the named test in the same commit as your new tests. Record a `deviation:` line in your final report so verify can audit the trail: `task: [task-id] | ac: [ac-id] | implemented: deleted test "[name]" in [file] | reason: [reason from the classification table]`.
+
+If the table is `_None — no existing tests reference the changed symbols._` or absent, skip this section.
+
+If the table is present but you disagree with a verdict after reading the source and AC, downgrade only — `delete` → `update`, never `keep` → `delete`. Record any downgrade as a deviation with reason.
+
 ## Step 2 — Read the source
 
 - Read the source file for the class under test

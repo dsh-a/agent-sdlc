@@ -37,6 +37,7 @@ Active preset: **personal**
 | monitor | haiku | haiku | haiku |
 | pre-digest | haiku | haiku | haiku |
 | salvage | haiku | haiku | haiku |
+| test-preflight | haiku | haiku | haiku |
 | orchestrator (/cycle) | opus | opus | opus |
 
 To override a single agent regardless of preset, change the value in that agent's row under the active preset column. The cycle orchestrator reads this table for all agent spawns — implementation agents at Phase 3.3, pre-digest and monitor at Phase 3 start.
@@ -67,6 +68,7 @@ Maps abstract model labels to specific model IDs. When the orchestrator spawns a
 | adversarial-tester | high |
 | self-improve | high |
 | monitor | low |
+| test-preflight | low |
 
 ---
 

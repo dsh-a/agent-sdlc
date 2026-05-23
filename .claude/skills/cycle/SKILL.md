@@ -267,8 +267,20 @@ For each parent task (independent in parallel, dependent when ready), first **cr
    - Agent marks sub-tasks `[x]` as it completes them
    - On failure/ambiguity: report to orchestrator, continue independent sub-tasks
 
-3. **Test** (separate agent from implementer; runs in the **same task worktree** as the implementer, after it — so it sees the implemented code; no `isolation:` parameter):
-   - **Write** (sonnet): `Agent(subagent_type: "test", model: "sonnet", prompt: "[worktree-startup preamble] PRD: [prd-path]\nSource files: [paths]\nTest files: [paths]\nAC (pre-extracted): [AC items]\nTask: [task description]")`
+3. **Pre-flight contradiction classifier** (haiku, runs in the same task worktree after implementer commits, before test agent). Skip when grep of `test/` for any public symbol the implementer touched returns no hits — true greenfield needs no classification.
+
+   ```
+   Agent(subagent_type: "test-preflight", model: "haiku",
+         prompt: "[worktree-startup preamble]
+                  Changed source files: [paths the implementer modified]
+                  AC (pre-extracted): [AC items from PRD]
+                  Base ref: feature/[name]")
+   ```
+
+   The classifier returns a `## Existing test classifications` table. Lift it verbatim into the test agent's spawn prompt (next step). It produces no file artifact — its output lives in the return value only.
+
+4. **Test** (separate agent from implementer; runs in the **same task worktree** as the implementer, after pre-flight — so it sees the implemented code; no `isolation:` parameter):
+   - **Write** (sonnet): `Agent(subagent_type: "test", model: "sonnet", prompt: "[worktree-startup preamble] PRD: [prd-path]\nSource files: [paths]\nTest files: [paths]\nAC (pre-extracted): [AC items]\nTask: [task description]\n[pre-flight classifications table if non-empty]")`
    - **Fix** (sonnet): re-spawn `test` agent with failure output and source paths
 
 ### 3.4 — Handle results
