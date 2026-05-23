@@ -3,7 +3,9 @@ Last updated: [YYYY-MM-DD HH:MM]
 Status: [active | paused | finished]
 
 ## References
-- PRD: [path or "not yet created"]
+- Mode: [full | lean | hotfix]
+- PRD: [path or "not yet created" or "inline (lean)"]
+- AC summary (lean only): [bullet list or n/a]
 - Task file: [path or "not yet created"]
 - Branch: [branch name or "not yet created"]
 

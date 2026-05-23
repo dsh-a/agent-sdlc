@@ -43,6 +43,28 @@ Pass `--manual` to use manual mode: `/cycle --manual agent_tasks/tasks-prd-featu
 
 `--manual` delegates to `/process-tasks` logic — one sub-task at a time with user approval gates after each. No parallel agents, no worktrees. Still creates a state file for resume capability. Requires a task file path (or will prompt for one).
 
+### Cycle modes (5.6.1, 5.6.3)
+
+`/cycle --mode full|lean|hotfix` selects the depth of the pipeline. Default is `full`. Modes are **user-declared** — the orchestrator may *suggest* a mode at dry-run (5.6.4) but never picks silently.
+
+**Behavior matrix:**
+
+| Phase | `full` | `lean` | `hotfix` |
+|---|---|---|---|
+| 1A PRD | yes | inline — derive AC from the feature description; skip `create-prd` spawn | skip |
+| 1C gate | yes | **merged with 2B** (one combined approval) | skip |
+| 2 task gen | yes | yes | skip (single implicit task) |
+| 2B gate | yes | **merged with 1C** | skip |
+| 3 implementation | parallel agents in worktrees | parallel agents in worktrees | single agent, **no worktree** (main checkout) |
+| 4A wrap-up | verify + review concurrently | verify + review concurrently | lite verify only; no review |
+| 4B release | yes | yes | yes |
+
+**Gate consolidation in lean.** When `--mode lean`, Phases 1C and 2B fuse into one approval point at the end of Phase 2: the user reviews the inline-derived AC summary *and* the generated task list together, then approves once. PRD is not written to a file; the AC summary lives inside the cycle state's `## References` section.
+
+**Hotfix posture.** `--mode hotfix` is for "fix one thing, fast." Single implicit task derived from the feature description (no `generate-tasks` spawn). Implementation runs on the feature branch directly — no worktree, no parallel agents, no pre-digest. Verify runs at **lite** depth (see 5.6.6). Review is skipped. The feature branch and PR open as normal in 4B.
+
+**Mode is recorded** in cycle state's `## References` section as `Mode: full|lean|hotfix` for the run report and `self-improve` aggregation.
+
 Dry-run ends with: **"Ready to execute? `/cycle --exe` to begin, or adjust first."**
 
 ---
@@ -52,6 +74,8 @@ Dry-run ends with: **"Ready to execute? `/cycle --exe` to begin, or adjust first
 ### Phase-3 worktree protocol (MANDATORY)
 
 The orchestrator creates and owns every Phase-3 worktree. Implementation agents do **not** use `isolation: "worktree"` — worktrees created by that harness flag branch from a stale base instead of the feature branch HEAD. The orchestrator avoids the bug by creating worktrees itself.
+
+**Mode override:** in `--mode hotfix`, worktrees are skipped entirely. A single implementation agent runs in the main checkout on the feature branch. No agent_id-based events, no parallel agents, no worktree-startup preamble. The rest of this section applies only when mode is `full` or `lean`.
 
 **One worktree per parent task** — the implementer and the test agent for that task share it.
 
@@ -142,6 +166,13 @@ On resume: cancel any scheduled cron (`CronDelete`), re-check blockers with user
 
 ---
 
+## Mode-conditional phase routing (5.6.1)
+
+Before entering Phase 1A, route per the active `--mode`:
+- **`full`** — all phases run as written below.
+- **`lean`** — skip `create-prd` spawn in Phase 1A; derive AC inline from the feature description and store under cycle state `## References` → `AC summary:`. Skip Phase 1C (folded into Phase 2B). Phase 2 still spawns `generate-tasks` (with the inline AC summary as input). Phase 2B presents AC + tasks together for one combined approval.
+- **`hotfix`** — skip Phases 1A, 1C, 2, 2B entirely. Treat the feature description as a single implicit task. Go directly to Phase 3 with one agent, no worktree (main checkout), no pre-digest. Phase 4A runs verify (lite depth) only.
+
 ## Phase 1A — Create PRD
 
 Spawn the `create-prd` agent (model: sonnet) with the feature description. The agent explores the codebase, checks the roadmap, scans existing PRDs, and returns a complete PRD draft and file path.
@@ -188,6 +219,8 @@ Existing task file → present for review instead of re-generating.
 ## Phase 2B — Gate 2
 
 Present task list. Ask: **"Begin implementation?"**
+
+In `--mode lean`, **also present the inline AC summary above the task list** — this is the consolidated 1C+2B gate. One combined approval covers both AC and tasks.
 
 Approved → create feature branch, update state, Phase 3. Changes → apply, re-ask.
 
@@ -456,7 +489,11 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    - Scope changes (copy the cycle state's **Scope changes** section verbatim; write "None" if empty)
 4. Present cycle report to user inline
 5. Generate run report → `agent_tasks/reports/report-prd-[feature-name]-[YYYY-MM-DD].md` using template `.claude/skills/cycle/report-template.md`. **Agent Audit**, **Rescues**, and **Agent Telemetry** sections are required. Copy the **Rescues** list from the cycle state file verbatim into the run report's `## Rescues` section (write "None" if cycle state has no rescues). For Agent Telemetry, read all files in `agent_states/events/` and aggregate one row per `agent_id` — fields: `agent_type`, tool-call count, breakdown by `tool`, error count (`exit:error`), wallclock (last `ts` − first), and `stop_reason` from any `subagent_stop` line. If `agent_states/events/` is empty or missing, write *"Telemetry not collected — enable hooks per README."* in place of the table. If >10 reports exist, summarize oldest into `agent_tasks/agent_metrics.md`.
-6. **Autonomous verify & review** — read `.claude/config.md` Optional Agents section. If both are enabled, issue the two `Agent` calls in a **single message** so they run concurrently — verify and review share no state and must not gate each other.
+6. **Autonomous verify & review** — read `.claude/config.md` Optional Agents section.
+
+   **Mode override:** in `--mode hotfix`, **skip the review spawn entirely** and spawn only `verify` at **lite** depth (see 5.6.6). In `--mode lean` and `--mode full`, behave as below.
+
+   If both are enabled, issue the two `Agent` calls in a **single message** so they run concurrently — verify and review share no state and must not gate each other.
 
    If `verify` is **enabled**: spawn the `verify` agent with the PRD path, source file paths, test file paths, and pre-extracted AC:
    ```
