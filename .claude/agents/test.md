@@ -159,7 +159,20 @@ For per-edit inline checks during implementation, prefer `mcp__ide__getDiagnosti
 ### 2. Full test suite
 Run `flutter test` (not just the new test file) to catch regressions.
 
-### 3. Self-check rubric (in-process)
+### 3. Silent-skip grep gate (mechanical, pre-commit)
+
+Before declaring done — and *separately from* the rubric below — run a literal grep on the test files you wrote or modified. Any match blocks the commit:
+
+```bash
+grep -rEn 'if \(find\w*\.isNotEmpty|if \(finder\.evaluate\(\)|\.skip\(|@Skip\(|xit\(|xtest\(' test/
+grep -rEn 'try \{[^}]*expect[^}]*\} catch' test/  # multi-line variants; check manually if grep -E misses them
+```
+
+If any hit: remove the guard (let the assertion fail loudly when the precondition isn't met), or rewrite as an explicit `expect(find..., findsNothing)` when "absence" is the actual AC. Then re-run the rubric and the full suite.
+
+This gate also runs orchestrator-side at merge time. If you commit despite a match, the orchestrator will block the merge, raise a `RESCUE silent-skip` event, and re-spawn you with the offending file — fix it here to save the round trip.
+
+### 4. Self-check rubric (in-process)
 
 Load the `test-rubric` skill and apply it to the tests you just wrote. The rubric runs seven checks (AC literalness, naive-shortcut, boundary, side effect, negative path, silent-skip grep, schema constraints).
 

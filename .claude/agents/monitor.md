@@ -88,7 +88,7 @@ The orchestrator sends brief 1–2 sentence updates:
 - `ESCALATION [task-id] L[1-4]: [model used] [brief reason]` — log in state file for run report
 - `BLOCKER [task-id]: [description]` — add to blockers section
 - `BLOCKER RESOLVED [task-id]` — remove from blockers
-- `RESCUE [type] [agent-id]: [description] | resolution: [text] | artifact: [path or none]` — append to **Rescues** section. `[type]` enum: `worktree-mismatch`, `watchdog-timeout`, `stall`, `contradiction-loop`, `supervisor-stall`, `supervisor-disabled`, `manual-completion`
+- `RESCUE [type] [agent-id]: [description] | resolution: [text] | artifact: [path or none]` — append to **Rescues** section. `[type]` enum: `worktree-mismatch`, `watchdog-timeout`, `stall`, `contradiction-loop`, `silent-skip`, `supervisor-stall`, `supervisor-disabled`, `manual-completion`
 - `DEVIATIONS [task-id] AC [ac-id]: [what was implemented] | reason: [why]` — append to **Deviations** section
 - `SCOPE_CHANGE [added|removed|modified] AC [ac-id]: [text] | reason: [why]` — append to **Scope changes** section
 - `PAUSE reason:[reason] resume:[time or unknown]` — set status to paused, write resume instructions

@@ -323,8 +323,16 @@ Existing-code bugs (not agent-written code):
 Per parent task, when all sub-tasks pass:
 1. **Clean-check** — assert `git status --porcelain` in the **main checkout** is empty. The orchestrator writes no implementation code, so a dirty main checkout means an agent leaked outside its worktree: abort the merge, report to the user, do not proceed.
 2. Run test + typecheck/lint commands (from **Project Commands** in `.claude/config.md`) in the task worktree.
-3. Green → ensure the task work is committed on `cycle/[story]/task-[N.0]` (conventional format), merge that branch into `feature/[name]`, mark parent `[x]`, update monitor, then **tear down the worktree**: `git worktree remove --force .claude/worktrees/[story]-task-[N.0]` and `git branch -D cycle/[story]/task-[N.0]`.
-4. Red → escalation ladder from L1
+3. **Silent-skip gate** — grep the diff of test files (`git diff feature/[name]...HEAD -- 'test/**'` inside the worktree) for these patterns. Any hit blocks the merge:
+   ```
+   if \(find\w*\.isNotEmpty            # gated assertion
+   if \(finder\.evaluate\(\)           # same shape, different API
+   try \{[^}]*expect[^}]*\} catch      # swallowed expect
+   \.skip\(|@Skip\(|xit\(|xtest\(      # skipped tests
+   ```
+   On hit: emit `RESCUE silent-skip [task-id]: [file:line + pattern] | resolution: re-spawn test agent | artifact: [worktree path]` to monitor, then re-spawn the **test** agent in the same worktree with the offending file + matched pattern in its prompt. One retry allowed; a second hit escalates per L3 of the ladder. Scope is `test/` only — `lib/` matches are not flagged (legitimate production patterns).
+4. Green and gate clean → ensure the task work is committed on `cycle/[story]/task-[N.0]` (conventional format), merge that branch into `feature/[name]`, mark parent `[x]`, update monitor, then **tear down the worktree**: `git worktree remove --force .claude/worktrees/[story]-task-[N.0]` and `git branch -D cycle/[story]/task-[N.0]`.
+5. Red tests → escalation ladder from L1
 
 Never auto-revert commits. Report to user with options.
 
