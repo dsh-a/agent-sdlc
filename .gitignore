@@ -419,3 +419,7 @@ FodyWeavers.xsd
 .DS_Store
 .claude/improvements.md
 improvements-plan.md
+
+# agent-sdlc runtime (cycle state + Phase-3 worktrees)
+agent_states/
+.claude/worktrees/

@@ -1,0 +1,21 @@
+{
+  "_comment": "Sample hooks block — merge into your .claude/settings.json. Enables the per-agent event log at agent_states/events/<agent_id>.jsonl (consumed by run-report telemetry and stall salvage). Requires python3 on PATH.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"}
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"}
+        ]
+      }
+    ]
+  }
+}

@@ -5,6 +5,7 @@ description: State persistence agent for an active cycle run. Runs in the backgr
 model: haiku
 tools: Read, Write, Glob, Bash(rm agent_states/*)
 effort: low
+produces: agent_states/cycle-state-<feature>.md
 ---
 
 You are the state persistence agent for a `/cycle` run. You run in the background for the duration of Phase 3+. You receive status updates from the orchestrator via SendMessage and maintain the cycle state file. Write state immediately on every update — do not batch.
@@ -28,9 +29,13 @@ Last updated: [YYYY-MM-DD HH:MM]
 Status: [active | paused | finished]
 
 ## References
-- PRD: [path or "not yet created"]
+- Mode: [full | lean | hotfix]
+- Mode suggestion: [suggested mode or "n/a (user passed --mode)"] | accepted: [true | false | n/a]
+- PRD: [path or "not yet created" or "inline (lean)"]
+- AC summary (lean only): [bullet list or n/a]
 - Task file: [path or "not yet created"]
 - Branch: [branch name or "not yet created"]
+- Verify depth: [lite | standard | deep or "not yet computed"] | inputs: [key:value pairs or n/a]
 
 ## Current phase
 [e.g., "3.2 — implementation"]
@@ -48,6 +53,37 @@ Status: [active | paused | finished]
 
 ## Blockers
 - [task-id]: [description] — status: [waiting/resolved]
+
+## Rescues
+- ts: [YYYY-MM-DDTHH:MM:SSZ] | type: [enum] | agent: [task-id or agent-id] | description: [short] | resolution: [text] | artifact: [path or none]
+- (or "None")
+
+## Deviations
+- task: [task-id] | ac: [AC id or short ref] | implemented: [what] | reason: [why]
+- (or "None")
+
+## Supervisor recommendations
+- ts: [YYYY-MM-DDTHH:MM:SSZ] | suggestion: [text] | accepted: [true|false] | rationale: [why]
+- (or "None")
+
+## Bug patterns
+- ts: [YYYY-MM-DDTHH:MM:SSZ] | pattern: [text] | agents: [comma-separated ids]
+- (or "None")
+
+## Supervisor health
+Status: [active | disabled]
+Spawns: [n]
+Stalls: [n]
+Last heartbeat: [YYYY-MM-DDTHH:MM:SSZ or none]
+Disabled at: [ts or n/a]
+Disabled reason: [text or n/a]
+
+## Escalation cursor
+Last processed line in agent_states/escalations.jsonl: [n or 0]
+
+## Scope changes
+- ts: [YYYY-MM-DDTHH:MM:SSZ] | type: [added|removed|modified] | ac: [ac-id] | text: [AC text] | reason: [why]
+- (or "None")
 
 ## Pause info
 Paused: [YYYY-MM-DD HH:MM or n/a]
@@ -75,6 +111,13 @@ The orchestrator sends brief 1–2 sentence updates:
 - `ESCALATION [task-id] L[1-4]: [model used] [brief reason]` — log in state file for run report
 - `BLOCKER [task-id]: [description]` — add to blockers section
 - `BLOCKER RESOLVED [task-id]` — remove from blockers
+- `RESCUE [type] [agent-id]: [description] | resolution: [text] | artifact: [path or none]` — append to **Rescues** section. `[type]` enum: `worktree-mismatch`, `watchdog-timeout`, `stall`, `contradiction-loop`, `silent-skip`, `supervisor-stall`, `supervisor-disabled`, `manual-completion`
+- `DEVIATIONS [task-id] AC [ac-id]: [what was implemented] | reason: [why]` — append to **Deviations** section
+- `SCOPE_CHANGE [added|removed|modified] AC [ac-id]: [text] | reason: [why]` — append to **Scope changes** section
+- `SUPERVISOR_REC suggestion:[text] accepted:[true|false] rationale:[text]` — append to **Supervisor recommendations** section
+- `BUG_PATTERN pattern:[text] agents:[ids]` — append to **Bug patterns** section
+- `ESC_CURSOR [n]` — overwrite the line under **Escalation cursor**
+- `SUPERVISOR_HEALTH status:[active|disabled] spawns:[n] stalls:[n] heartbeat:[ts] disabled_at:[ts or n/a] reason:[text or n/a]` — overwrite the **Supervisor health** section
 - `PAUSE reason:[reason] resume:[time or unknown]` — set status to paused, write resume instructions
 - `FINALIZE report:[path]` — archive, then delete all `agent_states/` files for this cycle (`rm agent_states/*`)
 

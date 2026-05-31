@@ -36,6 +36,9 @@ Active preset: **personal**
 | self-improve | sonnet | sonnet | opus |
 | monitor | haiku | haiku | haiku |
 | pre-digest | haiku | haiku | haiku |
+| salvage | haiku | haiku | haiku |
+| test-preflight | haiku | haiku | haiku |
+| supervisor | haiku | haiku | haiku |
 | orchestrator (/cycle) | opus | opus | opus |
 
 To override a single agent regardless of preset, change the value in that agent's row under the active preset column. The cycle orchestrator reads this table for all agent spawns — implementation agents at Phase 3.3, pre-digest and monitor at Phase 3 start.
@@ -66,6 +69,8 @@ Maps abstract model labels to specific model IDs. When the orchestrator spawns a
 | adversarial-tester | high |
 | self-improve | high |
 | monitor | low |
+| test-preflight | low |
+| supervisor | low |
 
 ---
 
@@ -77,6 +82,82 @@ Agents spawned during Phase 4A. Set to `skip` to disable.
 |---|---|
 | verify | enabled |
 | review | enabled |
+| supervisor | enabled |
+
+---
+
+## Hygiene flags (§5.8)
+
+Long-tail policy knobs. All default to conservative behavior.
+
+### Analyzer baseline (5.8.1)
+
+| Flag | Default | Behavior |
+|---|---|---|
+| `analyzer_baseline` | `soft_warn` | `off` — no baseline tracking. `soft_warn` — record analyzer warnings at Phase 3 start; Phase 4A surfaces any new warnings introduced during the cycle but does not block. `hard_fail_if_exceeded` — same recording, but new warnings flip review verdict to REQUEST CHANGES. |
+
+Baseline is recorded into `cycle_reports/<feature>/analyzer-baseline.txt` at Phase 3 start by capturing `flutter analyze` (or the project's typecheck/lint command) output. Phase 4A re-runs and diffs.
+
+### Compact at phase boundaries (5.8.2)
+
+| Flag | Default | Behavior |
+|---|---|---|
+| `auto_compact_at_boundaries` | `off` | When `on`, the orchestrator invokes `/compact` at Phase 2→3 and Phase 3→4A transitions to reclaim context. Off by default because compaction can cost orchestrator decision-continuity; enable once your cycles have telemetry showing the trade-off is favorable. |
+
+### Known-pitfalls loop (5.8.3)
+
+| Flag | Default | Behavior |
+|---|---|---|
+| `known_pitfalls_path` | `documentation/known-pitfalls.md` | Path to the project's known-pitfalls file. If the file exists, the orchestrator pre-attaches matching entries to implementation-agent prompts (matched by file globs). Set to empty string to disable. |
+
+See cycle SKILL § Known pitfalls for the file format.
+
+### Bug-triage (5.8.4)
+
+| Flag | Default | Behavior |
+|---|---|---|
+| `aggregate_bugs_into` | `documentation/bugs.md` | Path the `self-improve` agent appends new "Bugs discovered" entries to (dedup by title hash). Set to empty string to disable. |
+
+---
+
+## Per-phase skip flags (5.6.2)
+
+Conservative defaults. Flags act as **additional** skip conditions on top of the active `--mode`. Set a flag to `0` or `false` to disable that specific skip.
+
+| Flag | Default | Skips |
+|---|---|---|
+| `skip_predigest_if_files_lt` | 2 | Pre-digest spawn when the parent task's "Relevant Files" count is below this. (Codifies existing inline rule — small tasks don't need digestion.) |
+| `skip_preflight_if_no_existing_tests` | true | `test-preflight` spawn when grep of `test/` for the touched symbols returns no hits. (Codifies the greenfield short-circuit from 5.4.3.) |
+| `skip_review_if_files_lt` | 0 | Review spawn when changed files below this threshold. `0` = always run review. |
+| `skip_supervisor_if_total_subtasks_lt` | 3 | Supervisor spawn for the cycle when the task list is small enough that observation overhead exceeds value. |
+
+After ≥ 20 cycles of telemetry, `self-improve` proposes new values based on observed correlations between skipping and downstream rework.
+
+---
+
+## Supervisor Thresholds
+
+Item 5.5.4 placeholders. **All values are best guesses — `self-improve` tunes from real cycle telemetry once enough cycles have run.** Edit here to override.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `cadence_n` | 5 | Run a supervisor check after every N tool calls per agent |
+| `window_k` | 20 | Read the last K events of an agent on each check |
+| `stall_seconds` | 300 | An agent with no events for ≥ this duration triggers `stall` |
+| `spiral_edits` | 3 | Same file edited this many times without an intervening Read → `spiral` |
+| `spiral_errors` | 3 | This many consecutive `exit:error` events → `spiral` |
+
+### Detector states
+
+| Detector | Default | Notes |
+|---|---|---|
+| `spiral` | enabled | Repeat-edit / repeat-error pattern detection |
+| `drift` | enabled | File touches outside the agent's parent-task scope |
+| `stall` | enabled | Idle agent above the stall threshold |
+| `shallow` | enabled | Edit/Write before any Read of that file |
+| `contradiction` | enabled | Cycle-state RESCUE contradiction-loop newer than last check |
+
+Set a detector to `disabled` to silence it without removing the supervisor entirely.
 
 When enabled, these agents run autonomously during Phase 4A and their reports are included in the cycle report. When set to `skip`, the cycle recommends running them manually in separate conversations.
 

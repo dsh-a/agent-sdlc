@@ -27,9 +27,11 @@ A Claude Code agent team for autonomous feature development. Drop these agents a
 | Skill | `/setup` | Interactive configuration wizard for new projects |
 | Agent | `verify` | Spawned during cycle Phase 4A — audits AC coverage |
 | Agent | `review` | Spawned during cycle Phase 4A — reviews code quality |
-| Agent | `adversarial-tester` | Spawned by `test` — finds weak assertions |
+| Agent | `test-preflight` | Spawned by `/cycle` — classifies existing tests (keep/update/delete) before the test agent runs |
+| Agent | `adversarial-tester` | Opt-in (no longer in default loop) — Phase 4A hardening or manual second-pass review |
 | Agent | `self-improve` | Spawned by `/self-improve` — applies pipeline improvements |
 | Agent | `monitor` | Spawned by `/cycle` — maintains cycle state in the background |
+| Agent | `supervisor` | Spawned by `/cycle` — Phase-3 sidecar that observes event logs and emits whispers/escalations |
 
 ---
 
@@ -76,6 +78,12 @@ If your project uses a different toolchain, update these patterns to match (e.g.
 
 - **Remove** patterns you don't want auto-allowed
 - **Add** patterns for project-specific commands (e.g., `Bash(docker compose*)`)
+
+### Enable per-agent telemetry (recommended)
+
+`.claude/settings.json.sample` ships a `hooks` block (`PostToolUse` + `SubagentStop`) that appends one JSONL line per tool call to `agent_states/events/<agent_id>.jsonl`. The cycle's run-report telemetry, the supervisor, and stall salvage all consume this log.
+
+To enable, **merge** the `hooks` block from `.claude/settings.json.sample` into your `.claude/settings.json` (don't overwrite — preserve your existing `permissions`). Requires `python3` on PATH (built-in on macOS).
 
 ### 4. Conventions
 
