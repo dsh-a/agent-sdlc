@@ -252,6 +252,7 @@ Describe your project's architectural patterns. The review agent checks that cha
 | auto_verify | `true` | Spawn verify agent during Phase 4A |
 | auto_review | `true` | Spawn review agent during Phase 4A |
 | feature_idea_on_empty | `true` | When /cycle has no args and no active state, offer to pull from FEATURES.md |
+| agent_messaging | `false` | Whether SendMessage / agent-teams is available. `false` (default): the orchestrator writes cycle state inline and only spawns the monitor once at Finalize. `true`: a background monitor receives state-update verbs via SendMessage. Leave `false` unless agent-teams is enabled. |
 
 
 ## Branch Configuration

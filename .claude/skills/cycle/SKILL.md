@@ -168,18 +168,26 @@ All work on feature branches, never directly on the base branch.
 
 State directory: `agent_states/` (ephemeral — deleted on completion).
 
-### Monitor agent
+### State persistence
 
-At Phase 3 start, spawn the monitor agent with the feature name and state file path:
+The orchestrator keeps `agent_states/cycle-state-<feature>.md` current throughout the cycle, using the template and verb list in `.claude/agents/monitor.md`. **Two modes**, selected by `agent_messaging` in `.claude/config.md` § Cycle Options (default `false`):
 
+- **`agent_messaging: false` (default) — inline.** *You*, the orchestrator, write the state file directly. The monitor's verb list (`GATE`, `SPAWNED`, `PARENT`, `RESCUE`, `DEVIATIONS`, `SCOPE_CHANGE`, `SUPERVISOR_HEALTH`, …) is your **checklist of what to record when**. This is the normal path and is **not** a degradation — never log it as a rescue. No background monitor is spawned. Inline is also the only mode that works without SendMessage / agent-teams.
+- **`agent_messaging: true` — delegated.** Spawn the background monitor once at Phase 3 start and *send* it each verb via SendMessage; it writes the state file so your context stays lean:
+  ```
+  Agent(subagent_type: "monitor", run_in_background: true,
+        prompt: "Feature: [name]. State file: agent_states/cycle-state-[name].md")
+  ```
+
+**Reading convention for the rest of this skill:** wherever a step says "emit / send / forward / update `<VERB>` to monitor," it means *record that verb in cycle state* — write it inline (default) or SendMessage it to the monitor (when `agent_messaging: true`). Verb formats are defined in `monitor.md`.
+
+**Save-before-spawn:** before spawning any sonnet/opus agent, bring the state file current first (inline) or send the pending verbs to the monitor — so a crash mid-spawn leaves an accurate recovery point.
+
+**Finalize is always a one-shot spawn.** Regardless of mode, cleanup runs as a single short-lived monitor spawn — it holds the `rm agent_states/*` permission the orchestrator does not:
 ```
-Agent(subagent_type: "monitor", run_in_background: true,
-      prompt: "Feature: [name]. State file: agent_states/cycle-state-[name].md")
+Agent(subagent_type: "monitor",
+      prompt: "FINALIZE report:[run-report-path]. Archive per monitor.md, delete all agent_states/ files for this cycle, then exit.")
 ```
-
-The orchestrator sends 1–2 sentence updates to the monitor using the message types defined in `.claude/agents/monitor.md` (GATE, SPAWNED, PARENT, ESCALATION, etc.). The monitor writes state. The orchestrator does NOT write state files directly.
-
-**Save-before-spawn**: before spawning any sonnet/opus agent, update the monitor first.
 
 ---
 
@@ -189,7 +197,7 @@ Inspect $ARGUMENTS:
 
 | Input | Start at |
 |---|---|
-| State file (`agent_states/cycle-state-*.md`) | Resume: read state + digests, verify codebase, spawn monitor, skip completed phases |
+| State file (`agent_states/cycle-state-*.md`) | Resume: read state + digests, verify codebase, resume state persistence (§ State persistence), skip completed phases |
 | PRD file (`agent_tasks/prd-*.md`) | Phase 1B |
 | Task file (`agent_tasks/tasks-*.md`) | Phase 2 review |
 | Story number (e.g., `1.6`) | Phase 1A (pre-populate from `documentation/ROADMAP.md`) |
@@ -313,7 +321,7 @@ Agent(subagent_type: "general-purpose", model: "sonnet", run_in_background: true
 
 Run this in the background — it does not block Phase 3 from continuing. Scaffold agents spawned later will pick up the pattern files once they exist.
 
-Spawn monitor agent (model: monitor row from **Model Allocation** table in `.claude/config.md`, background) with feature name and state file path.
+Initialize state persistence per **§ State persistence**: by default (`agent_messaging: false`) write the state file inline — no agent spawned. Only when `agent_messaging: true`, spawn the background monitor here (model: monitor row from **Model Allocation** table in `.claude/config.md`).
 
 **The supervisor (item 5.5.1)** runs distinct from monitor (monitor: deterministic state archival; supervisor: heuristic observation). OQ-9 (consolidation) is deferred pending real telemetry.
 
@@ -341,7 +349,7 @@ The supervisor writes to `agent_states/whispers/`, `agent_states/escalations.jso
 
 ```
 agent_states/
-  cycle-state-<feature>.md       # monitor writes
+  cycle-state-<feature>.md       # orchestrator writes inline (monitor if agent_messaging)
   events/<agent-id>.jsonl        # PostToolUse hook writes
   whispers/<agent-id>.md         # supervisor writes
   escalations.jsonl              # supervisor writes
@@ -626,7 +634,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    If either agent is set to `skip` in config, do not spawn it. Instead recommend: **"Run `/verify` and/or `/review` in separate conversations, then return here for release."**
 
-7. Tell monitor: `FINALIZE report:[path]` — this deletes the state file. **Do not skip.** The cycle may end here if the user handles the PR manually.
+7. Run the **Finalize one-shot spawn** (§ State persistence) with `FINALIZE report:[path]` — it archives, then deletes the state file. **Do not skip.** The cycle may end here if the user handles the PR manually.
 
 **4A is not complete until steps 1–7 are done. Do not skip any step.**
 

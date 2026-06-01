@@ -70,4 +70,4 @@ Resume cron: [job ID or none]
 3. Resume from: [specific instruction]
 4. Verify: `flutter test`, `flutter analyze`, `git status`
 
-5. Spawn new monitor, reuse existing digests
+5. Resume state persistence (write inline by default; spawn a new monitor only if `agent_messaging: true`), reuse existing digests
