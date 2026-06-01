@@ -6,16 +6,43 @@ This file is the central configuration for the agent-sdlc pipeline. Agents and s
 
 ## Artifact Paths
 
-| Artifact | Path |
+Every artifact is one of three classes:
+- **local** — committed to the application repo; travels with the feature branch.
+- **runtime** — never committed; covered by the managed `.gitignore` block (cycle state, telemetry, worktrees).
+- **vault** — written to the external docs vault when `vault_root` is set (see **Docs Vault** below); otherwise treated as local.
+
+| Artifact | Path | Class |
+|---|---|---|
+| PRDs and task files | `agent_tasks/` | local |
+| Cycle state | `agent_states/` | runtime |
+| Telemetry event logs | `agent_states/events/` | runtime |
+| Phase-3 worktrees | `.claude/worktrees/` | runtime |
+| Cycle reports | `cycle_reports/` | vault |
+| Run + verify + review reports | `agent_tasks/reports/` | vault |
+| Documentation | `documentation/` | local |
+| Feature ideas | `documentation/FEATURES.md` | local |
+| Roadmap | `documentation/ROADMAP.md` | local |
+| Changelog | `documentation/CHANGELOG.md` | local |
+
+---
+
+## Docs Vault (external artifact store)
+
+When `vault_root` is set, the orchestrator redirects **vault**-class artifacts out of the application repo into a shared, git-backed Obsidian vault. This keeps retrospective process artifacts (cycle reports, run/verify/review reports) out of the product's git history while making them browsable and analyzable across every application that shares the vault. Leave `vault_root` empty to keep these artifacts local (committed to the app repo) — the framework is fully backward-compatible.
+
+| Field | Value | Description |
+|---|---|---|
+| vault_root |  | Absolute path to the vault root. Empty = disabled. Example: `/Users/you/Documents/ocelot` |
+| app_slug |  | Per-application subdirectory inside the vault. Empty = derived from the repo directory name. |
+
+**Resolution.** With `vault_root` set, the orchestrator ensures these symlinks exist at startup (creating the vault targets if missing, migrating any pre-existing local reports into them first) so every relative artifact path resolves into the vault with no per-reference changes:
+
+| Repo path (becomes a symlink) | → Vault target |
 |---|---|
-| PRDs and task files | `agent_tasks/` |
-| Cycle state (ephemeral) | `agent_states/` |
-| Cycle reports | `cycle_reports/` |
-| Run reports | `agent_tasks/reports/` |
-| Documentation | `documentation/` |
-| Feature ideas | `documentation/FEATURES.md` |
-| Roadmap | `documentation/ROADMAP.md` |
-| Changelog | `documentation/CHANGELOG.md` |
+| `cycle_reports` | `{vault_root}/cycle_reports/{app_slug}/` |
+| `agent_tasks/reports` | `{vault_root}/reports/{app_slug}/` |
+
+The symlinks are added to the managed `.gitignore` block (no trailing slash — git treats a symlink as a file), so the application repo never commits vault artifacts. The vault is versioned by its own git remote (e.g. `ocelot-docs`), independent of any application repo.
 
 ---
 

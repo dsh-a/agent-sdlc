@@ -87,10 +87,29 @@ To enable, **merge** the `hooks` block from `.claude/settings.json.sample` into 
 
 ### 4. Conventions
 
-The pipeline expects these directories (auto-created as needed):
-- `agent_tasks/` — PRDs, task files, and run reports
-- `agent_states/` — ephemeral cycle state (auto-created, auto-deleted)
-- `cycle_reports/` — per-cycle summaries
+The pipeline expects these directories (auto-created as needed), grouped by how they're tracked:
+
+| Directory | Class | Tracked? |
+|---|---|---|
+| `agent_tasks/` (PRDs, task files) | durable, branch-coupled | committed |
+| `documentation/` (FEATURES, ROADMAP, CHANGELOG, …) | durable, product-coupled | committed |
+| `agent_states/` (cycle state, telemetry, worktrees) | runtime | **never committed** |
+| `cycle_reports/`, `agent_tasks/reports/` | retrospective process artifacts | vault or local (see below) |
+
+**Gitignore protection is automatic.** On every `/cycle` invocation the orchestrator ensures a managed block in your project's `.gitignore` so runtime artifacts (cycle state, telemetry event logs, Phase-3 worktrees) are never committed:
+
+```
+# >>> agent-sdlc (managed — do not edit) >>>
+agent_states/
+.claude/worktrees/
+# <<< agent-sdlc <<<
+```
+
+### Storing reports in an external docs vault (optional)
+
+By default, cycle reports and run/verify/review reports are committed to the application repo. To keep these retrospective artifacts out of your product history — and make them browsable and analyzable across multiple applications — set `vault_root` (and optionally `app_slug`) in the **Docs Vault** section of `.claude/config.md`. The orchestrator then symlinks `cycle_reports/` and `agent_tasks/reports/` into the vault at startup, migrating any existing local reports, and adds the symlinks to the managed `.gitignore` block.
+
+The vault is a normal directory you version independently — e.g. a git-backed [Obsidian](https://obsidian.md) vault pushed to its own private repo. Leaving `vault_root` empty keeps everything local (fully backward-compatible).
 
 ### 5. Configure (recommended)
 

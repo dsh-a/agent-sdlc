@@ -23,6 +23,19 @@ Active cycle states:
 
 **Worktree janitor**: run `git worktree list`. For any worktree under `.claude/worktrees/` on a `cycle/*` branch whose cycle is not among the active state files above, prune it — `git worktree remove --force <path>` then `git branch -D <branch>`. Orphaned Phase-3 worktrees otherwise accumulate indefinitely.
 
+**Gitignore guard** — ensure runtime artifacts (cycle state, telemetry event logs, Phase-3 worktrees) are never committed to the project repo. Idempotent; appends a marked block once:
+!`grep -q 'agent-sdlc (managed)' .gitignore 2>/dev/null || printf '\n# >>> agent-sdlc (managed — do not edit) >>>\nagent_states/\n.claude/worktrees/\n# <<< agent-sdlc <<<\n' >> .gitignore`
+
+Only runtime artifacts are ignored. `agent_tasks/` (live PRD + task files) and `documentation/` are **durable** — they travel with the feature branch and must stay committed. Cycle reports and run reports are written to the external docs vault (see config **Artifact Paths**) and never land in the project repo at all.
+
+**Vault link guard** — read the **Docs Vault** section of `.claude/config.md`. If `vault_root` is non-empty, wire the vault before any report is written this cycle:
+1. Resolve `app_slug` (config value, else the basename of the repo root).
+2. Ensure the vault targets exist: `mkdir -p "{vault_root}/cycle_reports/{app_slug}" "{vault_root}/reports/{app_slug}"`.
+3. For each pair `cycle_reports → {vault_root}/cycle_reports/{app_slug}` and `agent_tasks/reports → {vault_root}/reports/{app_slug}`: if the repo path is already the correct symlink, skip; if it is a real directory, move its contents into the vault target then `rm -rf` it; finally `ln -s` the vault target to the repo path.
+4. Ensure the managed `.gitignore` block also lists `cycle_reports` and `agent_tasks/reports` (no trailing slash — git treats a symlink as a file, so `dir/` would not match).
+
+If `vault_root` is empty, skip entirely — reports stay local and committed (backward-compatible default).
+
 Recent cycle reports:
 !`ls cycle_reports/*.md 2>/dev/null | tail -5 || echo "none"`
 
