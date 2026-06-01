@@ -34,7 +34,7 @@ Write a brief internal plan: what the screen looks like and why, widgets used / 
 
 ## Step 5 — Implement
 
-Follow `flutter-conventions` for the ViewModel pattern, member order, View rules, theme tokens, file locations, and DI wiring. The skill is loaded — do not re-derive its content.
+Follow `flutter-conventions` for the ViewModel pattern, member order, View rules, theme tokens, file locations, DI wiring, and entity/model construction (assign every field explicitly; `copyWith` for mutations). The skill is loaded — do not re-derive its content.
 
 File locations (cross-reference): `lib/ui/<feature>/view_models/<feature>_view_model.dart`, `lib/ui/<feature>/views/<feature>_view.dart`, route in `lib/router.dart`, DI in `lib/dependencies/di_view_models.dart`.
 

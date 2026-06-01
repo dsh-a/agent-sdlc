@@ -100,6 +100,16 @@ File location: `lib/ui/<feature>/views/<feature>_view.dart`. Route wiring (if ne
 
 ---
 
+## Entity / model construction
+
+Models are immutable — change them only via `copyWith`.
+
+- Constructing inline (full constructor, not copyWith): assign every field of the class explicitly. Do not lean on positional defaults or silently omit nullable fields.
+- Calling `copyWith`: name only the fields that change.
+- Before you commit, cross-check the constructor call against the class's full field list. A missing or defaulted field is the most common silent data-loss bug in this codebase.
+
+---
+
 ## Testing conventions (cross-reference)
 
 Test patterns live in the `test` skill / agent. Two cross-cutting rules anchored here:
