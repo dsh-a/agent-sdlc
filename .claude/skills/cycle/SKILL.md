@@ -315,21 +315,27 @@ Run this in the background — it does not block Phase 3 from continuing. Scaffo
 
 Spawn monitor agent (model: monitor row from **Model Allocation** table in `.claude/config.md`, background) with feature name and state file path.
 
-**Spawn supervisor** (item 5.5.1) alongside monitor — they have distinct jobs (monitor: deterministic state archival; supervisor: heuristic observation). OQ-9 (consolidation) is deferred pending real telemetry.
+**The supervisor (item 5.5.1)** runs distinct from monitor (monitor: deterministic state archival; supervisor: heuristic observation). OQ-9 (consolidation) is deferred pending real telemetry.
+
+The supervisor is **not** a long-lived daemon and needs **no** agent-messaging. The orchestrator drives it by spawning a fresh, short-lived check per cadence tick (below); each spawn does exactly one check for one agent and exits, with continuity persisted on disk in `agent_states/supervisor/state.md`. This is what makes supervision work in environments without SendMessage/agent-teams.
 
 **Skip the supervisor entirely** when the task file has fewer than `skip_supervisor_if_total_subtasks_lt` sub-tasks (Per-phase skip flags in `.claude/config.md`, default 3) — observation overhead exceeds value on small task lists. Log the skip as `SUPERVISOR_HEALTH status:disabled spawns:0 stalls:0 heartbeat:none disabled_at:[ts] reason:skip-flag` so the run report reflects it.
 
+**Cadence — when to spawn a check.** No messaging required; it's control-flow driven. The orchestrator spawns a `CHECK <agent-id>` at these triggers:
+1. **On wave boundary** — after spawning a parallel wave, and each time control returns from a completing background agent, spawn a check for every *still-active* agent-id. This catches mid-run `spiral` / `stall` / `drift` while other agents keep working.
+2. **On agent completion** — when a Phase-3 implementation agent returns, before merging its worktree, spawn a final check for that agent-id (catches `shallow` / `drift` on the finished output).
+
+Each check is a short **foreground** spawn: the orchestrator waits for the one-line summary, then reads any new lines appended to `agent_states/escalations.jsonl` and acts on `pause-request` / `depth-recommendation` per the escalation ladder (5.5.4). Maintain a `supervisor_checks` counter and a `supervisor_check_failures` counter in cycle state — they feed the run report and the health watchdog below.
+
 ```
 Agent(subagent_type: "supervisor", model: "[supervisor row from Model Allocation]",
-      run_in_background: true,
-      prompt: "Feature: [name]. Cycle state: agent_states/cycle-state-[name].md.
+      prompt: "CHECK [agent-id]. Feature: [name].
+               Cycle state: agent_states/cycle-state-[name].md.
                Agent ID convention: <role>-<task-number>.
-               Initialize per supervisor.md; wait for CHECK <agent-id> messages
-               from the orchestrator. Detectors and cadence ship in 5.5.4 —
-               for now emit heartbeat + state.md only.")
+               Do exactly one check per supervisor.md, then exit.")
 ```
 
-The supervisor writes to `agent_states/whispers/`, `agent_states/escalations.jsonl`, and `agent_states/supervisor/` (heartbeat + state.md). It reads from `agent_states/events/*.jsonl` (the per-agent telemetry from 5.2.1) and `agent_states/cycle-state-*.md`. Do not poll the supervisor mid-tool-call; the cadence ladder in 5.5.4 defines when to check escalations.
+The supervisor writes to `agent_states/whispers/`, `agent_states/escalations.jsonl`, and `agent_states/supervisor/` (heartbeat + state.md). It reads from `agent_states/events/*.jsonl` (the per-agent telemetry from 5.2.1) and `agent_states/cycle-state-*.md`.
 
 **Artifact layout (Phase 3):**
 
@@ -438,13 +444,13 @@ Supervisor spawns are fresh per check — continuity lives in `agent_states/supe
 
 ### Supervisor health (5.5.5)
 
-Six layered mechanisms, all run at your watchdog tick (which fires alongside the cadence check above):
+Six layered mechanisms, evaluated as you spawn and collect each check (the cadence above):
 
-1. **Heartbeat watchdog.** Read mtime of `agent_states/supervisor/heartbeat`. If now − mtime > 60s **and** the supervisor has been spawned at least once this cycle, declare the supervisor offline this tick. Emit `RESCUE supervisor-stall [supervisor]: heartbeat stale [N]s | resolution: respawn-or-degrade | artifact: agent_states/supervisor/state.md` to monitor and forward `SUPERVISOR_HEALTH status:active spawns:[n] stalls:[n+1] heartbeat:[ts] disabled_at:n/a reason:n/a`.
-2. **Per-check spawn watchdog.** When you spawn the supervisor for a `CHECK <agent-id>`, treat the spawn as stalled if it does not return within 30s. Same `supervisor-stall` rescue + heartbeat path as (1).
-3. **Rescue logging on outage.** Already provided by (1)/(2) — `supervisor-stall` is in the rescue type enum.
-4. **Circuit breaker.** Maintain the **Supervisor health** section in cycle state (via monitor's `SUPERVISOR_HEALTH` verb). If `stalls` increments 3 times within a 5-minute window, **disable** the supervisor for the rest of the cycle: emit `RESCUE supervisor-disabled [supervisor]: 3 stalls in 5m | resolution: degraded mode | artifact: cycle-state` and forward `SUPERVISOR_HEALTH status:disabled spawns:[n] stalls:[n] heartbeat:[last] disabled_at:[now] reason:circuit-breaker`. Stop spawning supervisor checks; the cycle continues in degraded mode (no whispers, no escalations — falls back to today's behavior).
-5. **Run-report uptime %.** When you build the cycle run report at Phase 4A, populate the **Supervisor health** subsection of the Agent Telemetry block from cycle state. Classify the cycle as **degraded** if uptime % < 90 or status is `disabled`.
+1. **Last-check record (not a liveness watchdog).** The supervisor touches `agent_states/supervisor/heartbeat` at the end of every successful check. Because checks are intermittent *by design*, a stale heartbeat is **not** an outage signal — never treat heartbeat age as "offline." Record the heartbeat mtime as the supervisor's `last_check` for the run report. Liveness is judged per-check by mechanism 2.
+2. **Per-check spawn watchdog.** When you spawn a `CHECK <agent-id>`, treat the spawn as failed if it errors or does not return a summary within 30s. Increment `supervisor_check_failures`, emit `RESCUE supervisor-stall [supervisor]: check [agent-id] no return in [N]s | resolution: skip-or-disable | artifact: agent_states/supervisor/state.md` to monitor, and skip this tick's result.
+3. **Rescue logging on outage.** Already provided by (2) — `supervisor-stall` is in the rescue type enum.
+4. **Circuit breaker.** Maintain the **Supervisor health** section in cycle state (via monitor's `SUPERVISOR_HEALTH` verb). If `supervisor_check_failures` increments 3 times within a 5-minute window, **disable** the supervisor for the rest of the cycle: emit `RESCUE supervisor-disabled [supervisor]: 3 check failures in 5m | resolution: degraded mode | artifact: cycle-state` and forward `SUPERVISOR_HEALTH status:disabled spawns:[n] stalls:[n] heartbeat:[last] disabled_at:[now] reason:circuit-breaker`. Stop spawning supervisor checks; the cycle continues in degraded mode (no whispers, no escalations — falls back to today's behavior).
+5. **Run-report check success rate.** When you build the cycle run report at Phase 4A, populate the **Supervisor health** subsection of the Agent Telemetry block from cycle state: `supervisor_checks` attempted, `supervisor_check_failures`, and success rate. Classify the cycle as **degraded** if success rate < 90% or status is `disabled`.
 6. **`self-improve` hook.** Documented in `.claude/agents/self-improve.md` Step 2 (Effectiveness patterns → Supervisor health). When `supervisor-stall` or `supervisor-disabled` appears in ≥ 3 of the last 5 cycles, `self-improve` raises a P0 recommendation.
 
 ### Plan-revision flow (5.5.6)
@@ -462,7 +468,7 @@ If a recommendation conflicts with a recommendation you accepted earlier (or wit
 The orchestrator polls `agent_states/escalations.jsonl` at three moments only (item 5.5.2):
 1. **Phase transition** — end of Phase 3, before spawning verify/review.
 2. **Sub-task boundary** — after each parent task's Commit protocol, before spawning the next.
-3. **Watchdog tick** — see 5.5.5 (heartbeat + circuit breaker).
+3. **After each supervisor check** — you've just collected a check's result (see 5.5.5: per-check spawn watchdog + circuit breaker), so read any escalations it appended.
 
 Use a per-cycle `escalation_cursor:` field in cycle state to track the last processed line. See the `escalations` skill for per-type handling (`pause-request` → recovery decision + `RESCUE`; `depth-recommendation` → log decision in cycle state; `bug-pattern` → log + surface in run report). Never poll mid-tool-call.
 
