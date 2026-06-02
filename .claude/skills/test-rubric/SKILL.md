@@ -48,21 +48,21 @@ If the AC says something **must NOT happen** under some condition, is there a `v
 Run these once across the entire test file (or files) you wrote.
 
 ### 6. Silent-skip patterns (mechanical grep)
-Grep your new test files for these patterns — any hit is a hard fail:
+Grep your new test files for the active pack's **Test anti-patterns** (`.claude/config.md` § Project Commands → *Test anti-patterns*; default `.claude/packs/<pack>/test-antipatterns.md`). The family of hard fails these encode:
 
-- `if (find...isNotEmpty)` — gates an assertion on whether something exists, so it never fails when missing
-- `if (finder.evaluate()` — same pattern, different finder API
-- `try { ...expect... } catch` — swallows the expect's exception, turning failure into silent pass
-- `skip:`, `@Skip(`, `it.skip(`, `test.skip(`, `xit(`, `xtest(` — skipped tests masquerading as coverage
+- An assertion **gated behind a runtime check** (`if (collection.Any()) Assert…`, `if (find...isNotEmpty)`) — never fails when the thing is missing.
+- A **swallowed assertion** (`try { …Assert… } catch`) — turns failure into a silent pass.
+- A **skipped test** masquerading as coverage (`[Fact(Skip=…)]`, `[Ignore]`, `it.skip(`, `xit(`).
+- A **vacuous assertion** (`Assert.True(true)`, `Assert.Pass()`).
 
-Fail → remove the guard (let the assertion fail loudly when the precondition isn't met), or rewrite as an explicit `expect(find..., findsNothing)` when "absence" is the actual AC.
+Fail → remove the guard (let the assertion fail loudly when the precondition isn't met), or rewrite as an explicit "expect absence" assertion when "absence" is the actual AC.
 
 ### 7. Schema constraints (data layer only)
-If any source file under test is a repository, adapter, or DAO under `lib/data/`:
-- Call `mcp__supabase__list_tables` to identify NOT NULL / UNIQUE / CHECK / FK constraints on the touched table.
+If any source file under test is a repository, adapter, or DAO in the data/infrastructure layer **and** a data-schema Context Source is enabled (`.claude/config.md` § Context Sources):
+- Consult it to identify NOT NULL / UNIQUE / CHECK / FK constraints on the touched table.
 - For each constraint not currently asserted by a test, add a violation test (or note it as a deliberate gap in the report).
 
-Skip this check if no `lib/data/` files are in scope.
+Skip this check if no data-layer files are in scope or no data-schema source is wired.
 
 ---
 

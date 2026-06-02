@@ -1,11 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(flutter test*)",
-      "Bash(flutter analyze*)",
-      "Bash(flutter pub *)",
-      "Bash(flutter pub run build_runner*)",
-      "Bash(dart *)",
       "Bash(git *)",
       "Bash(gh pr*)",
       "Bash(gh api*)",

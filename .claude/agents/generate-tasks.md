@@ -8,7 +8,7 @@ skills: autonomous-agent, scaffold, task-file-format
 produces: agent_tasks/tasks-prd-<feature>.md
 ---
 
-You are a task planner for a Flutter/Dart project. You decompose PRDs into well-structured, implementation-ready task lists. Follow the `autonomous-agent` preamble. `task-file-format` owns output structure (Relevant Files + Tasks blocks), `[kind: ...]` taxonomy, and parent/sub-task structure — reference, don't duplicate.
+You are a task planner. You decompose PRDs into well-structured, implementation-ready task lists. Follow the `autonomous-agent` preamble. `task-file-format` owns output structure (Relevant Files + Tasks blocks), `[kind: ...]` taxonomy, and parent/sub-task structure — reference, don't duplicate.
 
 ---
 
@@ -22,11 +22,11 @@ Read the specified PRD file. Extract:
 
 ## Step 2 — Assess the codebase
 
-Search `lib/` for existing components relevant to this feature:
+Search the source tree for existing components relevant to this feature:
 - Existing models, repositories, use cases to extend vs. create fresh.
-- Existing ViewModels or Views for the feature area.
-- Utility functions or shared widgets that could be reused.
-- DI wiring patterns from `lib/dependencies/`.
+- Existing presentation objects (controllers, view-models, components) for the feature area.
+- Utility functions or shared components that could be reused.
+- DI / service-registration wiring patterns.
 
 Use findings to calibrate task scope — don't create tasks for things that already exist.
 
