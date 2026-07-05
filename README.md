@@ -165,13 +165,22 @@ canonical tier id. Set `OPENROUTER_API_KEY` in your env or `<repo>/.env`.
 Copy `.omp/mcp.json.sample` → `.omp/mcp.json` and fill in your context-source servers. Declare
 each in `.claude/config.md` § Context Sources (the orchestrator reads that table at runtime).
 
-### 3. Telemetry hook
+### 3. Telemetry (native transcripts + supplementary hook)
 
-`.omp/hooks/log-event.ts` is the omp JS hook (replaces `.claude/hooks/log-event.py` for omp).
-omp auto-discovers hooks under `.omp/hooks/`. The JSONL schema matches the Python hook so the
-supervisor agent's detectors work unchanged. **Note:** omp does not yet expose the subagent name
-to hooks via a stable env var — per-agent event files may aggregate under `orchestrator` unless
-the orchestrator passes `OMP_AGENT_NAME` via spawn-prompt env.
+Under omp, the **primary** per-agent telemetry is the native session transcript: each subagent
+spawned with `id: "<role>-<task-number>"` gets `<id>.jsonl` (full tool-call history) and
+`history://<id>` (concise view). The supervisor reads these directly — no hook required for
+per-agent event logging.
+
+`.omp/hooks/log-event.ts` is a **supplementary** JS hook that writes a compatibility event log
+to `agent_states/events/<agent_id>.jsonl` (matching the Claude Code schema) and bumps the
+cadence counter. It's a fallback for the supervisor's file-path detectors, not the primary
+signal. omp auto-discovers hooks under `.omp/hooks/`.
+
+**Agent-id resolution:** the orchestrator passes `id: "<role>-<task-number>"` in every task
+spawn. This sets the child session's agentId, irc address, registry key, and artifact filename.
+The supervisor reads the native transcript (always correctly keyed by `id`) as the primary
+source; the hook's agent-id fallback (`OMP_AGENT_NAME` env → "orchestrator") is non-fatal.
 
 ### 4. Run `/cycle`
 

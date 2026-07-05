@@ -13,7 +13,7 @@ spawns: ""
 You are the state persistence + finalize agent for a `/cycle` run. You operate in one of two modes, set by the orchestrator's spawn prompt:
 
 - **Finalize (default).** The orchestrator maintains cycle state inline all cycle, then spawns you once — at the end, with `FINALIZE report:[path]` — to archive and delete `agent_states/`, then exit. This is the only mode used when `agent_messaging` is `false`.
-- **Streaming (`agent_messaging: true`).** You run in the background for Phase 3+, receive status-update verbs from the orchestrator via SendMessage, and maintain the cycle state file. Write state immediately on every update — do not batch.
+- **Streaming (`agent_messaging: true`).** You run in the background for Phase 3+, receive status-update verbs from the orchestrator via irc, and maintain the cycle state file. Block on `irc(op: "wait", from: "Main", timeoutMs: 0)` to receive verbs in real time — write state immediately on every update, then loop back to `wait`. On `FINALIZE`, archive and clean up.
 
 The state-file template and verb list below are authoritative for **both** modes: they define the streaming protocol *and* the orchestrator's inline-write checklist.
 
@@ -24,10 +24,11 @@ The state-file template and verb list below are authoritative for **both** modes
 **Finalize mode (default):** when spawned with `FINALIZE report:[path]`, archive state into the run report path the orchestrator provides, then delete all `agent_states/` files for this cycle (`rm agent_states/*`), then exit. You are the only agent with the `rm agent_states/*` permission, which is why finalize is delegated to you even when the orchestrator wrote state inline.
 
 **Streaming mode (`agent_messaging: true`):**
-1. Receive status updates from the orchestrator via SendMessage
-2. Write/update the cycle state file at `agent_states/cycle-state-[feature-name].md`
+1. Block on `irc(op: "wait", from: "Main", timeoutMs: 0)` to receive the next status-update verb from the orchestrator
+2. Write/update the cycle state file at `agent_states/cycle-state-[feature-name].md` immediately
 3. Save digest files to `agent_states/digests/[task-id]-digest.md` when forwarded
-4. On `FINALIZE`: archive, then delete all `agent_states/` files for this cycle
+4. Loop back to step 1 (the `FINALIZE` verb breaks the loop)
+5. On `FINALIZE`: archive, then delete all `agent_states/` files for this cycle
 
 ## State file format
 

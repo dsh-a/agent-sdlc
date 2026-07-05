@@ -4,21 +4,24 @@ import { mkdirSync, appendFileSync, existsSync, readFileSync, writeFileSync } fr
 import { join, dirname } from "node:path";
 
 /**
- * log-event — omp telemetry hook.
+ * log-event — omp telemetry hook (supplementary).
  *
- * Replaces .claude/hooks/log-event.py (Claude Code PostToolUse / SubagentStop).
- * Listens to omp's `tool_result` (post-execution) and `agent_end` events,
- * appending one JSONL line per event to
- *   <main-root>/agent_states/events/<agent_id>.jsonl
+ * Under omp, the PRIMARY per-agent telemetry is the native session transcript:
+ * each subagent gets `<id>.jsonl` (full tool-call history) and `history://<id>`
+ * (concise view). The supervisor reads those directly.
  *
- * The JSONL schema matches the Python hook so the supervisor agent's detectors
- * (spiral, stall, drift, shallow) work unchanged.
+ * This hook is SUPPLEMENTARY: it writes a compatibility event log to
+ * `agent_states/events/<agent_id>.jsonl` matching the Claude Code schema so
+ * the supervisor's detectors work unchanged if it falls back to the file path.
+ * It also bumps the cadence counter at `agent_states/counters/<agent_id>`.
  *
- * Limitation: omp does not currently expose the subagent name to hooks via a
- * stable env var. `agent_id` is read from OMP_AGENT_NAME / PI_AGENT_NAME if the
- * orchestrator sets them in the spawn prompt env, else "orchestrator". Under
- * omp, per-agent event files may aggregate under "orchestrator" unless the
- * cycle SKILL passes agent identity via spawn-prompt env.
+ * Agent-id resolution: omp sets the child session's `agentId` from the task
+ * tool's `id` field. This hook tries `process.env.OMP_AGENT_NAME` (set by the
+ * orchestrator's spawn context if available), then falls back to "orchestrator".
+ * For accurate per-agent logging, the orchestrator should pass `id:` in every
+ * task spawn — the supervisor reads the native transcript (which is always
+ * correctly keyed) as the primary source, so hook aggregation under
+ * "orchestrator" is non-fatal.
  */
 export default function (pi: HookAPI): void {
   const root = resolveMainRoot();

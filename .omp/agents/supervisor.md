@@ -83,7 +83,7 @@ If `state.md` is missing, create it with `started: <now>`, empty ladders.
 ### Step 2 — Read inputs
 
 For the agent named in your prompt:
-- Read the last **K=20** lines of `agent_states/events/<agent-id>.jsonl` (windowed; older events are not your concern).
+- Read the agent's omp session transcript via `read("history://<agent-id>")` (concise view) for a quick scan, or read the `<agent-id>.jsonl` artifact file directly for full tool-call detail (the orchestrator spawns agents with `id: "<role>-<task-number>"`, so the artifact filename is deterministic). Focus on the last ~20 tool calls.
 - Read `agent_states/cycle-state-<feature>.md` for task context (which parent task this agent owns, current phase, recent `## Rescues` entries for contradiction detection).
 - Check `state.md` ladder for this agent to see prior whispers emitted (avoid duplicate emission — irc doesn't give you a read-back of what you sent).
 
@@ -91,13 +91,13 @@ For the agent named in your prompt:
 
 Five detectors, all running on every check. Threshold placeholders from `.claude/config.md` § Supervisor thresholds.
 
-**`spiral`** — same file edited ≥3 times in the K-window without a Read between, OR `exit:error` appears ≥3 times consecutively. Spiral = the agent is making the same change repeatedly without learning.
+**`spiral`** — same file edited ≥3 times in the recent transcript window without a Read between, OR `exit:error` appears ≥3 times consecutively. Spiral = the agent is making the same change repeatedly without learning.
 
-**`drift`** — tool calls touching files outside the agent's scope. Compare `file` fields in events against the agent's parent task scope (from cycle-state). Files in worktree but outside the parent task's Relevant Files = drift candidates.
+**`drift`** — tool calls touching files outside the agent's scope. Compare `file`/`path` fields in the transcript against the agent's parent task scope (from cycle-state). Files in worktree but outside the parent task's Relevant Files = drift candidates.
 
-**`stall`** — most recent event in `events/<agent-id>.jsonl` is older than the stall threshold (default 5 minutes) AND no `subagent_stop` event exists. Agent is alive but quiet.
+**`stall`** — check `irc(op: "list")` for the agent's status. If it's `running` but the last transcript entry is older than the stall threshold (default 5 minutes), the agent is alive but quiet. If it's `parked` or absent, the agent has stopped.
 
-**`shallow`** — an `Edit` or `Write` event on a file appears before any `Read` of that file in the agent's full event history (not just the K-window — re-read the full file once at first check, cache the read-set in state.md).
+**`shallow`** — an `edit` or `write` tool call on a file appears before any `read` of that file in the agent's transcript (not just the recent window — scan the full transcript once at first check, cache the read-set in state.md).
 
 **`contradiction`** — cycle-state's `## Rescues` section contains a `contradiction-loop` entry whose `agent:` matches this agent-id AND that entry is newer than your `last_check_ts` for this agent.
 

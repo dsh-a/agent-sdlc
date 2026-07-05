@@ -184,10 +184,10 @@ State directory: `agent_states/` (ephemeral — deleted on completion).
 The orchestrator keeps `agent_states/cycle-state-<feature>.md` current throughout the cycle, using the template and verb list in `.claude/agents/monitor.md`. **Two modes**, selected by `agent_messaging` in `.claude/config.md` § Cycle Options (default `false`):
 
 - **`agent_messaging: false` (default) — inline.** *You*, the orchestrator, write the state file directly. The monitor's verb list (`GATE`, `SPAWNED`, `PARENT`, `RESCUE`, `DEVIATIONS`, `SCOPE_CHANGE`, `SUPERVISOR_HEALTH`, …) is your **checklist of what to record when**. This is the normal path and is **not** a degradation — never log it as a rescue. No background monitor is spawned. Inline is also the only mode that works without the irc tool / agent-teams.
-- **`agent_messaging: true` — delegated.** Spawn the background monitor once at Phase 3 start and *send* it each verb via the `irc` tool; it writes the state file so your context stays lean:
+- **`agent_messaging: true` — delegated.** Spawn the background monitor once at Phase 3 start. The monitor blocks on `irc(op: "wait", from: "Main", timeoutMs: 0)` to receive verbs in real time — send each verb via `irc(op: "send", to: "<monitor-id>", message: "<verb>")`. It writes the state file so your context stays lean:
   ```
-  Spawn the `monitor` agent as a background task (model tier: haiku) with this prompt:
-  > Feature: [name]. State file: agent_states/cycle-state-[name].md
+  Spawn the `monitor` agent (model tier: haiku, id: "monitor") as a background task with this prompt:
+  > Feature: [name]. State file: agent_states/cycle-state-[name].md. You are in streaming mode — block on irc(op: "wait", from: "Main", timeoutMs: 0) to receive state-update verbs. Write each verb to the state file immediately. On FINALIZE, archive and clean up.
   ```
 
 **Reading convention for the rest of this skill:** wherever a step says "emit / send / forward / update `<VERB>` to monitor," it means *record that verb in cycle state* — write it inline (default) or send it to the monitor via the `irc` tool (when `agent_messaging: true`). Verb formats are defined in `monitor.md`.
@@ -393,7 +393,7 @@ For each parent task (independent in parallel, dependent when ready), first **cr
 1. **Pre-digest** (haiku, background) — default for any task touching ≥ `skip_predigest_if_files_lt` existing files (Per-phase skip flags in `.claude/config.md`, default 2). Reads relevant source files and returns a ~150-line structured summary (public API, constructor deps, key patterns). Skip when below threshold, when the task creates all-new files, or when a digest was already saved.
 
    ```
-   Spawn a generic `task` agent (model tier: [pre-digest model from Model Allocation table in .claude/config.md] — resolve the label through Model Versions, pass the concrete model id) with this prompt (background task — use async task dispatch):
+   Spawn a generic `task` agent (model tier: [pre-digest model from Model Allocation table in .claude/config.md] — resolve the label through Model Versions, pass the concrete model id, id: "predigest-[task-number]") with this prompt (background task — use async task dispatch):
    > Read these files and return a ~150-line structured summary
    > covering: public API (class names, method signatures, constructor
    > deps), key patterns, and anything an implementer needs to know.
@@ -420,7 +420,7 @@ For each parent task (independent in parallel, dependent when ready), first **cr
    Run **Context Sources retrieval** for stage `implement` (see § Context Sources retrieval) once for the parent task — query with the task's Relevant Files + touched symbols — and reuse the result across every agent spawned for this task (do not re-query per sub-agent). Prepend any `## Context: <id>` blocks to the prompt.
 
    ```
-   Spawn the `scaffold` agent (model tier: [per config] — resolve the label through Model Versions in .claude/config.md, pass the concrete model id) with this prompt:
+   Spawn the `scaffold` agent (model tier: [per config] — resolve through Model Versions, pass the concrete model id, id: "scaffold-[task-number]") with this prompt:
    > [worktree-startup preamble — Phase-3 worktree protocol]
    > [Context blocks if any]
    > PRD: [prd-path]
@@ -436,7 +436,7 @@ For each parent task (independent in parallel, dependent when ready), first **cr
 3. **Pre-flight contradiction classifier** (haiku, runs in the same task worktree after implementer commits, before test agent). Skip when `skip_preflight_if_no_existing_tests` is `true` (Per-phase skip flags in `.claude/config.md`, default true) **and** grep of the **Test path glob** (`.claude/config.md` § Project Commands) for any public symbol the implementer touched returns no hits — true greenfield needs no classification.
 
    ```
-   Spawn the `test-preflight` agent (model tier: haiku — resolve the label through Model Versions in .claude/config.md, pass the concrete model id) with this prompt:
+   Spawn the `test-preflight` agent (model tier: haiku — resolve through Model Versions, pass the concrete model id, id: "preflight-[task-number]") with this prompt:
    > [worktree-startup preamble]
    > Changed source files: [paths the implementer modified]
    > AC (pre-extracted): [AC items from PRD]
@@ -446,7 +446,7 @@ For each parent task (independent in parallel, dependent when ready), first **cr
    The classifier returns a `## Existing test classifications` table. Lift it verbatim into the test agent's spawn prompt (next step). It produces no file artifact — its output lives in the return value only.
 
 4. **Test** (separate agent from implementer; runs in the **same task worktree** as the implementer, after pre-flight — so it sees the implemented code; no `isolation:` parameter):
-   - **Write** (sonnet): Spawn the `test` agent (model tier: sonnet) with this prompt: `> [worktree-startup preamble] PRD: [prd-path]\nSource files: [paths]\nTest files: [paths]\nAC (pre-extracted): [AC items]\nTask: [task description]\n[pre-flight classifications table if non-empty]`
+   - **Write** (sonnet): Spawn the `test` agent (model tier: sonnet, id: "test-[task-number]") with this prompt: `> [worktree-startup preamble] PRD: [prd-path]\nSource files: [paths]\nTest files: [paths]\nAC (pre-extracted): [AC items]\nTask: [task description]\n[pre-flight classifications table if non-empty]`
    - **Fix** (sonnet): re-spawn `test` agent with failure output and source paths
 
 ### 3.4 — Handle results
@@ -459,17 +459,17 @@ For each parent task (independent in parallel, dependent when ready), first **cr
 
 ### Supervisor cadence (5.5.4)
 
-The PostToolUse hook increments a per-agent counter at `agent_states/counters/<agent-id>` on every tool call. At your watchdog tick (and at each sub-task boundary), read all counter files:
-
-- For each agent-id whose counter ≥ `cadence_n` (Supervisor Thresholds in `.claude/config.md`, default 5), spawn a supervisor check:
+**Under omp (default):** the task tool's async job progress and the agent registry status (`running` / `idle` / `parked`) replace the counter files. At your watchdog tick (and at each sub-task boundary), check `irc(op: "list")` for live agents. For each agent that has been `running` long enough to exceed the cadence threshold (default 5 tool calls — approximate via transcript length: read `history://<agent-id>` and count tool-call entries), spawn a supervisor check:
   ```
-  Spawn the `supervisor` agent (model tier: [supervisor row from Model Allocation] — resolve the label through Model Versions in .claude/config.md, pass the concrete model id) with this prompt:
+  Spawn the `supervisor` agent (model tier: [supervisor row from Model Allocation] — resolve through Model Versions, pass the concrete model id, id: "supervisor-<tick>") with this prompt:
   > CHECK <agent-id>. Feature: [name].
   ```
-- After spawn returns (or on a separate completion signal), reset that agent's counter to `0` by overwriting the file.
+- After spawn returns, drain any escalations via `irc(op: "inbox")`.
 - **Skip cadence checks entirely if supervisor health Status is `disabled`** (degraded mode — see below).
 
 Supervisor spawns are fresh per check — continuity lives in `agent_states/supervisor/state.md`. The escalation channel below is how the supervisor signals back to you.
+
+**Claude Code fallback:** the PostToolUse hook increments a per-agent counter at `agent_states/counters/<agent-id>` on every tool call. Read all counter files; for each agent-id whose counter ≥ `cadence_n` (default 5), spawn a supervisor check. Reset the counter to `0` after.
 
 ### Supervisor health (5.5.5)
 
@@ -503,7 +503,7 @@ The orchestrator collects supervisor escalations at three moments only (item 5.5
 
 **Claude Code fallback:** poll `agent_states/escalations.jsonl` with a per-cycle `escalation_cursor:` field tracking the last processed line.
 
-**Agent-ID stamp.** Every Phase-3 implementation agent must be spawned with an `agent_id` of the form `<role>-<task-number>` (e.g., `test-3.0`, `ui-story-2.1`). Under omp, this id is the irc address — the supervisor sends whispers via `irc(op: "send", to: "<agent-id>", …)` and the agent receives them directly (no polling). Under Claude Code, the PostToolUse hook routes events into `agent_states/events/<agent-id>.jsonl` and the supervisor writes whispers to `agent_states/whispers/<agent-id>.md` keyed on this ID. Include the agent-id explicitly in the spawn prompt either way.
+**Agent-ID stamp.** Every Phase-3 implementation agent must be spawned with `id: "<role>-<task-number>"` (e.g., `id: "test-3.0"`, `id: "ui-story-2.1"`) in the task spawn. Under omp, this `id` field sets the child session's agentId — it becomes the irc address (supervisor sends whispers via `irc(op: "send", to: "test-3.0", …)`), the registry key, and the artifact filename (`test-3.0.jsonl`, `test-3.0.md`). The supervisor reads the agent's omp session transcript (`history://test-3.0` for concise view, or the `<id>.jsonl` artifact for full tool-call detail) instead of a hook-written event log. Under Claude Code, the PostToolUse hook routes events into `agent_states/events/<agent-id>.jsonl` — pass the agent-id in the spawn prompt text since Claude Code's Agent() call has no `id` field.
 
 ### Escalation ladder
 
@@ -620,7 +620,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    If `verify` is **enabled**: spawn the `verify` agent with the PRD path, source file paths, test file paths, pre-extracted AC, **and the computed depth**:
    ```
-   Spawn the `verify` agent (model tier: [per config Model Allocation] — resolve the label through Model Versions in .claude/config.md, pass the concrete model id) with this prompt:
+   Spawn the `verify` agent (model tier: [per config Model Allocation] — resolve through Model Versions, pass the concrete model id, id: "verify") with this prompt:
    > [Context blocks if any]
    > PRD: [prd-path]. Source files: [paths]. Test files: [paths].
    > AC: [pre-extracted]. Branch: [branch-name]. Depth: <lite|standard|deep>.
@@ -630,7 +630,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    If `review` is **enabled**: spawn the `review` agent with the branch name:
    ```
-   Spawn the `review` agent (model tier: [per config Model Allocation] — resolve the label through Model Versions in .claude/config.md, pass the concrete model id) with this prompt:
+   Spawn the `review` agent (model tier: [per config Model Allocation] — resolve through Model Versions, pass the concrete model id, id: "review") with this prompt:
    > [Context blocks if any]
    > Branch: [branch-name]. PRD: [prd-path].
    > Report path: agent_tasks/reports/review-[feature]-[date].md — write your report there.
