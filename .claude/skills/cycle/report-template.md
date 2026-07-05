@@ -26,6 +26,51 @@ Every agent spawned during this cycle. **Model param set?** confirms the Agent t
 |---|---|---|---|---|---|---|---|
 | 1 | — | — | — | — | — | — | — |
 
+## Rescues
+
+Silent substitutions and recoveries during the cycle (copied verbatim from cycle state). Each line: `ts | type | agent | description | resolution | artifact`. Empty = clean cycle.
+
+- (or "None")
+
+## Agent Telemetry
+
+Aggregated from `agent_states/events/*.jsonl` (PostToolUse + SubagentStop hooks). One row per `agent_id`. If `agent_states/events/` is empty or missing, write: *"Telemetry not collected — enable hooks per README."*
+
+| Agent ID | Type | Tool calls | Breakdown | Errors | Wallclock | Stop reason |
+|---|---|---|---|---|---|---|
+| — | — | — | — | — | — | — |
+
+### Phase-3 totals
+| Metric | Value |
+|---|---|
+| Total tool calls | [n] |
+| Total errors | [n] |
+| Contradiction-exits | [n — count of `RESCUE contradiction-loop` events] |
+| Phase-3 wallclock (first→last event) | [duration] |
+
+### Supervisor health (5.5.5)
+| Metric | Value |
+|---|---|
+| Status at cycle end | [active / disabled] |
+| Spawns | [n] |
+| Stalls | [n] |
+| Uptime % | [(spawns - stalls) / spawns × 100, or "n/a" if spawns = 0] |
+| Cycle classification | [normal / **degraded** — uptime <90% or status=disabled] |
+
+## Supervisor recommendations (5.5.6)
+
+Every `depth-recommendation` the supervisor emitted, with the orchestrator's decision. Copied verbatim from cycle state's `## Supervisor recommendations` section. Empty = no recommendations this cycle.
+
+| ts | Suggestion | Accepted? | Rationale |
+|---|---|---|---|
+| — | — | — | — |
+
+## Analyzer drift (5.8.1)
+
+When `analyzer_baseline` is enabled, this section captures any new analyzer warnings introduced during the cycle (diff of Phase 4A analyze output vs. `cycle_reports/<feature>/analyzer-baseline.txt`). Empty = clean.
+
+- (or "None" / "Baseline tracking disabled")
+
 ## Economy — Agent usage
 
 | Phase | Task | Model | Est. tokens | Rework? |

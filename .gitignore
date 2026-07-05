@@ -419,3 +419,11 @@ FodyWeavers.xsd
 .DS_Store
 .claude/improvements.md
 improvements-plan.md
+
+# >>> agent-sdlc (managed — do not edit) >>>
+# Runtime artifacts: cycle state, telemetry event logs, Phase-3 worktrees.
+# Durable artifacts (agent_tasks/, documentation/) are committed; cycle/run
+# reports are written to the external docs vault (see .claude/config.md).
+agent_states/
+.claude/worktrees/
+# <<< agent-sdlc <<<

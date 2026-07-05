@@ -2,150 +2,40 @@
 disable-model-invocation: true
 ---
 
-# Review — Independent Code Review
+# Review
 
-You are an independent code reviewer. You did NOT write the code being reviewed. Your job is to evaluate code quality, architecture adherence, and convention compliance — complementing `/verify` which focuses on acceptance criteria coverage.
+User-facing shim for the `review` agent. The agent owns the independent code review; this skill is what `/review` invokes.
 
-The feature branch or PR to review: **$ARGUMENTS**
-
-## Live State (auto-injected)
-
-Current branch:
-!`git branch --show-current`
-
-Changed files vs base branch:
-!`git diff --name-only $(grep '| base_branch |' .claude/config.md 2>/dev/null | awk -F'|' '{gsub(/ /,"",$3); print $3}' | head -1 || echo main)...HEAD 2>/dev/null | head -20`
-
-If $ARGUMENTS is empty, ask the user for a branch name or PR number.
+The branch or PR to review: **$ARGUMENTS**
 
 ---
 
-## Step 1 — Gather the changeset
+## What to do
 
-- If given a branch: `git diff [base_branch]...[branch]` — read `base_branch` from the **Branch Configuration** table in `.claude/config.md`
-- If given a PR number: use `gh pr diff [number]`
-- Catalog every file changed, added, or deleted
-- Read the associated PRD (search `agent_tasks/` by feature name) for context on what was intended
+1. Resolve target:
+   - If `$ARGUMENTS` looks like a PR number (`#123` or `123`) → use `gh pr diff [number]` as the changeset source.
+   - If a branch name → use `git diff [base]...[branch]` (read `base` from `.claude/config.md` § Branch Configuration; default `main`).
+   - If empty → default to the current branch; confirm with the user.
 
----
-
-## Step 2 — Architecture review
-
-Read the **Layer Boundaries** table in `.claude/config.md`. For each layer defined, verify that files in that layer's path pattern only import from allowed sources and flag any forbidden imports.
-
-If no config file exists, apply these Flutter defaults:
-- **Domain layer** (`lib/domain/`): no Flutter imports, no data layer imports
-- **Data layer** (`lib/data/`): no UI imports, may import domain
-- **UI layer** (`lib/ui/`): no direct data layer imports — must go through ViewModels which use use cases/facades
-
-For each violation found, note the file, line, and which boundary is crossed.
-
----
-
-## Step 3 — Convention compliance
-
-Check each changed file against CLAUDE.md conventions:
-
-### Class member order
-1. External package deps
-2. Internal deps
-3. Variables
-4. Constructors
-5. Public methods
-6. Protected / internal methods
-7. Private methods
-
-### Code style
-
-Read the **Convention Checks** table in `.claude/config.md` if it exists. If no config file exists, apply these Flutter/Dart defaults:
-- **Naming**: `PascalCase` classes/enums, `camelCase` members/variables, `snake_case` files
-- **Line length**: 80 characters max
-- **Functions**: single purpose, aim for <20 lines
-- **Logging**: uses `Logger`, never `print`
-- **Null safety**: sound null-safe, avoids `!` unless guaranteed
-- **Comments**: `///` for public API, comments explain *why* not *what*
-
-### Pattern compliance
-
-Read the **Pattern Compliance** section in `.claude/config.md` if it exists. If no config file exists, apply these Flutter/Dart defaults:
-- ViewModels extend `ChangeNotifier`, wired via `Provider`
-- Views never call repositories, services, or use cases directly
-- Models with sync: use `Syncable` mixin, have `copyWith`
-- Adapters implement `ModelAdapter` with all required methods
-- Repositories implement `IRepository<T>` interface
-- New dependencies follow the DI load order in `dependencies.dart`
-
----
-
-## Step 4 — Code quality
-
-### Complexity
-- Flag methods longer than 20 lines
-- Flag deeply nested logic (3+ levels)
-- Flag methods with more than 3 parameters that could use a parameter object
-
-### Duplication
-- Check if new code duplicates existing utilities in `lib/utils/`
-- Check if similar logic exists elsewhere that could be shared
-
-### Error handling
-- Async methods should have proper error handling
-- Errors at system boundaries (Supabase calls, Drift operations) should be caught
-- Internal code between trusted layers does not need excessive defensive checks
-
-### Security (for code touching auth, user data, or network)
-- No hardcoded credentials or tokens
-- User input validated before use
-- No SQL injection vectors in raw queries (if any)
-
----
-
-## Step 5 — Test review
-
-For each changed source file, check:
-- Does a corresponding test file exist?
-- Do the tests cover the changed behavior?
-- Are mocks appropriate (not mocking the thing being tested)?
-
-This is a lighter check than `/verify` — flag missing tests but don't audit test quality in depth.
-
----
-
-## Step 6 — Produce the review
-
-### Review format
+2. Spawn the `review` agent:
 
 ```
-## Architecture
-[violations found or "Clean — no layer violations"]
-
-## Convention Compliance
-[issues found, grouped by type, or "All conventions followed"]
-
-## Code Quality
-[complexity, duplication, error handling findings]
-
-## Test Coverage
-[missing or insufficient tests]
-
-## Summary
-- Critical issues (must fix): [n]
-- Warnings (should fix): [n]
-- Suggestions (nice to have): [n]
-- Verdict: [APPROVE / REQUEST CHANGES / NEEDS DISCUSSION]
+Agent(subagent_type: "review", model: "sonnet",
+      prompt: "Branch: [name or PR ref]. PRD: [path or 'none'].
+               Report path: agent_tasks/reports/review-[feature]-[date].md.
+               Work autonomously — no user interaction.")
 ```
 
-For each finding, include:
-- File path and line number
-- What the issue is
-- Suggested fix (be specific)
-- Severity: **critical** (blocks merge), **warning** (should fix), **suggestion** (optional)
+3. After completion, read the report file and present:
+   - Verdict (APPROVE / REQUEST CHANGES / NEEDS DISCUSSION).
+   - Critical and Warning counts (fixed vs. remaining).
+   - The Auto-Fixed Issues section so the user can see what changed.
+
+4. If the verdict is `REQUEST CHANGES`, list the remaining critical findings inline and ask the user how to proceed.
 
 ---
 
-## Step 7 — Present and offer fixes
+## What this shim does NOT do
 
-Present the review and ask: **"Would you like me to fix the critical issues and warnings?"**
-
-- If yes: fix them on the feature branch, run `flutter test` + `flutter analyze`, commit the fixes
-- If no: the review stands as documentation for the user to address
+- Re-implement the review steps. The agent owns Steps 0–7 with `flutter-conventions` and `review-report-format` skills loaded.
+- Apply non-critical fixes. The agent auto-applies Critical + Warning per `review-report-format`; Suggestions are listed only.

@@ -23,13 +23,16 @@ A Claude Code agent team for autonomous feature development. Drop these agents a
 | Agent | `generate-tasks` | Spawned by `/cycle` — generates task files |
 | Agent | `scaffold` | Spawned by `/cycle` — scaffolds new components |
 | Agent | `ui-story` | Spawned by `/cycle` — implements UI components |
+| Agent | `coding` | Spawned by `/cycle` — general code changes (refactors, bug fixes, domain/data logic) under the minimalism ladder |
 | Agent | `test` | Spawned by `/cycle` — writes tests |
 | Skill | `/setup` | Interactive configuration wizard for new projects |
 | Agent | `verify` | Spawned during cycle Phase 4A — audits AC coverage |
 | Agent | `review` | Spawned during cycle Phase 4A — reviews code quality |
-| Agent | `adversarial-tester` | Spawned by `test` — finds weak assertions |
+| Agent | `test-preflight` | Spawned by `/cycle` — classifies existing tests (keep/update/delete) before the test agent runs |
+| Agent | `adversarial-tester` | Opt-in (no longer in default loop) — Phase 4A hardening or manual second-pass review |
 | Agent | `self-improve` | Spawned by `/self-improve` — applies pipeline improvements |
 | Agent | `monitor` | Spawned by `/cycle` — maintains cycle state in the background |
+| Agent | `supervisor` | Spawned by `/cycle` — Phase-3 sidecar that observes event logs and emits whispers/escalations |
 
 ---
 
@@ -77,12 +80,37 @@ If your project uses a different toolchain, update these patterns to match (e.g.
 - **Remove** patterns you don't want auto-allowed
 - **Add** patterns for project-specific commands (e.g., `Bash(docker compose*)`)
 
+### Enable per-agent telemetry (recommended)
+
+`.claude/settings.json.sample` ships a `hooks` block (`PostToolUse` + `SubagentStop`) that appends one JSONL line per tool call to `agent_states/events/<agent_id>.jsonl`. The cycle's run-report telemetry, the supervisor, and stall salvage all consume this log.
+
+To enable, **merge** the `hooks` block from `.claude/settings.json.sample` into your `.claude/settings.json` (don't overwrite — preserve your existing `permissions`). Requires `python3` on PATH (built-in on macOS).
+
 ### 4. Conventions
 
-The pipeline expects these directories (auto-created as needed):
-- `agent_tasks/` — PRDs, task files, and run reports
-- `agent_states/` — ephemeral cycle state (auto-created, auto-deleted)
-- `cycle_reports/` — per-cycle summaries
+The pipeline expects these directories (auto-created as needed), grouped by how they're tracked:
+
+| Directory | Class | Tracked? |
+|---|---|---|
+| `agent_tasks/` (PRDs, task files) | durable, branch-coupled | committed |
+| `documentation/` (FEATURES, ROADMAP, CHANGELOG, …) | durable, product-coupled | committed |
+| `agent_states/` (cycle state, telemetry, worktrees) | runtime | **never committed** |
+| `cycle_reports/`, `agent_tasks/reports/` | retrospective process artifacts | vault or local (see below) |
+
+**Gitignore protection is automatic.** On every `/cycle` invocation the orchestrator ensures a managed block in your project's `.gitignore` so runtime artifacts (cycle state, telemetry event logs, Phase-3 worktrees) are never committed:
+
+```
+# >>> agent-sdlc (managed — do not edit) >>>
+agent_states/
+.claude/worktrees/
+# <<< agent-sdlc <<<
+```
+
+### Storing reports in an external docs vault (optional)
+
+By default, cycle reports and run/verify/review reports are committed to the application repo. To keep these retrospective artifacts out of your product history — and make them browsable and analyzable across multiple applications — set `vault_root` (and optionally `app_slug`) in the **Docs Vault** section of `.claude/config.md`. The orchestrator then symlinks `cycle_reports/` and `agent_tasks/reports/` into the vault at startup, migrating any existing local reports, and adds the symlinks to the managed `.gitignore` block.
+
+The vault is a normal directory you version independently — e.g. a git-backed [Obsidian](https://obsidian.md) vault pushed to its own private repo. Leaving `vault_root` empty keeps everything local (fully backward-compatible).
 
 ### 5. Configure (recommended)
 
