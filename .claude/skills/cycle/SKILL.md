@@ -21,10 +21,10 @@ Active cycle states:
 
 **Janitor check**: for each state file listed above, check whether a matching cycle report already exists in `cycle_reports/` (match by feature name substring). If a match exists, the cycle completed without sending `FINALIZE` — delete the state file now and do not offer to resume it.
 
-**Worktree janitor**: run `git worktree list`. For any worktree under `.claude/worktrees/` on a `cycle/*` branch whose cycle is not among the active state files above, prune it — `git worktree remove --force <path>` then `git branch -D <branch>`. Orphaned Phase-3 worktrees otherwise accumulate indefinitely.
+**Task-branch janitor**: omp's isolated tasks create `omp/task/<id>` branches during Phase 3. Run `git branch --list 'omp/task/*'`. For any whose cycle is not among the active state files above (orphaned from a crashed cycle), prune: `git branch -D <branch>`. omp cleans up its own isolation workspaces on completion, but task branches can linger if a cycle was interrupted mid-merge.
 
-**Gitignore guard** — ensure runtime artifacts (cycle state, telemetry event logs, Phase-3 worktrees) are never committed to the project repo. Idempotent; appends a marked block once:
-!`grep -q 'agent-sdlc (managed)' .gitignore 2>/dev/null || printf '\n# >>> agent-sdlc (managed — do not edit) >>>\nagent_states/\n.claude/worktrees/\n# <<< agent-sdlc <<<\n' >> .gitignore`
+**Gitignore guard** — ensure runtime artifacts (cycle state, telemetry event logs) are never committed to the project repo. Idempotent; appends a marked block once:
+!`grep -q 'agent-sdlc (managed)' .gitignore 2>/dev/null || printf '\n# >>> agent-sdlc (managed — do not edit) >>>\nagent_states/\n# <<< agent-sdlc <<<\n' >> .gitignore`
 
 Only runtime artifacts are ignored. `agent_tasks/` (live PRD + task files) and `documentation/` are **durable** — they travel with the feature branch and must stay committed. Cycle reports and run reports are written to the external docs vault (see config **Artifact Paths**) and never land in the project repo at all.
 
@@ -107,43 +107,39 @@ Dry-run ends with: **"Ready to execute? `/cycle --exe` to begin, or adjust first
 
 ## Agent spawn rules
 
-### Phase-3 worktree protocol (MANDATORY)
+### Phase-3 isolation (native omp)
 
-The orchestrator creates and owns every Phase-3 worktree. Implementation agents do **not** use `isolation: "worktree"` — worktrees created by that harness flag branch from a stale base instead of the feature branch HEAD. The orchestrator avoids the bug by creating worktrees itself.
+Under omp, each Phase-3 implementation agent spawns with `isolated: true`. omp captures a baseline from the current HEAD (the feature branch), creates an isolated workspace, runs the agent, commits to a task branch (`omp/task/<id>`), and cherry-picks into the parent (feature branch). This replaces the manual git worktree protocol entirely — no `git worktree add`, no worktree-startup preamble, no WORKTREE MISMATCH rescue, no manual merge/teardown.
 
-**Mode override:** in `--mode hotfix`, worktrees are skipped entirely. A single implementation agent runs in the main checkout on the feature branch. No agent_id-based events, no parallel agents, no worktree-startup preamble. The rest of this section applies only when mode is `full` or `lean`.
+**Mode override:** in `--mode hotfix`, isolation is skipped. A single implementation agent runs in the main checkout on the feature branch (`isolated: false`). The rest of this section applies only when mode is `full` or `lean`.
 
-**One worktree per parent task** — the implementer and the test agent for that task share it.
+**One isolated workspace per agent** — the implementer and test agent no longer share a worktree. The implementer commits → omp merges into the feature branch → the test agent gets a fresh workspace from the updated HEAD. This is cleaner: the test agent sees committed, merged code rather than worktree-local state.
 
-For each parent task, before spawning its agents:
-
-1. **Create the worktree** from the current feature-branch HEAD: `git worktree add -b cycle/[story]/task-[N.0] .claude/worktrees/[story]-task-[N.0] feature/[name]`. The base is `feature/[name]` HEAD *at creation time* — create it immediately before spawning, so a dependent task forks from the post-merge HEAD that already contains its prerequisite.
-2. **Spawn the agent non-isolated** — no `isolation:` parameter — with the worktree-startup preamble (below) prepended to its prompt.
-3. The agent works entirely inside its worktree; the orchestrator merges and tears it down (see **Commit protocol**).
-
-Separate worktree directories already give full isolation — each has its own working tree, index, and build artifacts; the shared git object store is concurrency-safe. The `isolation:` flag is unnecessary once the orchestrator owns worktree creation.
-
-**Worktree-startup preamble** — prepend to EVERY Phase-3 implementation agent prompt, with `[path]` and `[branch]` filled in:
-
-> Before any other action: run `cd [path]`, then verify `git rev-parse --show-toplevel` equals `[path]` AND `git branch --show-current` equals `[branch]`. If either check fails, do NOT proceed — stop immediately and report `WORKTREE MISMATCH`. Every file path in this prompt is absolute and inside your worktree; never Read, Edit, or Write a path outside `[path]`.
-
-The orchestrator rewrites the task's "Relevant Files" paths to the worktree root before injecting them, so the agent is never handed a main-checkout path.
-
-**On `WORKTREE MISMATCH`** — if an agent aborts with this signal, the orchestrator sends `RESCUE worktree-mismatch [agent-id]: [short description] | resolution: [retry|escalate] | artifact: none` to monitor before proceeding via the escalation ladder.
+**Dependency ordering:** dependent tasks fork from the post-merge HEAD automatically — spawn a dependent task only after its prerequisite's isolated agent has completed and omp has merged the task branch.
 
 **Handoff format** — every Phase-3 implementation agent's final response must include a `## Deviations` section. Each item: `task: [task-id] | ac: [AC ref] | implemented: [what] | reason: [why]`. Write `None` if the implementation matches PRD AC literally. The orchestrator forwards each deviation to monitor via a `DEVIATIONS` message (see §3.4 Success).
 
 Named agents (`scaffold`, `ui-story`, `test`, etc.) have their model set in their definition. Pass `model:` only to override or for generic haiku agents (monitor, pre-digest).
 
-### Agent labels
+### Agent identity (`role` field)
 
-Each agent definition includes a `label` field in its frontmatter (e.g., `[SCAFFOLD]`, `[TEST]`). When reporting status to the user or sending updates to the monitor, prefix messages with the agent's label for identification. Example: `[SCAFFOLD] Task 1.2 complete` or `[TEST] 3 tests added for LoginService`.
+Every task spawn includes a `role:` field — a short identity string that becomes the agent's system-prompt persona and registry display name (visible in `irc(op: "list")`). Format: `<role> (task <task-number>)`. Example: `role: "Scaffold engineer (task 2.0)"`. This replaces the old `label` frontmatter convention for status display.
 
-### Pre-digestion
+### Shared context (`context` field)
 
-Before spawning a named implementation agent, optionally spawn a **haiku** agent (background) to read relevant source files and return a ~200-line context digest. Pass the digest in the implementation agent's prompt to reduce redundant file reads.
+When spawning multiple agents for one parent task (implementer, pre-flight, test), the shared background — worktree context, PRD path, AC, context-source blocks, digest — goes in the task tool's `context` field (batch mode) or a `local://` file referenced by each spawn (flat mode). omp renders `context` into every spawned subagent's system prompt as a `CONTEXT` section. Do not repeat this content in each `assignment`.
 
-**Prompt budget**: haiku prompts <200 words (single task, no background). Implementation agent prompts: task context + digest only — no instructions, those live in the agent definition.
+Each spawn's `assignment` contains ONLY the per-agent-specific work: the sub-task list, the changed source files, the pre-flight classifications table, etc.
+
+### Pre-digestion (async via job tool)
+
+Before spawning a named implementation agent, optionally spawn a **haiku** pre-digest agent as a background job (`async: true`). The pre-digest reads relevant source files and returns a ~150-line structured summary. Use the `job` tool to manage it:
+
+- Spawn the pre-digest as a background task. For multiple independent parent tasks, spawn all their pre-digests in parallel — they run as concurrent background jobs under the session semaphore.
+- While pre-digests run, the orchestrator can proceed with other work (e.g., context-source retrieval for the next task).
+- Collect results via `job poll` when the implementation agent is ready to spawn. Pass the digest content in the implementation agent's `context`.
+
+**Prompt budget**: haiku prompts <200 words (single task, no background). Implementation agent `assignment`: task-specific work only — instructions live in the agent definition, shared context lives in `context`.
 
 ### Context Sources retrieval
 
@@ -168,7 +164,7 @@ All work on feature branches, never directly on the base branch.
 
 - **Naming**: read `feature_branch_pattern` from the **Branch Configuration** table in `.claude/config.md`. Default: `feature/[short-description]`, `fix/...`, or `refactor/...`
 - **Create at Phase 2B**: `git checkout -b feature/[name] [base_branch]` — where `[base_branch]` is the `base_branch` value from `.claude/config.md`
-- **Parallel tasks**: the orchestrator creates one git worktree per parent task, branched from `feature/[name]` HEAD — branch `cycle/[story]/task-[N.0]`, path `.claude/worktrees/[story]-task-[N.0]`. See **Phase-3 worktree protocol**. (`feature/[name]/task-N` cannot be used as a branch name — it collides with the `feature/[name]` ref.)
+- **Parallel tasks**: each isolated agent gets its own workspace from `feature/[name]` HEAD. omp creates `omp/task/<id>` branches and cherry-picks into `feature/[name]` on completion. See **Phase-3 isolation** (§ Agent spawn rules).
 - **Merge order**: dependency order. Run the test and typecheck/lint commands (from **Project Commands** in `.claude/config.md`) after each merge.
 - **Conflicts**: sonnet agent resolves. Ambiguous conflicts → escalate to user.
 - **After Phase 4**: do NOT merge into the base branch. User decides after `/verify` + `/review`.
@@ -235,9 +231,9 @@ Spawn the `create-prd` agent (model: sonnet) with the feature description. The a
 Run **Context Sources retrieval** for stage `prd` (see § Context Sources retrieval) and prepend any `## Context: <id>` blocks to the prompt below.
 
 ```
-Spawn the `create-prd` agent (model tier: sonnet — resolve the label through Model Versions in .claude/config.md, pass the concrete model id) with this prompt:
-> [Context blocks if any]
-> Feature: [description]. [Any roadmap story number or context].
+task(agent: "create-prd", context: "[context-source blocks if any]",
+  tasks: [{ id: "create-prd", role: "PRD author",
+    assignment: "Feature: [description]. [Any roadmap story number or context]." }])
 ```
 
 Confirm the PRD file exists at the agent's `produces:` path. Missing = re-spawn or escalate.
@@ -268,9 +264,9 @@ Spawn the `generate-tasks` agent (model: sonnet) with the PRD file path. The age
 Run **Context Sources retrieval** for stage `tasks` and prepend any `## Context: <id>` blocks to the prompt below.
 
 ```
-Spawn the `generate-tasks` agent (model tier: sonnet — resolve the label through Model Versions in .claude/config.md, pass the concrete model id) with this prompt:
-> [Context blocks if any]
-> PRD: [prd-file-path]
+task(agent: "generate-tasks", context: "[context-source blocks if any]",
+  tasks: [{ id: "generate-tasks", role: "Task planner",
+    assignment: "PRD: [prd-file-path]" }])
 ```
 
 Confirm the task file exists at the agent's `produces:` path. Missing = re-spawn or escalate.
@@ -385,73 +381,78 @@ Present analysis in dry-run mode. In `--exe` mode, proceed.
 
 Before spawning any implementation agent:
 
-1. **Extract file paths** from the task file's "Relevant Files" section — pass these explicitly in every agent prompt. This eliminates discovery round-trips.
-2. **Extract AC** from the PRD's Acceptance Criteria section — pass directly to test and verify agents so they skip PRD search.
+1. **Extract file paths** from the task file's "Relevant Files" section — pass these in the shared `context`.
+2. **Extract AC** from the PRD's Acceptance Criteria section — pass in the shared `context` so test and verify agents skip PRD search.
+3. **Run Context Sources retrieval** for stage `implement` once per parent task — query with the task's Relevant Files + touched symbols. Prepend any `## Context: <id>` blocks to the shared `context`.
 
-For each parent task (independent in parallel, dependent when ready), first **create the task worktree** per the **Phase-3 worktree protocol** (`git worktree add` from `feature/[name]` HEAD), then:
+#### Parallel task waves (batch mode)
 
-1. **Pre-digest** (haiku, background) — default for any task touching ≥ `skip_predigest_if_files_lt` existing files (Per-phase skip flags in `.claude/config.md`, default 2). Reads relevant source files and returns a ~150-line structured summary (public API, constructor deps, key patterns). Skip when below threshold, when the task creates all-new files, or when a digest was already saved.
+For **independent** parent tasks, spawn them as a batch — one `task` call with a `tasks[]` array, each item getting its own `id`, `role`, `assignment`, and `isolated: true`. The shared `context` (PRD path, AC, context-source blocks, project commands) is written once and rendered into every spawn's system prompt:
 
+```
+task(
+  agent: "<kind-agent>",        // scaffold, ui-story, coding, or task
+  context: "[shared background: PRD path, AC, context-source blocks, digest, project commands]",
+  tasks: [
+    { id: "scaffold-1.0", role: "Scaffold engineer (task 1.0)", isolated: true,
+      assignment: "[sub-task list + relevant files for task 1.0]" },
+    { id: "coding-2.0", role: "Software engineer (task 2.0)", isolated: true,
+      assignment: "[sub-task list + relevant files for task 2.0]" },
+    ...
+  ]
+)
+```
+
+The session semaphore bounds concurrency. Each isolated agent gets its own workspace from the feature-branch HEAD; omp merges each task branch when the agent completes.
+
+For **dependent** tasks, wait for the prerequisite's isolated agent to complete and omp to merge its branch, then spawn the dependent task (it forks from the updated HEAD automatically).
+
+#### Per-task agent sequence
+
+For each parent task (whether batched or sequential), the sequence is:
+
+1. **Pre-digest** (haiku, background job) — default for any task touching ≥ `skip_predigest_if_files_lt` existing files (default 2). Spawn all independent tasks' pre-digests as parallel background jobs, then collect via `job poll`:
    ```
-   Spawn a generic `task` agent (model tier: [pre-digest model from Model Allocation table in .claude/config.md] — resolve the label through Model Versions, pass the concrete model id, id: "predigest-[task-number]") with this prompt (background task — use async task dispatch):
-   > Read these files and return a ~150-line structured summary
-   > covering: public API (class names, method signatures, constructor
-   > deps), key patterns, and anything an implementer needs to know.
-   > Files: [file paths from Relevant Files section].
-   > Be dense — no prose explanations, just facts.
+   task(agent: "task", context: "Read source files and return a structured summary.",
+     tasks: [{ id: "predigest-1.0", role: "Pre-digest (task 1.0)", assignment: "Files: [paths]. Return ~150-line summary: public API, constructor deps, key patterns. Dense — no prose." },
+             { id: "predigest-2.0", role: "Pre-digest (task 2.0)", assignment: "Files: [paths]. ..." }])
    ```
+   Collect each via `job poll` when its implementation agent is ready. Pass the digest in the implementation agent's `context`.
 
-   Wait for the digest before spawning the implementation agent. Pass digest content in the implementation agent's prompt.
+2. **Implement** — dispatch by the parent task's `[kind: …]` tag:
 
-2. **Implement** — dispatch by the parent task's `[kind: …]` tag (set by `generate-tasks`). If the tag is missing on an existing task file, fall back to inferring from the prose. The agent runs in the task worktree; no `isolation:` parameter.
+   | `kind` value | agent |
+   |---|---|
+   | `scaffold` or `scaffold-*` | `scaffold` |
+   | `ui-story` | `ui-story` |
+   | `test` | `test` |
+   | `coding` | `coding` |
+   | `task (generic)` | `task` |
 
-   | `kind` value | agent | Model |
-   |---|---|---|
-   | `scaffold` or `scaffold-*` | `scaffold` | per config |
-   | `ui-story` | `ui-story` | per config |
-   | `test` | `test` | per config |
-   | `coding` | `coding` | per config |
-   | `task (generic)` | `task` | per config |
+   Each implementation agent spawns with `isolated: true`, `id: "<kind>-<task-number>"`, `role: "<role> (task <task-number>)"`. The `context` carries PRD path, AC, context-source blocks, digest, and project commands. The `assignment` carries only the sub-task list and relevant files.
 
-   For `scaffold-*` kinds (e.g., `scaffold-facade`), pass the pattern name in the agent's prompt so it loads the matching `.claude/agents/scaffold/<pattern>.md`.
-
-   Read the **Model Allocation** table in `.claude/config.md` for each agent's assigned model under the active preset. If no config file exists, default to sonnet for all implementation agents.
-
-   Run **Context Sources retrieval** for stage `implement` (see § Context Sources retrieval) once for the parent task — query with the task's Relevant Files + touched symbols — and reuse the result across every agent spawned for this task (do not re-query per sub-agent). Prepend any `## Context: <id>` blocks to the prompt.
-
-   ```
-   Spawn the `scaffold` agent (model tier: [per config] — resolve through Model Versions, pass the concrete model id, id: "scaffold-[task-number]") with this prompt:
-   > [worktree-startup preamble — Phase-3 worktree protocol]
-   > [Context blocks if any]
-   > PRD: [prd-path]
-   > Source files: [paths from Relevant Files, rooted at the worktree]
-   > AC (pre-extracted): [AC items from PRD]
-   > Task: [sub-task list]
-   > Digest: [digest content if available]
-   ```
+   For `scaffold-*` kinds, pass the pattern name in the `assignment` so the agent loads `.claude/agents/scaffold/<pattern>.md`.
 
    - Agent marks sub-tasks `[x]` as it completes them
    - On failure/ambiguity: report to orchestrator, continue independent sub-tasks
+   - omp merges the task branch into the feature branch on completion
 
-3. **Pre-flight contradiction classifier** (haiku, runs in the same task worktree after implementer commits, before test agent). Skip when `skip_preflight_if_no_existing_tests` is `true` (Per-phase skip flags in `.claude/config.md`, default true) **and** grep of the **Test path glob** (`.claude/config.md` § Project Commands) for any public symbol the implementer touched returns no hits — true greenfield needs no classification.
-
+3. **Pre-flight** (haiku, after implementer merges, before test agent). Skip when `skip_preflight_if_no_existing_tests` is `true` and grep of the **Test path glob** for any public symbol the implementer touched returns no hits.
    ```
-   Spawn the `test-preflight` agent (model tier: haiku — resolve through Model Versions, pass the concrete model id, id: "preflight-[task-number]") with this prompt:
-   > [worktree-startup preamble]
-   > Changed source files: [paths the implementer modified]
-   > AC (pre-extracted): [AC items from PRD]
-   > Base ref: feature/[name]
+   task(agent: "test-preflight",
+     context: "[shared: PRD path, AC, project commands]",
+     tasks: [{ id: "preflight-<task-number>", role: "Pre-flight classifier (task <n>)", isolated: true,
+       assignment: "Changed source files: [paths]. Base ref: feature/[name]." }])
    ```
+   The classifier returns a `## Existing test classifications` table. Lift it into the test agent's `assignment`.
 
-   The classifier returns a `## Existing test classifications` table. Lift it verbatim into the test agent's spawn prompt (next step). It produces no file artifact — its output lives in the return value only.
-
-4. **Test** (separate agent from implementer; runs in the **same task worktree** as the implementer, after pre-flight — so it sees the implemented code; no `isolation:` parameter):
-   - **Write** (sonnet): Spawn the `test` agent (model tier: sonnet, id: "test-[task-number]") with this prompt: `> [worktree-startup preamble] PRD: [prd-path]\nSource files: [paths]\nTest files: [paths]\nAC (pre-extracted): [AC items]\nTask: [task description]\n[pre-flight classifications table if non-empty]`
-   - **Fix** (sonnet): re-spawn `test` agent with failure output and source paths
+4. **Test** (separate agent from implementer; gets a fresh isolated workspace from the updated feature-branch HEAD after the implementer's merge):
+   - **Write**: `task(agent: "test", context: "[shared]", tasks: [{ id: "test-<n>", role: "Test engineer (task <n>)", isolated: true, assignment: "Source files: [paths]\nTest files: [paths]\nTask: [desc]\n[pre-flight table]" }])`
+   - **Fix**: re-spawn `test` agent with failure output and source paths
 
 ### 3.4 — Handle results
 
-- **Success**: capture the agent's `## Deviations` section — forward each to monitor (`DEVIATIONS [task-id] AC [ac-id]: [what] | reason: [why]`); then run the **Commit protocol** below (clean-check → test → merge task worktree into feature branch → teardown), send status to monitor
+- **Success**: capture the agent's `## Deviations` section — forward each to monitor (`DEVIATIONS [task-id] AC [ac-id]: [what] | reason: [why]`). omp has already merged the task branch into the feature branch (branch-mode merge on isolated agent completion). Run the **Run all tests** + **Analyze / lint** commands (§ Project Commands) to verify the merge is clean. Send status to monitor.
 - **Failure**: escalation ladder (below)
 - **Contradiction-exit** (agent's return contains `status: contradiction-exit` per the `contradiction-exit` skill — item 5.4.4): emit `RESCUE contradiction-loop [task-id]: [trigger value] | resolution: human escalation | artifact: [report path or "agent return"]` to monitor, then jump to **L4** immediately. Do **not** run the escalation ladder for L1–L3 — the agent already exhausted its retries by construction. Preserve the structured block verbatim in the user-facing message.
 - **Stalled** (agent killed by the harness watchdog, or returns no clean result): run **Stall salvage** (below), then the escalation ladder using the salvage assessment as context
@@ -525,14 +526,9 @@ A stalled agent — one the harness watchdog kills before it returns cleanly, or
 On detecting a stall, spawn one inline Haiku salvage pass — do not analyze the stall yourself:
 
 ```
-Spawn a generic `task` agent (model tier: [salvage model from Model Allocation table in .claude/config.md] — resolve the label through Model Versions, pass the concrete model id) with this prompt:
-> The [agent role] agent for [task/feature] stalled before finishing.
-> Salvage only what is recoverable — do NOT redo its work.
-> Inputs: [partial report path if any] and the git state of [worktree or branch]
-> (run `git diff [base]` and `git log`).
-> Produce a `PARTIAL — agent stalled` artifact at [path]: record what
-> completed, mark what is missing, assess whether the result is coherent.
-> Return the artifact path.
+task(agent: "task", context: "Salvage only what is recoverable — do NOT redo its work.",
+  tasks: [{ id: "salvage-<agent-id>", role: "Salvage pass",
+    assignment: "The [agent role] agent for [task/feature] stalled. Inputs: [partial report path if any] and the git state (run git diff [base] and git log). Produce a PARTIAL — agent stalled artifact at [path]: record what completed, mark what is missing, assess whether the result is coherent. Return the artifact path." }])
 ```
 
 Send `RESCUE stall [agent-id]: [agent role] stalled before finishing | resolution: ran Haiku salvage | artifact: [salvage report path]` to monitor. Then: for a stalled `verify`/`review`, the `PARTIAL` report feeds the 4A gate; for a stalled implementation agent, proceed via the escalation ladder with the salvage assessment as the "what was attempted" context.
@@ -547,11 +543,11 @@ Existing-code bugs (not agent-written code):
 ### Commit protocol
 
 Per parent task, when all sub-tasks pass:
-1. **Clean-check** — assert `git status --porcelain` in the **main checkout** is empty. The orchestrator writes no implementation code, so a dirty main checkout means an agent leaked outside its worktree: abort the merge, report to the user, do not proceed.
-2. Run test + typecheck/lint commands (from **Project Commands** in `.claude/config.md`) in the task worktree.
-3. **Silent-skip gate** — grep the diff of test files (`git diff feature/[name]...HEAD -- '<test-glob>'` inside the worktree, where `<test-glob>` is the **Test path glob** from `.claude/config.md` § Project Commands) for the regex patterns in the active pack's **Test anti-patterns** file (`.claude/config.md` § Project Commands → *Test anti-patterns*; one regex per line, `#`-comments stripped). Any hit blocks the merge.
-   On hit: emit `RESCUE silent-skip [task-id]: [file:line + pattern] | resolution: re-spawn test agent | artifact: [worktree path]` to monitor, then re-spawn the **test** agent in the same worktree with the offending file + matched pattern in its prompt. One retry allowed; a second hit escalates per L3 of the ladder. Scope is the test glob only — production-code matches are not flagged (legitimate production patterns).
-4. Green and gate clean → ensure the task work is committed on `cycle/[story]/task-[N.0]` (conventional format), merge that branch into `feature/[name]`, mark parent `[x]`, update monitor, then **tear down the worktree**: `git worktree remove --force .claude/worktrees/[story]-task-[N.0]` and `git branch -D cycle/[story]/task-[N.0]`.
+1. **Clean-check** — assert `git status --porcelain` in the main checkout is empty. The orchestrator writes no implementation code, so a dirty main checkout means something leaked: abort, report to the user.
+2. Run test + typecheck/lint commands (from **Project Commands** in `.claude/config.md`) in the main checkout (omp has already merged the task branch).
+3. **Silent-skip gate** — grep the diff of test files (`git diff [base]...HEAD -- '<test-glob>'`, where `<test-glob>` is the **Test path glob** from `.claude/config.md` § Project Commands) for the regex patterns in the active pack's **Test anti-patterns** file. Any hit blocks.
+   On hit: emit `RESCUE silent-skip [task-id]: [file:line + pattern] | resolution: re-spawn test agent | artifact: none` to monitor, then re-spawn the `test` agent (isolated) with the offending file + matched pattern. One retry; a second hit escalates per L3.
+4. Green and gate clean → mark parent `[x]`, update monitor. omp has already merged the task branch and cleaned up the workspace — no manual `git worktree remove` or `git branch -D` needed.
 5. Red tests → escalation ladder from L1
 
 Never auto-revert commits. Report to user with options.
@@ -618,24 +614,21 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    Record the chosen depth and its inputs in cycle state under `## References` → `Verify depth: <tier> | inputs: <key:value pairs>` for `self-improve` calibration.
 
-   If `verify` is **enabled**: spawn the `verify` agent with the PRD path, source file paths, test file paths, pre-extracted AC, **and the computed depth**:
+   If `verify` is **enabled**: spawn the `verify` agent (not isolated — reads the main checkout):
    ```
-   Spawn the `verify` agent (model tier: [per config Model Allocation] — resolve through Model Versions, pass the concrete model id, id: "verify") with this prompt:
-   > [Context blocks if any]
-   > PRD: [prd-path]. Source files: [paths]. Test files: [paths].
-   > AC: [pre-extracted]. Branch: [branch-name]. Depth: <lite|standard|deep>.
-   > Report path: agent_tasks/reports/verify-[prd-stem]-[date].md — write your report there.
-   > Work autonomously — no user interaction.
+   task(agent: "verify", context: "[PRD path, AC, context-source blocks, project commands]",
+     tasks: [{ id: "verify", role: "AC auditor",
+       assignment: "Source files: [paths]. Test files: [paths]. Branch: [branch-name]. Depth: <lite|standard|deep>. Report path: agent_tasks/reports/verify-[prd-stem]-[date].md — write your report there. Work autonomously." }])
    ```
 
-   If `review` is **enabled**: spawn the `review` agent with the branch name:
+   If `review` is **enabled**: spawn the `review` agent (not isolated — reads the main checkout):
    ```
-   Spawn the `review` agent (model tier: [per config Model Allocation] — resolve through Model Versions, pass the concrete model id, id: "review") with this prompt:
-   > [Context blocks if any]
-   > Branch: [branch-name]. PRD: [prd-path].
-   > Report path: agent_tasks/reports/review-[feature]-[date].md — write your report there.
-   > Work autonomously — no user interaction.
+   task(agent: "review", context: "[PRD path, context-source blocks, project commands]",
+     tasks: [{ id: "review", role: "Code reviewer",
+       assignment: "Branch: [branch-name]. Report path: agent_tasks/reports/review-[feature]-[date].md — write your report there. Work autonomously." }])
    ```
+
+   Verify and review can be spawned as a single batch call (two items, one `context`) since they run concurrently.
 
    Wait for both to complete.
 

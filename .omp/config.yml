@@ -27,11 +27,16 @@ tools:
   approval:
     bash: allow
 
-# The framework manages its own worktree isolation (cycle SKILL § Phase-3
-# worktree protocol). Disable omp's task isolation to avoid a second layer.
+# Native task isolation — omp creates an isolated workspace per spawn
+# (baseline captured from the current HEAD = feature branch), runs the agent,
+# commits to a task branch, and cherry-picks into the parent. This replaces
+# the framework's manual git worktree protocol. Branch-mode merge so each
+# agent's commits land on the feature branch.
 task:
   isolation:
-    mode: none
+    mode: auto
+  # Merge strategy: commit to omp/task/<id> branch, cherry-pick into parent
+  mergeMode: branch
 
 compaction:
   strategy: snapcompact

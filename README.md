@@ -210,6 +210,21 @@ protocol; the file-based path remains as the Claude Code fallback. The severity 
 (`note` → `strong` → `pause`) is unchanged — it moves into the irc message body as a
 `[severity]` prefix.
 
+### 6. Native task isolation + batch spawns
+
+Phase-3 implementation agents spawn with `isolated: true` — omp captures a baseline from the
+feature-branch HEAD, creates an isolated workspace, runs the agent, commits to a task branch
+(`omp/task/<id>`), and cherry-picks into the feature branch. This replaces the manual
+`git worktree add` + worktree-startup preamble + manual merge/teardown entirely.
+
+Independent parent tasks spawn as a **batch** — one `task` call with a `tasks[]` array, each
+item getting its own `id`, `role`, `assignment`, and `isolated: true`. Shared background (PRD
+path, AC, context-source blocks, digest) goes in the `context` field once, rendered into every
+spawn's system prompt. The session semaphore bounds concurrency.
+
+Pre-digest agents run as parallel background **jobs** (`job poll` to collect), overlapping
+digestion across independent tasks while the orchestrator does other work.
+
 ---
 
 ## The `/cycle` skill

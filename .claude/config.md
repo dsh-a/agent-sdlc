@@ -297,7 +297,7 @@ pre-digest). See `.claude/skills/context-sources/SKILL.md` for the full contract
 | auto_verify | `true` | Spawn verify agent during Phase 4A |
 | auto_review | `true` | Spawn review agent during Phase 4A |
 | feature_idea_on_empty | `true` | When /cycle has no args and no active state, offer to pull from FEATURES.md |
-| agent_messaging | `false` | Whether SendMessage / agent-teams is available. `false` (default): the orchestrator writes cycle state inline and only spawns the monitor once at Finalize. `true`: a background monitor receives state-update verbs via SendMessage. Leave `false` unless agent-teams is enabled. |
+| agent_messaging | `false` | Whether the orchestrator delegates state persistence to a background monitor. `false` (default): the orchestrator writes cycle state inline and only spawns the monitor at Finalize. `true`: a background monitor receives state-update verbs via irc (`irc(op: "wait")`) and maintains the state file. Under omp, irc is always available to subagents, so `true` is viable. Leave `false` for the leanest orchestrator context. |
 
 
 ## Branch Configuration
