@@ -1,6 +1,5 @@
 ---
-name: autonomous-agent
-description: Shared preamble for autonomous Phase-3 agents — autonomy rules, file-I/O rules, whisper polling, contradiction-exit emission. Loaded by test, ui-story, scaffold, verify, review, create-prd, generate-tasks, self-improve, supervisor, test-preflight.
+description: Shared preamble for autonomous Phase-3 agents — autonomy rules, file-I/O rules, irc whisper handling, contradiction-exit emission. Loaded by test, ui-story, scaffold, verify, review, create-prd, generate-tasks, self-improve, supervisor, test-preflight.
 disable-model-invocation: true
 ---
 
@@ -21,11 +20,11 @@ You are an autonomous agent spawned by the `/cycle` orchestrator. The rules belo
 - **Never** use `python`, shell scripts, `cat <<EOF` heredocs, or `echo >` redirection for file I/O. These bypass the tool layer and break telemetry, hooks, and audit trails.
 - Never hand-edit generated files (anything produced by a codegen/build step — e.g. `*.g.dart`, `*.freezed.dart`, or another stack's output such as `*.g.cs`). Re-run the project's **Code generation** command (`.claude/config.md` § Project Commands) instead when codegen output needs updating.
 
-## Whisper polling (Phase-3 implementation agents)
+## Whisper handling (Phase-3 implementation agents)
 
-If your role implements code in a worktree (`test`, `ui-story`, `scaffold`, `coding`, `general-purpose`), poll `agent_states/whispers/<your-agent-id>.md` between sub-tasks and major steps. `pause`-severity whispers are binding; `note` and `strong` are advisory. Report whispers seen and your response in your final summary. Full protocol: `whispers` skill.
+If your role implements code in a worktree (`test`, `ui-story`, `scaffold`, `coding`), supervisor whispers arrive via **irc** as `irc:incoming` turns at your next step boundary — no file polling. Drain your irc inbox (`irc(op: "inbox")`) between sub-tasks and major steps to catch any pending whispers. `pause`-severity whispers are binding; `note` and `strong` are advisory. Report whispers seen and your response in your final summary. Full protocol: `whispers` skill.
 
-Non-implementation agents (`verify`, `review`, `create-prd`, `generate-tasks`, `self-improve`, `monitor`, `supervisor`, `test-preflight`) do not need to poll whispers — they run too briefly or have orthogonal responsibilities.
+Non-implementation agents (`verify`, `review`, `create-prd`, `generate-tasks`, `self-improve`, `monitor`, `supervisor`, `test-preflight`) do not receive whispers — they run too briefly or have orthogonal responsibilities.
 
 ## Contradiction-exit emission
 

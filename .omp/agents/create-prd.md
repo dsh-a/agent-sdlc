@@ -34,7 +34,7 @@ Scan `agent_tasks/` for existing PRD files. Read their Introduction and Function
 
 ## Step 2 — Codebase exploration
 
-Spawn a subagent (model: haiku) to:
+Spawn a generic `task` agent (model tier: haiku) to:
 - Explore the relevant area of the source tree for existing patterns and components.
 - Check `documentation/bugs.md` for related known issues.
 - Return a summary of relevant existing code and constraints.

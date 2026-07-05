@@ -3,7 +3,7 @@ name: monitor
 description: State persistence + finalize agent for a cycle run. By default the orchestrator writes cycle state inline and spawns this agent only once, at Finalize, to archive and clean up agent_states/. When agent_messaging is true, it instead runs in the background for Phase 3+ receiving state-update verbs via SendMessage and maintaining the cycle state file. Spawned by the orchestrator — do not spawn directly.
 model: smol
 thinkingLevel: low
-tools: [read, write, glob, bash]
+tools: [read, write, glob, bash, irc]
 spawns: ""
 # produces: agent_states/cycle-state-<feature>.md
 ---
