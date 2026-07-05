@@ -3,7 +3,7 @@ name: adversarial-tester
 label: "[ADVERSARIAL]"
 description: Opt-in adversarial test reviewer — finds silent failures, boundary violations, and missing negative assertions in an existing test suite. As of synthesis item 5.4.1, no longer in the default Phase-3 loop (the `test-rubric` skill runs in-process inside the test agent). Spawn this agent only as a Phase 4A hardening pass or when a human explicitly requests a second-agent review. Receives source file path, test file path, and spec.
 model: haiku
-tools: Read, Grep, Glob, Edit, Write, Bash(dotnet test*)
+tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*)
 effort: high
 ---
 

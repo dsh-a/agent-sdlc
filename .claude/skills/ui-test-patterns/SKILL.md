@@ -4,79 +4,99 @@ description: UI / presentation-layer test patterns — coverage matrix, test-hos
 disable-model-invocation: true
 ---
 
-# UI Test Patterns
+# Widget Test Patterns
 
-> **Active placeholder.** This skill is loaded deterministically by the `test` and
-> `ui-story` agents. Populate it from the active pack's UI test patterns
-> (`.claude/packs/<lang>/ui-test-patterns.md` — see `packs/flutter/` for a complete worked
-> example) via `/setup`, or edit directly. The framework/idiom specifics belong here; the
-> coverage *intent* below is language-agnostic.
+> **This is the ACTIVE UI-test-patterns skill.** Loaded deterministically by the `test` and
+> `ui-story` agents. The body below is populated from the **`flutter` pack**
+> (`.claude/packs/flutter/ui-test-patterns.md`). To switch stacks, run `/setup` or copy
+> another pack's UI test patterns here.
 
-Conventions for testing presentation-layer code (views, components, view-models). Used by
-the `test` and `ui-story` agents. Cross-references `project-conventions` for layer rules.
+Conventions for testing Flutter Views and ViewModels. Used by the `test` and `ui-story`
+agents. Cross-references `project-conventions` for layer rules.
 
 ---
 
 ## File location
 
-Test path mirrors source path per your project's test layout (configure the test glob in
-`.claude/config.md` § Project Commands).
+Test path mirrors source path: `lib/ui/auth/login_view_model.dart` → `test/ui/auth/login_view_model_test.dart`. File name: `<class_under_test>_test.dart`.
 
 ## Structure
 
-- Organize tests by method or behavior.
-- One logical assertion target per test; descriptive names stating the expected outcome.
-- **Arrange → Act → Assert** with phases visually separated.
+- Use `group()` to organize by method or behavior.
+- Each `test()` verifies exactly one assertion (one `expect` per test).
+- Descriptive names that state the expected outcome.
+- Pattern: **Arrange → Act → Assert** with blank lines separating phases.
 
-## Mocking / test doubles
+## Mocking
 
-- Use the project's standard mocking library (state it in `project-conventions`).
-- Reuse shared fakes/builders over re-declaring per test; register fallback values where the
-  framework requires them.
+- `mocktail` is the project default — `class MockX extends Mock implements X`.
+- Reuse mocks from `test/test_helpers.dart` over defining new ones; add cross-file mocks back into `test_helpers.dart`.
+- `registerFallbackValue()` in `setUpAll` for any enum/model types passed to `any()`.
+- For directory-level pattern conflicts (mocktail vs. manual stubs), apply the `pattern-divergence` skill.
 
 ## Setup
 
-- Declare dependencies and the subject-under-test once; instantiate fresh per test so each
-  starts clean.
+- Declare dependencies and class-under-test as `late` variables at the group/main level.
+- Instantiate everything in `setUp()` so each test starts fresh.
 
 ---
 
-## Coverage matrix — views / components
+## Widget tests — Views
+
+```dart
+Widget buildTestApp(MyViewModel viewModel) {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider<MyViewModel>.value(value: viewModel),
+    ],
+    child: const MaterialApp(home: MyView()),
+  );
+}
+```
+
+Coverage matrix:
 
 | Category | What to verify |
 |---|---|
-| Rendering | Key elements present in initial state |
-| Loading state | Loading affordance shown, interactions disabled |
-| Error state | Error surfaced to the user |
+| Rendering | Key widgets present in initial state |
+| Loading state | Loading indicator shown, interactions disabled |
+| Error state | Error message displayed to user |
 | Empty state | Appropriate message when no data |
-| Interactions | User action triggers the correct presentation method |
-| Conditional UI | Permission/auth-gated elements hidden as expected |
+| Interactions | Tap/input triggers correct ViewModel method |
+| Conditional UI | Auth-gated elements hidden for guests |
 
-## Coverage matrix — view-models / presenters
+## Widget tests — ViewModels
 
 | Category | What to verify |
 |---|---|
-| State transitions | Loading flips true → false around async work |
-| Error handling | Error state set on failure, cleared on retry |
-| Change notification | Observers notified after state changes |
+| State transitions | `isLoading` goes true → false during async operations |
+| Error handling | `errorMessage` set on failure, cleared on retry |
+| notifyListeners | Called after state changes |
 | Input validation | Invalid inputs produce error states before calling services |
 
 ---
 
-## Snapshot / golden tests
+## Golden tests
 
-Write snapshot tests only for views with significant visual design. **Never auto-update
-snapshots** — present the update command in your report for the user to run and review.
+Write golden tests only for Views with significant visual design or shared components. **Never auto-update goldens** — present the update command in your report for the user to run and review. Golden file location: `test/goldens/` mirroring the view path.
+
+## Property-based tests
+
+```dart
+for (final entry in {5: false, 6: true /* boundary */, 7: true}.entries) {
+  test('password of length ${entry.key} is ${entry.value ? "valid" : "invalid"}', () {
+    expect(validatePassword('x' * entry.key).isValid, entry.value);
+  });
+}
+```
 
 ## Integration tests
 
-Write integration tests only for critical multi-screen/multi-service flows. **Flag them in
-your report as requiring a separate run environment — do not run them autonomously** unless
-the project's test setup supports it.
+Write integration tests only for critical multi-screen flows. **Flag them in your report as requiring manual device execution.** Live in `integration_test/`.
 
 ## What NOT to do
 
-- Do not test private methods — test through the public API.
-- Do not test generated code.
-- Do not auto-update snapshot/golden files.
-- Do not mix integration tests into unit-test files.
+- Do not test private methods — test through public API.
+- Do not test generated code (`.g.dart`).
+- Do not auto-update golden files.
+- Do not write integration tests in unit test files.

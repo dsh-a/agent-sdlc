@@ -72,8 +72,9 @@ Switching stacks = pointing **Active Pack** at a different `packs/<lang>/` and p
 | Skill | `/self-improve` | Analyze past cycle runs and tune agent/skill instructions |
 | Skill | `/setup` | Interactive configuration wizard (detects stack, picks a pack) |
 | Skill | `project-conventions` | The active stack's conventions (loaded by agents) |
+| Skill | `minimalism` | The reuse-first / YAGNI ladder (loaded by implementers) |
 | Skill | `context-sources` | The MCP/RAG plug-in contract |
-| Agent | `create-prd`, `generate-tasks`, `scaffold`, `ui-story`, `test`, `test-preflight` | Spawned by `/cycle` during Phases 1–3 |
+| Agent | `create-prd`, `generate-tasks`, `scaffold`, `ui-story`, `coding`, `test`, `test-preflight` | Spawned by `/cycle` during Phases 1–3 |
 | Agent | `verify`, `review` | Spawned during Phase 4A — AC audit + code review |
 | Agent | `monitor`, `supervisor` | Cycle state persistence + Phase-3 observation |
 | Agent | `adversarial-tester` | Opt-in second-pass test hardening |

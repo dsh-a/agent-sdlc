@@ -13,9 +13,9 @@ from the `project-conventions` skill (see `.claude/packs/README.md` for the swap
 
 | Field | Value |
 |---|---|
-| active_pack | `dotnet` |
+| active_pack | `flutter` |
 
-Available packs: `dotnet` (default), `flutter` (reference example). Author a new one by
+Available packs: `flutter` (default), `dotnet` (alternate template). Author a new one by
 copying `.claude/packs/dotnet/` — see `.claude/packs/README.md`.
 
 ---
@@ -72,6 +72,7 @@ Active preset: **personal**
 | generate-tasks | sonnet | sonnet | opus |
 | scaffold | sonnet | sonnet | sonnet |
 | ui-story | sonnet | sonnet | sonnet |
+| coding | sonnet | sonnet | sonnet |
 | test | sonnet | sonnet | sonnet |
 | verify | sonnet | sonnet | opus |
 | review | sonnet | sonnet | opus |
@@ -106,6 +107,7 @@ Maps abstract model labels to specific model IDs. When the orchestrator spawns a
 | generate-tasks | high |
 | scaffold | medium |
 | ui-story | high |
+| coding | high |
 | test | high |
 | verify | max |
 | review | max |
@@ -208,19 +210,19 @@ When enabled, these agents run autonomously during Phase 4A and their reports ar
 
 ## Project Commands
 
-Agents run these commands to test, lint, and generate code. Update to match your project's toolchain. Defaults below target the active pack (`dotnet`).
+Agents run these commands to test, lint, and generate code. Update to match your project's toolchain. Defaults below target the active pack (`flutter`).
 
 | Purpose | Command |
 |---|---|
-| Run all tests | `dotnet test` |
-| Run specific test file | `dotnet test --filter FullyQualifiedName~<name>` |
-| Analyze / lint | `dotnet build -warnaserror` |
-| Code generation | _(none — remove or set to your codegen step, e.g. `dotnet ef migrations add`)_ |
-| Test path glob | `tests/**` |
-| Test anti-patterns | `.claude/packs/dotnet/test-antipatterns.md` |
+| Run all tests | `flutter test` |
+| Run specific test file | `flutter test <path>` |
+| Analyze / lint | `flutter analyze` |
+| Code generation | `flutter pub run build_runner build --delete-conflicting-outputs` |
+| Test path glob | `test/**` |
+| Test anti-patterns | `.claude/packs/flutter/test-antipatterns.md` |
 
 - The `Code generation` command is optional — remove it if your project has no code generation step.
-- **Test path glob** is the path the silent-skip gate and preflight short-circuit scope to (default `tests/**`; Flutter projects use `test/**`).
+- **Test path glob** is the path the silent-skip gate and preflight short-circuit scope to (default `test/**` for Flutter; .NET-style layouts use `tests/**`).
 - **Test anti-patterns** points at the regex list the cycle silent-skip gate greps changed test files against. It defaults to the active pack's file; override per-project here.
 
 ---
@@ -235,33 +237,32 @@ Define your project's architectural layers and import rules. The review agent ch
 
 | Layer | Path pattern | Allowed imports | Forbidden imports |
 |---|---|---|---|
-| Domain / Core | `src/**/Domain/` | Pure language, other domain modules | Framework, infrastructure, data access |
-| Application | `src/**/Application/` | Domain abstractions | Concrete infrastructure |
-| Infrastructure / Data | `src/**/Infrastructure/` | Domain abstractions, external packages | Presentation layer |
-| Presentation | `src/**/{Api,Web,Ui}/` | Application services via intermediaries | Direct infrastructure/data access |
+| Domain / Core | `lib/domain/` | Pure Dart, other domain modules | Flutter framework, data layer, `package:provider` |
+| Data / Infrastructure | `lib/data/` | Domain layer, external packages | UI layer |
+| UI / Presentation | `lib/ui/` | Domain layer via intermediaries (ViewModels, facades, use cases) | Direct data-layer imports |
 
-Adapt path patterns to your project structure. (Defaults shown for a layered .NET solution; the `flutter` pack uses `lib/domain/`, `lib/data/`, `lib/ui/`.)
+Adapt path patterns to your project structure. (Defaults shown for the `flutter` pack — MVVM over Clean Architecture; the `dotnet` template uses `src/**/Domain|Application|Infrastructure/`.)
 
 ### Pattern Compliance
 
 Describe your project's architectural patterns. The review agent checks that changed files follow these patterns.
 
-- **State management / presentation pattern**: _[describe your pattern — e.g., MVC controllers, MVVM, Blazor components, CQRS handlers]_
-- **Presentation code** never calls repositories, services, or use cases directly — it goes through an application service or equivalent intermediary
-- **New dependencies** follow the project's DI pattern — _[describe your DI approach, e.g., built-in `IServiceCollection`, Autofac, manual factory]_
-- **Interfaces/abstractions** are used at layer boundaries (e.g., `IRepository`, `IService`)
+- **State management / presentation pattern**: MVVM with `ChangeNotifier` + Provider — ViewModels extend `ChangeNotifier`; Views observe via `context.watch`/`context.read`
+- **Views** never call repositories, services, or use cases directly — they go through a ViewModel or equivalent intermediary
+- **New dependencies** follow the project's DI pattern — Provider / `MultiProvider`, wired in `lib/dependencies/`
+- **Interfaces/abstractions** are used at layer boundaries (e.g., `IRepository<T>`, `IService`)
 
 ### Convention Checks
 
 | Convention | Rule |
 |---|---|
-| Type / method / property naming | `PascalCase` |
-| Local / parameter naming | `camelCase` |
-| File naming | One public type per file, file name matches type (e.g. `OrderService.cs`) |
-| Private fields | Leading underscore (`_field`) |
-| Line length | 120 characters max |
-| Logging | Project logger abstraction (e.g. `ILogger<T>`; never `Console.WriteLine` in production code) |
-| Error handling | Async functions have proper error handling at system boundaries (database calls, API calls, external services) |
+| Class naming | `PascalCase` |
+| Method / variable naming | `camelCase` |
+| File naming | `snake_case.dart` |
+| Private members | Leading underscore (`_field`, `_method`) |
+| Line length | 100 characters max |
+| Logging | Project `Logger` from package `logging` (never `print` in production code) |
+| Error handling | Async functions have proper error handling at system boundaries (Drift / Supabase / network / external services) |
 | Comments | `///` for public API documentation; inline comments explain _why_, not _what_ |
 
 ---

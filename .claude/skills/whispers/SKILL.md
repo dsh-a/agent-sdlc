@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Whispers
 
-The Phase-3 supervisor emits **whispers** — short, agent-directed advisories — to `agent_states/whispers/<agent-id>.md`. Implementation agents (test, ui-story, scaffold, general-purpose) poll this file between sub-tasks. This skill defines the file format, severity semantics, and polling protocol.
+The Phase-3 supervisor emits **whispers** — short, agent-directed advisories — to `agent_states/whispers/<agent-id>.md`. Implementation agents (test, ui-story, scaffold, coding, general-purpose) poll this file between sub-tasks. This skill defines the file format, severity semantics, and polling protocol.
 
 You will be reading or writing whispers depending on your role. The format and rules are the same in both directions.
 

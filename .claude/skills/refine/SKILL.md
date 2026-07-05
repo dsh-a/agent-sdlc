@@ -37,7 +37,7 @@ To keep the main thread cheap, delegate read-heavy and mechanical work to subage
 | 7 | Writing child files (mechanical carve-up after user confirms allocation) | main thread | inherit | low |
 | 8 | Index table maintenance | main thread | inherit | low |
 
-**Forbidden reads:** generated/codegen files (can be 10k+ lines — e.g. `*.g.cs`, `*.Designer.cs`, `*.g.dart`). Read the hand-authored source/schema definition instead. Pass this rule to any spawned subagent.
+**Forbidden reads:** generated/codegen files (can be 10k+ lines — e.g. `*.g.dart`, `*.freezed.dart`, or your codegen's output such as `*.g.cs`). Read the hand-authored source/schema definition instead. Pass this rule to any spawned subagent.
 
 When spawning the Explore subagent, pass `model: "haiku"` and a self-contained prompt that lists every claim to verify and the expected output format (a structured grounding table). Do not let the subagent read generated files.
 
@@ -74,7 +74,7 @@ Claim types to extract:
 
 | Claim type | How the subagent verifies |
 |---|---|
-| File path (`src/.../Foo.cs`) | `Glob` / `Read` |
+| File path (`lib/.../foo.dart`) | `Glob` / `Read` |
 | Class / component / function name | `grep -r "class Foo\|Foo("` |
 | Schema column / table | Read the hand-authored schema/model definition (NEVER generated files) |
 | "Currently X is at Y" / "X is a Z" | grep + structural comparison |
@@ -192,8 +192,8 @@ The `## Refinement log` section lives at the bottom of the story file. Each refi
 ### 2026-04-28 — Pass 1
 
 **Grounding:**
-- VERIFIED: `OrderSearchPanel` exists at `src/Web/Components/Orders/OrderSearchPanel.cs`
-- CONTRADICTED: story claimed `_orderLines` is a `Dictionary<string, OrderLine>` — actual type is `Dictionary<string, List<OrderLine>>`. User confirmed story prose was outdated; rewrote.
+- VERIFIED: `OrderSearchPanel` exists at `lib/ui/orders/views/order_search_panel.dart`
+- CONTRADICTED: story claimed `_orderLines` is a `Map<String, OrderLine>` — actual type is `Map<String, List<OrderLine>>`. User confirmed story prose was outdated; rewrote.
 
 **Questions answered:**
 - Q (Scope): What does the AI `[⚡]` button look like when out of scope? → Hidden entirely on this screen until 1.8 ships. Story updated.

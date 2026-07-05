@@ -19,7 +19,7 @@ the pipeline.
     context-sources/      # the MCP/RAG plug-in contract
     cycle/                # the orchestrator (/cycle)
   packs/               # swappable language packs — see packs/README.md
-    dotnet/  flutter/
+    flutter/  dotnet/
 ```
 
 ## The two layers
@@ -31,7 +31,7 @@ the `project-conventions` skill.
 **Pack (stack-specific).** A pack supplies the conventions, test patterns, anti-patterns, and
 code idioms for one stack. The **active** conventions are loaded deterministically from the
 `project-conventions` skill (via each agent's `skills:` frontmatter); a pack is the
-swappable source you populate that skill from. Default active pack: **dotnet**. See
+swappable source you populate that skill from. Default active pack: **flutter**. See
 [`packs/README.md`](packs/README.md).
 
 ## What reads what

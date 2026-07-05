@@ -38,9 +38,9 @@ their handoff for auditability. See [`../skills/context-sources/SKILL.md`](../sk
 
 ## Two per-agent things that are NOT config-driven
 
-- **`tools:` frontmatter** — the Bash/MCP allowlist is static per agent. The default packs
-  use `Bash(dotnet …)` + `mcp__ide__getDiagnostics`. Switching toolchains means editing these
-  tokens across the implementation/review agents.
+- **`tools:` frontmatter** — the Bash/MCP allowlist is static per agent. The default pack
+  (`flutter`) uses `Bash(flutter …)` + `mcp__ide__getDiagnostics`. Switching toolchains means
+  editing these tokens across the implementation/review agents.
 - **Data-layer schema checks** — `review`, `verify`, `test-rubric`, and `adversarial-tester`
   contain a **context-gated** schema-drift check that activates only when a data-schema
   Context Source is enabled. With none wired, the check is skipped and noted as not performed.

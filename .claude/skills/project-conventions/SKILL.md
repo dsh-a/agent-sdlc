@@ -8,101 +8,128 @@ disable-model-invocation: true
 
 > **This is the ACTIVE conventions skill.** Agents load it deterministically via their
 > `skills:` frontmatter — it is the one place language/framework rules live. The body
-> below is the **default .NET placeholder**: it states the *shape* of each rule but leaves
-> the specifics for your team to fill in. Run `/setup` to populate it from a language pack
-> (`.claude/packs/<lang>/conventions.md`), or edit it directly. See `.claude/packs/README.md`.
+> below is populated from the **`flutter` pack** (`.claude/packs/flutter/conventions.md`).
+> To switch stacks, run `/setup` or copy another pack's `conventions.md` body here. See
+> `.claude/packs/README.md`.
 >
-> **Active pack:** see `.claude/config.md` → **Active Pack** (default `dotnet`).
+> **Active pack:** see `.claude/config.md` → **Active Pack** (`flutter`).
 
-This codebase targets **.NET / C#**. The rules below are authoritative across agents.
-Project-specific overrides live in `.claude/config.md` § Pattern Compliance and
-§ Layer Boundaries — read those first; what follows applies unless overridden.
+This codebase targets **Flutter/Dart** with **MVVM (`ChangeNotifier` + Provider)**. The rules below are authoritative when this pack is active. Project-specific overrides live in `.claude/config.md` § Pattern Compliance and § Layer Boundaries — read those first; what follows applies unless overridden.
 
 ---
 
 ## Layer boundaries
 
-> _Fill in your architecture. Example shape for a layered / Clean Architecture solution:_
-
-- **Presentation** (controllers / endpoints / Blazor components / view models) depends on
-  application services or use cases — never on infrastructure or data access directly.
-- **Application** (use cases, handlers, services) depends on domain abstractions
-  (interfaces) — never on concrete infrastructure.
-- **Domain** (entities, value objects, domain services) is pure — no framework, no I/O,
-  no EF Core, no HTTP. Depends on nothing outward.
-- **Infrastructure / Data** (EF Core, repositories, external clients) implements domain
-  abstractions. The only layer that references the database or external services.
-
-Map these to your project structure in `.claude/config.md` § Layer Boundaries (path
-patterns + allowed/forbidden imports). The `review` agent enforces what you put there.
+- **Views** call methods on the ViewModel only — never repositories, services, or use cases directly.
+- **ViewModels** depend on use cases / facades — never repositories or adapters directly.
+- **Use cases** depend on repositories / services. Never Flutter imports (pure Dart).
+- **Facades** aggregate repository interfaces. Public constructor fields (not private). Never Flutter imports.
+- **Repositories** depend on data sources + adapters. Drift / Supabase live here.
 
 ---
 
-## Member order (all types)
+## ViewModels
 
-1. Constants and static fields
-2. Injected dependencies (constructor parameters → readonly fields)
-3. State fields (private, exposed via properties where needed)
-4. Constructor(s)
-5. Public methods
-6. Private methods
+- Extend `ChangeNotifier`.
+- Dependencies via constructor (use cases, facades — never repos directly).
+- Use `Logger`, never `print`.
+- **Class member order**: external deps → internal deps → state variables → constructor → public methods → private methods.
+- State exposure pattern: private field + public getter.
+
+```dart
+class FeatureViewModel extends ChangeNotifier {
+  final Logger _log = Logger('Feature ViewModel');
+
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
+
+  String? _errorMessage;
+  String? get errorMessage => _errorMessage;
+
+  // Constructor with required deps
+  // Public methods (called by View)
+  // Private methods
+}
+```
+
+File location: `lib/ui/<feature>/view_models/<feature>_view_model.dart`. DI wiring: `lib/dependencies/di_view_models.dart` as a `ChangeNotifierProvider`.
+
+---
+
+## Views
+
+- Use `context.watch<ViewModel>()` or `context.read<ViewModel>()` from Provider.
+- Use theme tokens: `Theme.of(context).textTheme`, `Theme.of(context).colorScheme`. **Never hardcoded styles.**
+- Use `const` constructors wherever possible.
+- Break `build()` into small private widget classes when it exceeds ~40 lines.
+- Never perform network calls or heavy computation inside `build()`.
+- Use `ListView.builder` / `SliverList` for any list longer than a handful of static items.
+- Use `Key` values on widgets that need to be found in tests.
+- Handle loading and error states explicitly.
+
+File location: `lib/ui/<feature>/views/<feature>_view.dart`. Route wiring (if needed): `lib/router.dart`.
+
+---
+
+## Member order (all classes)
+
+1. Static fields and constants
+2. External dependencies (constructor-injected)
+3. Internal dependencies / collaborators
+4. State variables (private with public getter)
+5. Constructor
+6. Public methods
+7. Private methods
 
 ---
 
 ## Naming defaults
 
-- Files: one public type per file, file name matches the type (`OrderService.cs`).
-- Types, methods, properties, constants: `PascalCase`.
-- Locals and parameters: `camelCase`.
-- Private fields: `_camelCase`.
-- Interfaces: `IOrderRepository`. Async methods: `…Async` suffix.
-- Booleans: affirmative — `IsLoading`, `HasError`, `CanSubmit`.
+- Files: `snake_case.dart`.
+- Classes: `PascalCase`.
+- Members: `camelCase`; private members `_camelCase`.
+- Booleans: `isLoading`, `hasError`, `canSubmit` — prefer affirmative names.
+- ViewModels: `<Feature>ViewModel`; Views: `<Feature>View`; UseCases: `<Verb>UseCase`; Repositories interface `I<Entity>Repository`.
 
 ---
 
 ## Logging
 
-- Use the project logger abstraction (e.g. `ILogger<T>` injected via constructor).
-  Never `Console.WriteLine` in production code.
-- Owners that emit logs: services, handlers, repositories, infrastructure clients.
+- Always `Logger('<Owner> <Role>')` from package `logging`. Never `print`.
+- Owners that emit logs: ViewModels, use cases, facades, services, repositories. Views generally do not log.
 
 ---
 
-## Error handling
+## Imports
 
-- `async` methods have proper error handling at **system boundaries** (database, HTTP,
-  external services). Internal trusted-layer code does not need excessive defensive checks.
-- Prefer the project's established result/exception strategy — state it in
-  `.claude/config.md` § Pattern Compliance so agents follow it consistently.
+- Domain layer (`lib/domain/`, `lib/data/repositories/.../*_repository.dart` interfaces): pure Dart only. No `package:flutter/...` imports.
+- UI layer (`lib/ui/`): Flutter imports allowed.
+- Data layer (`lib/data/`): Flutter imports allowed for services that wrap platform APIs.
 
 ---
 
 ## Entity / model construction
 
-- When constructing a domain object with its full constructor, assign **every** field
-  explicitly — do not lean on defaults or silently omit nullable fields.
-- When copying with a `with` expression (records) or a builder, name only the fields that
-  change.
-- Before committing, cross-check the construction site against the type's full member list.
-  A missing or defaulted field is a common silent data-loss bug.
+Models are immutable — change them only via `copyWith`.
+
+- Constructing inline (full constructor, not copyWith): assign every field of the class explicitly. Do not lean on positional defaults or silently omit nullable fields.
+- Calling `copyWith`: name only the fields that change.
+- Before you commit, cross-check the constructor call against the class's full field list. A missing or defaulted field is the most common silent data-loss bug in this codebase.
 
 ---
 
 ## Testing conventions (cross-reference)
 
-Test patterns live in the `test` skill / agent and the active pack's `test-patterns.md`.
-Two cross-cutting rules anchored here:
+Test patterns live in the `test` skill / agent. Two cross-cutting rules anchored here:
 
-- Test path mirrors source path per your project's test layout (configure the test glob in
-  `.claude/config.md` § Project Commands). Example: `src/Orders/OrderService.cs` →
-  `tests/Orders.Tests/OrderServiceTests.cs`.
-- Reuse shared test fixtures/builders rather than re-instantiating dependencies per test.
+- Test path mirrors source path: `lib/ui/auth/login_view_model.dart` → `test/ui/auth/login_view_model_test.dart`.
+- Widget tests use a `buildTestApp` helper that wraps `MultiProvider` + the test ViewModel + `MaterialApp(home: MyView())`. Reuse helpers from `test/test_helpers.dart`.
 
 ---
 
 ## What this skill does NOT cover
 
 - Per-pattern scaffolding detail (use the `scaffold` skill and `.claude/agents/scaffold/*.md`).
-- Component/UI test patterns (use the `test` skill / agent and the pack's `test-patterns.md`).
-- Architecture-review rubric (use the `review` agent's checklist).
+- Widget-test patterns (use the `test` skill / agent).
+- Architecture-review rubric (use `review` agent's checklist).
 - Project-specific overrides (live in `.claude/config.md` § Pattern Compliance).

@@ -6,8 +6,8 @@ patterns, and code idioms for one stack.
 
 ```
 packs/
-  dotnet/    ← default active pack (placeholders — fill via /setup)
-  flutter/   ← worked reference example (the framework's original Flutter content)
+  flutter/   ← default active pack (the framework's Flutter content)
+  dotnet/    ← alternate template (placeholders — fill via /setup, or copy to author a new pack)
 ```
 
 ## What a pack contains

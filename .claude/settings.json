@@ -1,11 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dotnet test*)",
-      "Bash(dotnet build*)",
-      "Bash(dotnet format*)",
-      "Bash(dotnet restore*)",
-      "Bash(dotnet ef*)",
+      "Bash(flutter test*)",
+      "Bash(flutter analyze*)",
+      "Bash(flutter pub*)",
       "Bash(git *)",
       "Bash(gh pr*)",
       "Bash(gh api*)",

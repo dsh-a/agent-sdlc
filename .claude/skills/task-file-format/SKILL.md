@@ -16,13 +16,13 @@ The `generate-tasks` agent decomposes a PRD into a task file at `agent_tasks/tas
 ## Relevant Files
 
 ### Source Files (modify)
-- `src/path/to/File.cs` — Brief description of why this file is relevant
+- `lib/path/to/file.dart` — Brief description of why this file is relevant
 
 ### Source Files (create)
-- `src/path/to/NewFile.cs` — Brief description
+- `lib/path/to/new_file.dart` — Brief description
 
 ### Test Files (create)
-- `tests/path/to/FileTests.cs` — Tests for `File.cs`
+- `test/path/to/file_test.dart` — Tests for `file.dart`
 
 ### Notes
 - Tests go in the project's test tree mirroring the source structure (per the **Test path glob** in `.claude/config.md` § Project Commands)
@@ -47,7 +47,8 @@ Every parent task carries one `[kind: <name>]` tag. The orchestrator dispatches 
 |---|---|
 | `ui-story` | `ui-story` agent (UI screen or component) |
 | `test` | `test` agent (test-only tasks) |
-| `general-purpose` | `general-purpose` agent (multi-file fallback) |
+| `coding` | `coding` agent (general code change — refactor, bug fix, domain/data logic, wiring; not a scaffold, UI, or test) |
+| `general-purpose` | `general-purpose` agent (last-resort escape hatch for work no other kind fits — the bare agent loads no skills, so prefer `coding` for any real code change) |
 | `scaffold` | `scaffold` agent (generic — picks pattern itself) |
 | `scaffold-entity` | `scaffold` agent, entity/model pattern |
 | `scaffold-facade` | `scaffold` agent, facade pattern |

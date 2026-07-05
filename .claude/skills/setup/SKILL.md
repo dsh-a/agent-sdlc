@@ -31,15 +31,15 @@ exists, offer to scaffold one by copying `.claude/packs/dotnet/` and filling it 
 
 ## Step 2 — Verify project commands
 
-Confirm the build/test/analyze commands for the stack. Defaults for `dotnet`:
+Confirm the build/test/analyze commands for the stack. Defaults for `flutter`:
 
 | Purpose | Command |
 |---|---|
-| Run all tests | `dotnet test` |
-| Run specific test file | `dotnet test --filter FullyQualifiedName~<name>` |
-| Analyze / lint | `dotnet build -warnaserror` (or `dotnet format --verify-no-changes`) |
-| Code generation | _(usually none; e.g. `dotnet ef migrations add` if applicable)_ |
-| Test path glob | `tests/**` |
+| Run all tests | `flutter test` |
+| Run specific test file | `flutter test <path>` |
+| Analyze / lint | `flutter analyze` |
+| Code generation | `flutter pub run build_runner build --delete-conflicting-outputs` |
+| Test path glob | `test/**` |
 
 Ask the user to confirm or correct each, plus the **Test path glob** and **Test
 anti-patterns** file (defaults to the active pack's). Wait for confirmation before continuing.
@@ -99,7 +99,7 @@ and `docs/CONTEXT-SOURCES.md`.
 ## Step 8 — Update permissions
 
 Remind the user to align `.claude/settings.json` Bash allowlist with the chosen toolchain
-(e.g. `Bash(dotnet test*)`, `Bash(dotnet build*)`) and add any `mcp__<source>__*` entries.
+(e.g. `Bash(flutter test*)`, `Bash(flutter analyze*)`) and add any `mcp__<source>__*` entries.
 (The agent cannot self-edit `settings.json` — the user applies this.)
 
 ## Step 9 — Scaffold pattern discovery
@@ -115,7 +115,7 @@ Ask: **"Scan the codebase for recurring patterns to improve scaffold accuracy?"*
 Configuration complete:
 
   Config file:     .claude/config.md
-  Active pack:     [dotnet | flutter | ...]
+  Active pack:     [flutter | dotnet | ...]
   Model preset:    [personal | team | enterprise]
   Architecture:    [layers summary]
   Auto verify:     [enabled | disabled]

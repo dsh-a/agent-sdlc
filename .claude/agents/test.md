@@ -3,7 +3,7 @@ name: test
 label: "[TEST]"
 description: Write unit, component, and integration tests. Use when the cycle pipeline needs tests written or fixed for a specific class, presenter/view-model, view, or feature. Receives a task context describing what to test and relevant acceptance criteria.
 model: sonnet
-tools: Read, Grep, Glob, Edit, Write, Bash(dotnet test*), Bash(dotnet build*), mcp__ide__getDiagnostics
+tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), mcp__ide__getDiagnostics
 effort: high
 skills: autonomous-agent, project-conventions, ui-test-patterns, test-rubric, contradiction-exit, pattern-divergence, whispers
 ---

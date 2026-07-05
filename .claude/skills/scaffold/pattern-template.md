@@ -27,7 +27,7 @@ Every pattern file must include these sections:
 
 | File | Path |
 |---|---|
-| <component> | <path pattern, e.g., `src/Application/UseCases/<Name>UseCase.cs`> |
+| <component> | <path pattern, e.g., `lib/domain/use_cases/<name>_use_case.dart`> |
 
 ## Dependencies
 

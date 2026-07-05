@@ -410,6 +410,7 @@ For each parent task (independent in parallel, dependent when ready), first **cr
    | `scaffold` or `scaffold-*` | `scaffold` | per config |
    | `ui-story` | `ui-story` | per config |
    | `test` | `test` | per config |
+   | `coding` | `coding` | per config |
    | `general-purpose` | general-purpose | per config |
 
    For `scaffold-*` kinds (e.g., `scaffold-facade`), pass the pattern name in the agent's prompt so it loads the matching `.claude/agents/scaffold/<pattern>.md`.

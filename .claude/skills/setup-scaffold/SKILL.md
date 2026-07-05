@@ -67,7 +67,7 @@ Present a summary to the user:
 
 ```
 Discovered patterns:
-  - [pattern name] — [N] instances found (e.g., src/Data/Repositories/UserRepository.cs)
+  - [pattern name] — [N] instances found (e.g., lib/data/repositories/user_repository.dart)
     → Will create: .claude/agents/scaffold/[name].md
     → Replaces default template: [template name] (or "new — no default template")
 
