@@ -23,6 +23,7 @@ A Claude Code agent team for autonomous feature development. Drop these agents a
 | Agent | `generate-tasks` | Spawned by `/cycle` — generates task files |
 | Agent | `scaffold` | Spawned by `/cycle` — scaffolds new components |
 | Agent | `ui-story` | Spawned by `/cycle` — implements UI components |
+| Agent | `coding` | Spawned by `/cycle` — general code changes (refactors, bug fixes, domain/data logic) under the minimalism ladder |
 | Agent | `test` | Spawned by `/cycle` — writes tests |
 | Skill | `/setup` | Interactive configuration wizard for new projects |
 | Agent | `verify` | Spawned during cycle Phase 4A — audits AC coverage |

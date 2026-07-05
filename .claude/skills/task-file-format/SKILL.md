@@ -48,7 +48,8 @@ Every parent task carries one `[kind: <name>]` tag. The orchestrator dispatches 
 |---|---|
 | `ui-story` | `ui-story` agent (UI screen or component) |
 | `test` | `test` agent (test-only tasks) |
-| `general-purpose` | `general-purpose` agent (multi-file fallback) |
+| `coding` | `coding` agent (general code change — refactor, bug fix, domain/data logic, wiring; not a scaffold, UI, or test) |
+| `general-purpose` | `general-purpose` agent (last-resort escape hatch for work no other kind fits — the bare agent loads no skills, so prefer `coding` for any real code change) |
 | `scaffold` | `scaffold` agent (generic — picks pattern itself) |
 | `scaffold-syncable-entity` | `scaffold` agent, syncable-entity pattern |
 | `scaffold-facade` | `scaffold` agent, facade pattern |

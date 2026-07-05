@@ -56,6 +56,7 @@ Active preset: **personal**
 | generate-tasks | sonnet | sonnet | opus |
 | scaffold | sonnet | sonnet | sonnet |
 | ui-story | sonnet | sonnet | sonnet |
+| coding | sonnet | sonnet | sonnet |
 | test | sonnet | sonnet | sonnet |
 | verify | sonnet | sonnet | opus |
 | review | sonnet | sonnet | opus |
@@ -90,6 +91,7 @@ Maps abstract model labels to specific model IDs. When the orchestrator spawns a
 | generate-tasks | high |
 | scaffold | medium |
 | ui-story | high |
+| coding | high |
 | test | high |
 | verify | max |
 | review | max |
