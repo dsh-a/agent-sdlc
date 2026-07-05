@@ -125,21 +125,23 @@ Named agents (`scaffold`, `ui-story`, `test`, etc.) have their model set in thei
 
 Every task spawn includes a `role:` field — a short identity string that becomes the agent's system-prompt persona and registry display name (visible in `irc(op: "list")`). Format: `<role> (task <task-number>)`. Example: `role: "Scaffold engineer (task 2.0)"`. This replaces the old `label` frontmatter convention for status display.
 
-### Shared context (`context` field)
+### Shared context (`local://` files — on-demand, not injected)
 
-When spawning multiple agents for one parent task (implementer, pre-flight, test), the shared background — worktree context, PRD path, AC, context-source blocks, digest — goes in the task tool's `context` field (batch mode) or a `local://` file referenced by each spawn (flat mode). omp renders `context` into every spawned subagent's system prompt as a `CONTEXT` section. Do not repeat this content in each `assignment`.
+Write each piece of shared background to a `local://` file once. Subagents share the parent's `local://` root. Each agent's `assignment` references only the files it needs — the agent reads them on demand via the `read` tool. This avoids injecting the full shared context as input tokens into every agent's system prompt (which the `context` field would do).
 
-Each spawn's `assignment` contains ONLY the per-agent-specific work: the sub-task list, the changed source files, the pre-flight classifications table, etc.
+**Granular files** (write once, reference per-agent):
 
-### Pre-digestion (async via job tool)
+| File | Contents | Who reads it |
+|---|---|---|
+| `local://prd.md` | PRD path + feature description | implementer, test, verify, review |
+| `local://ac.md` | Pre-extracted AC from PRD | test, verify, implementer |
+| `local://ctx-sources.md` | Context-source blocks (stage `implement`) | implementer, test |
+| `local://digest-<task>.md` | Pre-digest summary for task N | implementer for task N only |
+| `local://commands.md` | Project Commands (test, analyze, codegen) | any agent that runs them |
 
-Before spawning a named implementation agent, optionally spawn a **haiku** pre-digest agent as a background job (`async: true`). The pre-digest reads relevant source files and returns a ~150-line structured summary. Use the `job` tool to manage it:
+**Do NOT use the `context` field** for batch spawns — it raw-injects all shared background into every subagent's system prompt as input tokens. Use `local://` files + `read` instead so each agent pulls only what it needs. Pass an empty `context` (or minimal one-liner) in batch calls; the `assignment` carries the `local://` file references.
 
-- Spawn the pre-digest as a background task. For multiple independent parent tasks, spawn all their pre-digests in parallel — they run as concurrent background jobs under the session semaphore.
-- While pre-digests run, the orchestrator can proceed with other work (e.g., context-source retrieval for the next task).
-- Collect results via `job poll` when the implementation agent is ready to spawn. Pass the digest content in the implementation agent's `context`.
-
-**Prompt budget**: haiku prompts <200 words (single task, no background). Implementation agent `assignment`: task-specific work only — instructions live in the agent definition, shared context lives in `context`.
+**Prompt budget**: pre-digest prompts <200 words. Implementation agent `assignment`: sub-task list + `local://` file references only — instructions live in the agent definition.
 
 ### Context Sources retrieval
 
@@ -147,8 +149,7 @@ A reusable step invoked at five stages (`prd`, `tasks`, `implement`, `review`, `
 
 1. Read `.claude/config.md` § Context Sources. Select rows where `enabled` is `true` **and** `consult_at` contains the current stage. If none, skip silently.
 2. For each selected `mcp` source: load its tool via `ToolSearch` if deferred, then query it once with the row's `query_hint` plus concrete context (feature name, the task's Relevant Files, touched symbols). For `skill` sources, run the named skill.
-3. Prepend the trimmed result to the agent's spawn prompt as a `## Context: <id>` block, and instruct the agent to echo `context-sources-consulted: <ids|none>` in its handoff.
-4. **Degrade gracefully.** Unavailable (no tool match / error / timeout): `optional` → write `context-source <id>: unavailable` to the run report and proceed; `required` → gate the user (interactive) or log `context-source <id>: DEGRADED` and proceed (autonomous). Never block on an `optional` source. `enabled: false` rows are never queried.
+3. Write the trimmed result to `local://ctx-sources.md` (append per source). Each agent's `assignment` references this file if it needs context-source data. Instruct the agent to echo `context-sources-consulted: <ids|none>` in its handoff.
 
 This is the same inject-downward pattern as Pre-digestion and Known pitfalls. `predigest` is intentionally **not** a consult stage by default (the pre-digest is a cheap summarizer).
 
@@ -228,12 +229,12 @@ Before entering Phase 1A, route per the active `--mode`:
 
 Spawn the `create-prd` agent (model: sonnet) with the feature description. The agent explores the codebase, checks the roadmap, scans existing PRDs, and returns a complete PRD draft and file path.
 
-Run **Context Sources retrieval** for stage `prd` (see § Context Sources retrieval) and prepend any `## Context: <id>` blocks to the prompt below.
+Run **Context Sources retrieval** for stage `prd` (see § Context Sources retrieval) — results go to `local://ctx-sources.md`.
 
 ```
-task(agent: "create-prd", context: "[context-source blocks if any]",
+task(agent: "create-prd", context: "Create a PRD from the feature description.",
   tasks: [{ id: "create-prd", role: "PRD author",
-    assignment: "Feature: [description]. [Any roadmap story number or context]." }])
+    assignment: "Feature: [description]. [Any roadmap story number or context]. Read local://ctx-sources.md if it exists for context-source data." }])
 ```
 
 Confirm the PRD file exists at the agent's `produces:` path. Missing = re-spawn or escalate.
@@ -261,12 +262,12 @@ Approved → Phase 2. Changes → apply, re-ask.
 
 Spawn the `generate-tasks` agent (model: sonnet) with the PRD file path. The agent assesses the codebase, decomposes the PRD, and returns a complete task file and path.
 
-Run **Context Sources retrieval** for stage `tasks` and prepend any `## Context: <id>` blocks to the prompt below.
+Run **Context Sources retrieval** for stage `tasks` — results go to `local://ctx-sources.md`.
 
 ```
-task(agent: "generate-tasks", context: "[context-source blocks if any]",
+task(agent: "generate-tasks", context: "Decompose the PRD into implementation tasks.",
   tasks: [{ id: "generate-tasks", role: "Task planner",
-    assignment: "PRD: [prd-file-path]" }])
+    assignment: "PRD: [prd-file-path]. Read local://ctx-sources.md if it exists for context-source data." }])
 ```
 
 Confirm the task file exists at the agent's `produces:` path. Missing = re-spawn or escalate.
@@ -381,23 +382,24 @@ Present analysis in dry-run mode. In `--exe` mode, proceed.
 
 Before spawning any implementation agent:
 
-1. **Extract file paths** from the task file's "Relevant Files" section — pass these in the shared `context`.
-2. **Extract AC** from the PRD's Acceptance Criteria section — pass in the shared `context` so test and verify agents skip PRD search.
-3. **Run Context Sources retrieval** for stage `implement` once per parent task — query with the task's Relevant Files + touched symbols. Prepend any `## Context: <id>` blocks to the shared `context`.
+1. **Extract file paths** from the task file's "Relevant Files" section — pass these per-agent in each `assignment`.
+2. **Extract AC** from the PRD's Acceptance Criteria section — write to `local://ac.md`. Test and verify agents read it; implementer reads it.
+3. **Run Context Sources retrieval** for stage `implement` once per parent task — write results to `local://ctx-sources.md`. Implementer and test agents reference it.
+4. **Write `local://prd.md`** with the PRD path + feature description. Any agent that needs PRD context reads it.
 
 #### Parallel task waves (batch mode)
 
-For **independent** parent tasks, spawn them as a batch — one `task` call with a `tasks[]` array, each item getting its own `id`, `role`, `assignment`, and `isolated: true`. The shared `context` (PRD path, AC, context-source blocks, project commands) is written once and rendered into every spawn's system prompt:
+For **independent** parent tasks, spawn them as a batch — one `task` call with a `tasks[]` array. Each item gets its own `id`, `role`, `assignment`, and `isolated: true`. The `context` field is left minimal (omp requires it for batch mode but it raw-injects into every system prompt — keep it to a one-liner). Shared background lives in `local://` files that each agent reads on demand:
 
 ```
 task(
   agent: "<kind-agent>",        // scaffold, ui-story, coding, or task
-  context: "[shared background: PRD path, AC, context-source blocks, digest, project commands]",
+  context: "Read local:// files referenced in your assignment for shared context.",
   tasks: [
     { id: "scaffold-1.0", role: "Scaffold engineer (task 1.0)", isolated: true,
-      assignment: "[sub-task list + relevant files for task 1.0]" },
+      assignment: "Sub-tasks: [list]. Relevant files: [paths]. Read local://prd.md and local://ac.md for PRD context. Read local://digest-1.0.md if it exists. Read local://ctx-sources.md for context-source data." },
     { id: "coding-2.0", role: "Software engineer (task 2.0)", isolated: true,
-      assignment: "[sub-task list + relevant files for task 2.0]" },
+      assignment: "Sub-tasks: [list]. Relevant files: [paths]. Read local://prd.md and local://ac.md. Read local://digest-2.0.md if it exists. Read local://ctx-sources.md." },
     ...
   ]
 )
@@ -417,7 +419,7 @@ For each parent task (whether batched or sequential), the sequence is:
      tasks: [{ id: "predigest-1.0", role: "Pre-digest (task 1.0)", assignment: "Files: [paths]. Return ~150-line summary: public API, constructor deps, key patterns. Dense — no prose." },
              { id: "predigest-2.0", role: "Pre-digest (task 2.0)", assignment: "Files: [paths]. ..." }])
    ```
-   Collect each via `job poll` when its implementation agent is ready. Pass the digest in the implementation agent's `context`.
+   Collect each via `job poll` when its implementation agent is ready. Write the digest to `local://digest-<task-number>.md`. The implementation agent's `assignment` references it.
 
 2. **Implement** — dispatch by the parent task's `[kind: …]` tag:
 
@@ -429,7 +431,7 @@ For each parent task (whether batched or sequential), the sequence is:
    | `coding` | `coding` |
    | `task (generic)` | `task` |
 
-   Each implementation agent spawns with `isolated: true`, `id: "<kind>-<task-number>"`, `role: "<role> (task <task-number>)"`. The `context` carries PRD path, AC, context-source blocks, digest, and project commands. The `assignment` carries only the sub-task list and relevant files.
+   Each implementation agent spawns with `isolated: true`, `id: "<kind>-<task-number>"`, `role: "<role> (task <task-number>)"`. The `assignment` carries the sub-task list, relevant files, and `local://` file references. The agent reads only what it needs.
 
    For `scaffold-*` kinds, pass the pattern name in the `assignment` so the agent loads `.claude/agents/scaffold/<pattern>.md`.
 
@@ -437,17 +439,16 @@ For each parent task (whether batched or sequential), the sequence is:
    - On failure/ambiguity: report to orchestrator, continue independent sub-tasks
    - omp merges the task branch into the feature branch on completion
 
-3. **Pre-flight** (haiku, after implementer merges, before test agent). Skip when `skip_preflight_if_no_existing_tests` is `true` and grep of the **Test path glob** for any public symbol the implementer touched returns no hits.
+3. **Pre-flight** (haiku, after implementer merges, before test agent). Skip when `skip_preflight_if_no_existing_tests` is `true` and grep of the **Test path glob** for any public symbol the implementer touched returns no hits. The pre-flight agent needs ONLY changed source files + base ref — no shared context files:
    ```
-   task(agent: "test-preflight",
-     context: "[shared: PRD path, AC, project commands]",
+   task(agent: "test-preflight", context: "Classify existing tests for changed symbols.",
      tasks: [{ id: "preflight-<task-number>", role: "Pre-flight classifier (task <n>)", isolated: true,
        assignment: "Changed source files: [paths]. Base ref: feature/[name]." }])
    ```
    The classifier returns a `## Existing test classifications` table. Lift it into the test agent's `assignment`.
 
-4. **Test** (separate agent from implementer; gets a fresh isolated workspace from the updated feature-branch HEAD after the implementer's merge):
-   - **Write**: `task(agent: "test", context: "[shared]", tasks: [{ id: "test-<n>", role: "Test engineer (task <n>)", isolated: true, assignment: "Source files: [paths]\nTest files: [paths]\nTask: [desc]\n[pre-flight table]" }])`
+4. **Test** (separate agent from implementer; gets a fresh isolated workspace from the updated feature-branch HEAD after the implementer's merge). The test agent reads `local://ac.md` and `local://ctx-sources.md` but does NOT need the digest:
+   - **Write**: `task(agent: "test", context: "Write tests for the implemented feature.", tasks: [{ id: "test-<n>", role: "Test engineer (task <n>)", isolated: true, assignment: "Source files: [paths]\nTest files: [paths]\nTask: [desc]\nRead local://ac.md for AC. Read local://ctx-sources.md for context-source data.\n[pre-flight table]" }])`
    - **Fix**: re-spawn `test` agent with failure output and source paths
 
 ### 3.4 — Handle results
@@ -616,19 +617,19 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    If `verify` is **enabled**: spawn the `verify` agent (not isolated — reads the main checkout):
    ```
-   task(agent: "verify", context: "[PRD path, AC, context-source blocks, project commands]",
+   task(agent: "verify", context: "Audit AC coverage for the implemented feature.",
      tasks: [{ id: "verify", role: "AC auditor",
-       assignment: "Source files: [paths]. Test files: [paths]. Branch: [branch-name]. Depth: <lite|standard|deep>. Report path: agent_tasks/reports/verify-[prd-stem]-[date].md — write your report there. Work autonomously." }])
+       assignment: "Source files: [paths]. Test files: [paths]. Branch: [branch-name]. Depth: <lite|standard|deep>. Read local://ac.md for AC. Read local://prd.md for PRD context. Report path: agent_tasks/reports/verify-[prd-stem]-[date].md — write your report there. Work autonomously." }])
    ```
 
    If `review` is **enabled**: spawn the `review` agent (not isolated — reads the main checkout):
    ```
-   task(agent: "review", context: "[PRD path, context-source blocks, project commands]",
+   task(agent: "review", context: "Review code quality and architecture adherence.",
      tasks: [{ id: "review", role: "Code reviewer",
-       assignment: "Branch: [branch-name]. Report path: agent_tasks/reports/review-[feature]-[date].md — write your report there. Work autonomously." }])
+       assignment: "Branch: [branch-name]. Read local://prd.md for PRD context. Report path: agent_tasks/reports/review-[feature]-[date].md — write your report there. Work autonomously." }])
    ```
 
-   Verify and review can be spawned as a single batch call (two items, one `context`) since they run concurrently.
+   Verify and review can be spawned as a single batch call (two items, minimal `context`) since they run concurrently. Each reads `local://` files on demand.
 
    Wait for both to complete.
 

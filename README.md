@@ -219,8 +219,9 @@ feature-branch HEAD, creates an isolated workspace, runs the agent, commits to a
 
 Independent parent tasks spawn as a **batch** — one `task` call with a `tasks[]` array, each
 item getting its own `id`, `role`, `assignment`, and `isolated: true`. Shared background (PRD
-path, AC, context-source blocks, digest) goes in the `context` field once, rendered into every
-spawn's system prompt. The session semaphore bounds concurrency.
+path, AC, context-source blocks, digest) is written to granular `local://` files once; each
+agent's `assignment` references only the files it needs, so the agent reads on demand rather
+than having all context injected as input tokens. The session semaphore bounds concurrency.
 
 Pre-digest agents run as parallel background **jobs** (`job poll` to collect), overlapping
 digestion across independent tasks while the orchestrator does other work.
