@@ -3,7 +3,7 @@ name: verify
 description: Independent AC coverage audit. Evaluates whether the implementation and test suite genuinely satisfy the PRD's acceptance criteria. Use after a cycle completes to produce a verification report.
 model: default
 thinkingLevel: xhigh
-tools: [read, grep, glob, write, edit, bash, lsp]
+tools: [read, grep, glob, ast_grep, ast_edit, write, edit, bash, lsp, web_search]
 spawns: ""
 autoloadSkills: [autonomous-agent, ac-audit-rubric, pattern-divergence]
 # produces: agent_tasks/reports/verify-<feature>-<date>.md

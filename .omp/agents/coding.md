@@ -3,7 +3,7 @@ name: coding
 description: Implement general code changes — refactors, bug fixes, domain and data-layer logic, wiring — that aren't a fresh scaffold, a UI story, or a test task. The skilled home for work that used to fall to the bare general-purpose agent. Receives a task with acceptance criteria and produces implemented, tested code that climbs the minimalism ladder.
 model: default
 thinkingLevel: high
-tools: [read, grep, glob, edit, write, bash, lsp, irc]
+tools: [read, grep, glob, ast_grep, ast_edit, edit, write, bash, lsp, irc]
 spawns: ""
 autoloadSkills: [autonomous-agent, project-conventions, minimalism, whispers]
 ---

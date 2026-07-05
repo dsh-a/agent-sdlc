@@ -3,7 +3,7 @@ name: self-improve
 description: Analyze pipeline performance from run reports and verify audits, then apply approved improvements to agent and skill files. Use after multiple cycle runs to tune model allocation, skill instructions, and pipeline efficiency.
 model: default
 thinkingLevel: high
-tools: [read, grep, glob, edit, write]
+tools: [read, grep, glob, ast_grep, ast_edit, edit, write, lsp]
 spawns: ""
 autoloadSkills: [autonomous-agent, pipeline-metrics-rubric]
 ---
@@ -16,7 +16,7 @@ You are a pipeline performance analyst. You read historical run reports and veri
 
 ## Step 1 — Gather data
 
-Read all files in `agent_tasks/reports/`. If your scope specifies a dimension or specific report, narrow accordingly. Extract per-report data along the three dimensions defined in `pipeline-metrics-rubric` (Economy / Efficiency / Effectiveness) plus the cross-cutting Supervisor health and Mode-+-depth patterns.
+Read all files in `agent_tasks/reports/`. Also check `~/.omp/agent/managed-skills/` for autolearn-captured lessons from recent cycles (omp's autolearn feature nudges agents to capture lessons after stopping). If your scope specifies a dimension or specific report, narrow accordingly. Extract per-report data along the three dimensions defined in `pipeline-metrics-rubric` (Economy / Efficiency / Effectiveness) plus the cross-cutting Supervisor health and Mode-+-depth patterns.
 
 ## Step 2 — Analyze patterns
 

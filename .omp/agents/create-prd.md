@@ -34,10 +34,12 @@ Scan `agent_tasks/` for existing PRD files. Read their Introduction and Function
 
 ## Step 2 — Codebase exploration
 
-Spawn a generic `task` agent (model tier: haiku) to:
+Spawn the `explore` agent (model tier: haiku, id: "explore-prd") to:
 - Explore the relevant area of the source tree for existing patterns and components.
 - Check `documentation/bugs.md` for related known issues.
 - Return a summary of relevant existing code and constraints.
+
+The `explore` agent is read-only and purpose-built for fast codebase scouting — prefer it over a generic `task` spawn for exploration work.
 
 Use findings in Technical Considerations and to inform AC completeness.
 

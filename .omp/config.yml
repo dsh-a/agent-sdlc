@@ -49,3 +49,11 @@ lsp:
 
 skills:
   enableSkillCommands: true
+
+# Autolearn — after an agent stops, omp nudges it to capture lessons to memory
+# and create/enhance managed skills. Feeds the self-improve agent's work across
+# cycles. Passive by default (reminder rides the next turn, no extra tokens).
+autolearn:
+  enabled: true
+  autoContinue: false
+  minToolCalls: 5

@@ -3,7 +3,7 @@ name: review
 description: Independent code review. Evaluates code quality, architecture adherence, and convention compliance for a feature branch or PR. Use after a cycle completes, before merging to the base branch.
 model: default
 thinkingLevel: xhigh
-tools: [read, grep, glob, write, edit, bash, lsp]
+tools: [read, grep, glob, ast_grep, ast_edit, write, edit, bash, lsp, web_search]
 spawns: ""
 autoloadSkills: [autonomous-agent, project-conventions, review-report-format, minimalism-review]
 # produces: agent_tasks/reports/review-<feature>-<date>.md

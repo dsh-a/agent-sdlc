@@ -214,7 +214,11 @@ Inspect $ARGUMENTS:
 
 Create/update state file immediately after determining entry point.
 
-On resume: cancel any scheduled cron (`CronDelete`), re-check blockers with user, reuse saved digests.
+**Phase tracking (todo tool).** Initialize the `todo` tool with the pipeline phases as a visible progress tracker. Mark each phase `in_progress` when entering, `done` when complete. This gives the user real-time progress in the TUI alongside the cycle state file:
+```
+todo(op: "init", items: ["Phase 1A — Create PRD", "Phase 1C — Gate 1", "Phase 2 — Generate tasks", "Phase 2B — Gate 2", "Phase 3 — Implementation", "Phase 4A — Wrap-up", "Phase 4B — Release"])
+```
+On resume, re-initialize and mark completed phases `done` before continuing.
 
 ---
 
@@ -223,7 +227,7 @@ On resume: cancel any scheduled cron (`CronDelete`), re-check blockers with user
 Before entering Phase 1A, route per the active `--mode`:
 - **`full`** — all phases run as written below.
 - **`lean`** — skip `create-prd` spawn in Phase 1A; derive AC inline from the feature description and store under cycle state `## References` → `AC summary:`. Skip Phase 1C (folded into Phase 2B). Phase 2 still spawns `generate-tasks` (with the inline AC summary as input). Phase 2B presents AC + tasks together for one combined approval.
-- **`hotfix`** — skip Phases 1A, 1C, 2, 2B entirely. Treat the feature description as a single implicit task. Go directly to Phase 3 with one agent, no worktree (main checkout), no pre-digest. Phase 4A runs verify (lite depth) only.
+- **`hotfix`** — skip Phases 1A, 1C, 2, 2B entirely. Treat the feature description as a single implicit task. Go directly to Phase 3 with one agent, no isolation (`isolated: false`), no pre-digest. Phase 4A runs verify (lite depth) only.
 
 ## Phase 1A — Create PRD
 
@@ -329,8 +333,9 @@ Compaction reclaims context but can cost orchestrator decision-continuity; keep 
 Check `.claude/agents/scaffold/` for project-specific pattern files (files with `Type: project-specific`). If none exist and the task list includes scaffold-type work, autonomously spawn a setup-scaffold agent:
 
 ```
-Spawn a generic `task` agent (model tier: sonnet) with this prompt (background task — use async task dispatch):
-> Run the /setup-scaffold skill in scan mode. Read .claude/skills/setup-scaffold/SKILL.md and follow its steps. Do not ask the user questions — use your best judgment for pattern discovery and create all pattern files you find. Report what was created.
+task(agent: "explore", context: "Run the /setup-scaffold skill in scan mode.",
+  tasks: [{ id: "setup-scaffold", role: "Pattern discovery",
+    assignment: "Read .claude/skills/setup-scaffold/SKILL.md and follow its steps. Do not ask the user questions — use your best judgment for pattern discovery and create all pattern files you find. Report what was created." }])
 ```
 
 Run this in the background — it does not block Phase 3 from continuing. Scaffold agents spawned later will pick up the pattern files once they exist.
@@ -345,31 +350,28 @@ The supervisor is **not** a long-lived daemon and needs **no** agent-messaging. 
 
 **Cadence — when to spawn a check.** No messaging required; it's control-flow driven. The orchestrator spawns a `CHECK <agent-id>` at these triggers:
 1. **On wave boundary** — after spawning a parallel wave, and each time control returns from a completing background agent, spawn a check for every *still-active* agent-id. This catches mid-run `spiral` / `stall` / `drift` while other agents keep working.
-2. **On agent completion** — when a Phase-3 implementation agent returns, before merging its worktree, spawn a final check for that agent-id (catches `shallow` / `drift` on the finished output).
+2. **On agent completion** — when a Phase-3 implementation agent returns, before omp merges its task branch, spawn a final check for that agent-id (catches `shallow` / `drift` on the finished output).
 
-Each check is a short **foreground** spawn: the orchestrator waits for the one-line summary, then reads any new lines appended to `agent_states/escalations.jsonl` and acts on `pause-request` / `depth-recommendation` per the escalation ladder (5.5.4). Maintain a `supervisor_checks` counter and a `supervisor_check_failures` counter in cycle state — they feed the run report and the health watchdog below.
+Each check is a short **foreground** spawn: the orchestrator waits for the one-line summary, then drains any escalations via `irc(op: "inbox")` and acts on `pause-request` / `depth-recommendation` per the escalation ladder (5.5.4). Maintain a `supervisor_checks` counter and a `supervisor_check_failures` counter in cycle state — they feed the run report and the health watchdog below.
 
 ```
-Spawn the `supervisor` agent (model tier: [supervisor row from Model Allocation] — resolve the label through Model Versions in .claude/config.md, pass the concrete model id) with this prompt:
-> CHECK [agent-id]. Feature: [name].
-> Cycle state: agent_states/cycle-state-[name].md.
-> Agent ID convention: <role>-<task-number>.
-> Do exactly one check per supervisor.md, then exit.
+task(agent: "supervisor", context: "CHECK [agent-id]. One check per spawn.",
+  tasks: [{ id: "supervisor-<tick>", role: "Supervisor check",
+    assignment: "CHECK [agent-id]. Feature: [name]. Cycle state: agent_states/cycle-state-[name].md. Agent ID convention: <role>-<task-number>. Do exactly one check per supervisor.md, then exit." }])
 ```
 
-The supervisor writes to `agent_states/whispers/`, `agent_states/escalations.jsonl`, and `agent_states/supervisor/` (heartbeat + state.md). It reads from `agent_states/events/*.jsonl` (the per-agent telemetry from 5.2.1) and `agent_states/cycle-state-*.md`.
+The supervisor sends whispers via `irc` to implementation agents and escalations via `irc` to the orchestrator. It writes `agent_states/supervisor/state.md` (ladder state) and touches `agent_states/supervisor/heartbeat`. It reads the agent's omp session transcript (`history://<agent-id>`) and `agent_states/cycle-state-*.md`.
 
 **Artifact layout (Phase 3):**
 
 ```
 agent_states/
   cycle-state-<feature>.md       # orchestrator writes inline (monitor if agent_messaging)
-  events/<agent-id>.jsonl        # PostToolUse hook writes
-  whispers/<agent-id>.md         # supervisor writes
-  escalations.jsonl              # supervisor writes
-  supervisor/state.md            # supervisor writes
+  supervisor/state.md            # supervisor writes (ladder + last_check)
   supervisor/heartbeat           # supervisor touches
 ```
+
+Whispers and escalations travel via irc — no file artifacts. Agent transcripts (`<id>.jsonl`) live in the omp artifacts dir.
 
 ### 3.2 — Dependency analysis
 

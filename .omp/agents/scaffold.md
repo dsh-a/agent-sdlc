@@ -3,7 +3,7 @@ name: scaffold
 description: Scaffold new components — entities/models, use cases, facades, services, or presentation (view-model + view) pairs. Use when the cycle pipeline needs a new component created end-to-end including DI wiring and any codegen.
 model: default
 thinkingLevel: medium
-tools: [read, grep, glob, edit, write, bash, lsp, irc]
+tools: [read, grep, glob, ast_grep, ast_edit, edit, write, bash, lsp, irc]
 spawns: "task"
 autoloadSkills: [autonomous-agent, project-conventions, minimalism, whispers]
 ---

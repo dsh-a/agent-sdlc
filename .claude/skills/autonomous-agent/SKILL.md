@@ -1,5 +1,5 @@
 ---
-description: Shared preamble for autonomous Phase-3 agents — autonomy rules, file-I/O rules, irc whisper handling, contradiction-exit emission. Loaded by test, ui-story, scaffold, verify, review, create-prd, generate-tasks, self-improve, supervisor, test-preflight.
+description: Shared preamble for autonomous Phase-3 agents — autonomy rules, file-I/O rules, LSP-first code intelligence, ast_grep/ast_edit for structural edits, irc whisper handling, contradiction-exit emission. Loaded by test, ui-story, scaffold, verify, review, create-prd, generate-tasks, self-improve, supervisor, test-preflight.
 disable-model-invocation: true
 ---
 
@@ -20,6 +20,21 @@ You are an autonomous agent spawned by the `/cycle` orchestrator. The rules belo
 - **Never** use `python`, shell scripts, `cat <<EOF` heredocs, or `echo >` redirection for file I/O. These bypass the tool layer and break telemetry, hooks, and audit trails.
 - Never hand-edit generated files (anything produced by a codegen/build step — e.g. `*.g.dart`, `*.freezed.dart`, or another stack's output such as `*.g.cs`). Re-run the project's **Code generation** command (`.claude/config.md` § Project Commands) instead when codegen output needs updating.
 
+## Code intelligence (LSP-first)
+
+When you need to find definitions, references, or rename symbols, prefer the **`lsp`** tool over `grep`:
+- `lsp(action: "definition", ...)` — jump to a symbol's definition (more accurate than grepping for the name).
+- `lsp(action: "references", ...)` — find all call sites of a symbol (catches shadowed names grep misses).
+- `lsp(action: "rename", ...)` — rename a symbol across all files (safer than find-and-replace; never drops callsites).
+- `lsp(action: "diagnostics", ...)` — get errors/warnings for a file or glob (use after edits to catch issues early).
+
+Use `grep` only for plain-text lookup when structure is irrelevant (string literals, comments, config keys).
+
+For structural code search and codemods (pattern-based, not text-based), prefer **`ast_grep`** (find) and **`ast_edit`** (rewrite) over manual grep+edit:
+- `ast_grep` finds nodes by AST shape — e.g., all calls to `foo($x)` regardless of argument names.
+- `ast_edit` rewrites structurally — e.g., `oldApi($A, $B)` → `newApi($B, $A)` with capture substitution.
+- Use these when the pattern is syntactic (calls, imports, declarations); use `grep` when it's lexical.
+
 ## Whisper handling (Phase-3 implementation agents)
 
 If your role implements code in a worktree (`test`, `ui-story`, `scaffold`, `coding`), supervisor whispers arrive via **irc** as `irc:incoming` turns at your next step boundary — no file polling. Drain your irc inbox (`irc(op: "inbox")`) between sub-tasks and major steps to catch any pending whispers. `pause`-severity whispers are binding; `note` and `strong` are advisory. Report whispers seen and your response in your final summary. Full protocol: `whispers` skill.
@@ -37,12 +52,6 @@ If you proceed but diverge from the literal PRD AC or task description (e.g., a 
 ```
 deviation: task: [task-id] | ac: [AC ref or "n/a"] | implemented: [what] | reason: [why]
 ```
-
-The orchestrator forwards deviations to monitor for the cycle state's `## Deviations` section. Verify reads them at audit time.
-
-## Worktree-startup preamble (Phase-3 implementation agents only)
-
-If your spawn prompt begins with `Before any other action: run cd [path]...` (the worktree-startup preamble from the cycle SKILL), follow that protocol literally. On `WORKTREE MISMATCH` you must stop immediately — do not attempt to recover.
 
 ---
 
