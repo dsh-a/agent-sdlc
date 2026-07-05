@@ -1,0 +1,93 @@
+# OpenRouter provider config for agent-sdlc (omp target).
+#
+# Copy to ~/.omp/agent/models.yml, uncomment ONE model per tier, set
+# OPENROUTER_API_KEY in your env or <repo>/.env, then uncomment the matching
+# equivalence.override line so the canonical tier id resolves.
+#
+# Verify current model ids at https://openrouter.ai/models before use.
+# Prices below are illustrative — confirm on OpenRouter.
+
+providers:
+  openrouter:
+    baseUrl: https://openrouter.ai/api/v1
+    api: openai-completions
+    apiKey: OPENROUTER_API_KEY        # env-var-name or literal
+    authHeader: true
+    models:
+      # ── opus tier (slow role: orchestrator, verify, review) ──────────
+      # Uncomment ONE:
+      # - id: anthropic/claude-opus-4.1
+      #   name: Claude Opus 4.1 (OpenRouter)
+      #   reasoning: true
+      #   input: [text, image]
+      #   contextWindow: 200000
+      #   maxTokens: 32000
+      # - id: openai/gpt-5-codex
+      #   name: GPT-5 Codex (OpenRouter)
+      #   reasoning: true
+      #   input: [text, image]
+      #   contextWindow: 200000
+      #   maxTokens: 16000
+      # - id: x-ai/grok-4
+      #   name: Grok 4 (OpenRouter)
+      #   reasoning: true
+      #   input: [text, image]
+      #   contextWindow: 200000
+      #   maxTokens: 16000
+
+      # ── sonnet tier (default/task role: implementation agents) ────────
+      # Uncomment ONE:
+      # - id: anthropic/claude-sonnet-4.1
+      #   name: Claude Sonnet 4.1 (OpenRouter)
+      #   reasoning: true
+      #   input: [text, image]
+      #   contextWindow: 200000
+      #   maxTokens: 16000
+      # - id: openai/gpt-5.1
+      #   name: GPT-5.1 (OpenRouter)
+      #   reasoning: true
+      #   input: [text, image]
+      #   contextWindow: 200000
+      #   maxTokens: 16000
+      # - id: google/gemini-2.5-pro
+      #   name: Gemini 2.5 Pro (OpenRouter)
+      #   reasoning: true
+      #   input: [text, image]
+      #   contextWindow: 1000000
+      #   maxTokens: 65536
+
+      # ── haiku tier (smol role: monitor, preflight, supervisor) ────────
+      # Uncomment ONE:
+      # - id: anthropic/claude-haiku-4.5
+      #   name: Claude Haiku 4.5 (OpenRouter)
+      #   input: [text, image]
+      #   contextWindow: 200000
+      #   maxTokens: 8192
+      # - id: google/gemini-2.5-flash
+      #   name: Gemini 2.5 Flash (OpenRouter)
+      #   reasoning: true
+      #   input: [text, image]
+      #   contextWindow: 1000000
+      #   maxTokens: 65536
+      # - id: deepseek/deepseek-chat
+      #   name: DeepSeek Chat (OpenRouter)
+      #   input: [text]
+      #   contextWindow: 128000
+      #   maxTokens: 8192
+
+# Map each uncommented OpenRouter model to its canonical tier id.
+# omp coalesces these so modelRoles in .omp/config.yml resolve correctly.
+equivalence:
+  overrides:
+    # opus tier → claude-opus-4-6
+    # openrouter/anthropic/claude-opus-4.1: claude-opus-4-6
+    # openrouter/openai/gpt-5-codex: claude-opus-4-6
+    # openrouter/x-ai/grok-4: claude-opus-4-6
+    # sonnet tier → claude-sonnet-4-5
+    # openrouter/anthropic/claude-sonnet-4.1: claude-sonnet-4-5
+    # openrouter/openai/gpt-5.1: claude-sonnet-4-5
+    # openrouter/google/gemini-2.5-pro: claude-sonnet-4-5
+    # haiku tier → claude-haiku-4-5
+    # openrouter/anthropic/claude-haiku-4.5: claude-haiku-4-5
+    # openrouter/google/gemini-2.5-flash: claude-haiku-4-5
+    # openrouter/deepseek/deepseek-chat: claude-haiku-4-5

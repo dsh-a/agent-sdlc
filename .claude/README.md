@@ -3,6 +3,12 @@
 Everything the pipeline needs lives here. Copy this directory into a project root to install
 the pipeline.
 
+**omp target:** this branch also ships a native `.omp/` adapter layer (agents, config, hooks,
+context) for the Oh My Pi harness with OpenRouter. See the repo-root README § "omp + OpenRouter
+deployment". Under omp, `.claude/skills/` and `.claude/packs/` are discovered via the `claude`
+provider (priority 80); `.claude/agents/` is the source-of-truth for agent bodies but omp
+discovers agents from `.omp/agents/` (native, priority 100).
+
 ```
 .claude/
   config.md            # central runtime config — the one file you customize

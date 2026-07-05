@@ -98,3 +98,51 @@ When the orchestrator polls:
 ## Layering with rescues
 
 When the orchestrator processes a `pause-request` and decides on a recovery path, it emits a corresponding `RESCUE` event to monitor (per the existing 5.2.3 plumbing). The escalation captures *what the supervisor saw*; the rescue captures *what the orchestrator did about it*. Both flow into the run report.
+
+## OMP IRC transport (default under omp)
+
+Under omp, escalations travel over the **irc** tool instead of `agent_states/escalations.jsonl`.
+The supervisor sends directly to the orchestrator:
+
+```
+irc(op: "send", to: "Main", message: "<type> | agent: <id> | detector: <name> | <type-specific fields>")
+```
+
+The three types (`pause-request`, `depth-recommendation`, `bug-pattern`) keep the same
+field shape, serialized as a single-line pipe-delimited message body. The orchestrator
+parses the prefix to decide the action.
+
+### Orchestrator receipt (replaces polling)
+
+The orchestrator no longer polls `escalations.jsonl` at 3 moments. Instead, at each of those
+moments (phase transition, sub-task boundary, watchdog tick) it drains its irc inbox:
+
+```
+irc(op: "inbox")   # non-blocking drain; returns all pending escalation messages
+```
+
+For time-sensitive `pause-request` handling, the orchestrator can `wait` with a bounded
+timeout at watchdog ticks:
+
+```
+irc(op: "wait", from: "supervisor-<tick>", timeoutMs: 30000)
+```
+
+The cursor tracking (`escalation_cursor:` in cycle state) is unnecessary under irc — messages
+are consumed on read, not seeked by line number.
+
+### Pairing with whispers
+
+`pause-request` escalations still pair with `pause` whispers. Under irc, both travel as irc
+sends in the same supervisor check: the whisper to the implementation agent, the escalation to
+the orchestrator.
+
+### Audit trail
+
+File-path escalations archive to `cycle_reports/<feature>/supervisor/escalations.jsonl`.
+Under irc, the audit trail is the orchestrator's session JSONL. The supervisor echoes every
+escalation to its own return summary so the run report aggregates them.
+
+### When to fall back to the file path
+
+The file path is the Claude Code fallback. Under omp, irc is the default.

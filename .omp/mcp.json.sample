@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json",
+  "_comment": "Template for .omp/mcp.json — connect MCP servers referenced by .claude/config.md § Context Sources. Copy to .omp/mcp.json and fill in real commands/URLs/credentials. Do NOT commit secrets; .omp/mcp.json should be gitignored.",
+  "mcpServers": {
+    "company-a-docs": {
+      "_comment": "Engineering + product documentation MCP. Consulted at prd/tasks/implement/review (config.md § Context Sources). Replace with your team's actual server definition.",
+      "command": "REPLACE_ME",
+      "args": []
+    },
+    "codebase-rag": {
+      "_comment": "RAG codebase-analysis context. NOT YET RELEASED — leave disabled (enabled: false) in config.md § Context Sources until the server exists.",
+      "command": "REPLACE_ME",
+      "args": []
+    }
+  }
+}

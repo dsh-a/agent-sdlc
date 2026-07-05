@@ -37,15 +37,24 @@ This fork is **language-agnostic with explicit plug-in points**:
 .claude/
   config.md                      # the one file you customize (Active Pack, Project Commands,
                                   #   Architecture Rules, Context Sources, model preset)
-  skills/
+  skills/                        # discovered by omp via the `claude` provider (priority 80)
     project-conventions/         # ACTIVE conventions — loaded by agents deterministically
     context-sources/             # the MCP/RAG plug-in contract
     cycle/                       # the orchestrator
   packs/
     dotnet/                      # default active pack (placeholders — fill via /setup)
     flutter/                     # worked reference example
-  agents/                        # the agent team (stack-neutral)
+  agents/                        # source-of-truth agent bodies (Claude Code path)
   .mcp.json.sample               # template for connecting your MCP servers
+.omp/
+  agents/                        # 13 omp-native agent definitions (frontmatter + body)
+  config.yml                     # omp harness settings (modelRoles → OpenRouter, approval, task)
+  models.yml.sample              # OpenRouter provider config + per-tier model menu
+  mcp.json.sample                # Context Sources MCP template (omp format)
+  AGENTS.md                      # project context (auto-loaded by omp, native priority 100)
+  RULES.md                       # sticky hard rules (always-apply)
+  hooks/
+    log-event.ts                 # telemetry hook (omp JS hook, replaces log-event.py)
 ```
 
 Switching stacks = pointing **Active Pack** at a different `packs/<lang>/` and populating the
@@ -130,6 +139,67 @@ telemetry, the supervisor, and stall salvage all consume this log. Requires `pyt
 
 Gitignore protection is automatic — on every `/cycle` the orchestrator ensures a managed
 block keeps runtime artifacts out of git.
+
+
+## omp + OpenRouter deployment
+
+This branch (`feature/omp-openrouter`) targets the **Oh My Pi (omp)** harness with models
+routed through **OpenRouter**. The `.omp/` directory is the native omp adapter layer; `.claude/`
+remains the source of truth for skills, packs, and the agent-readable runtime config.
+
+### 1. Pick your OpenRouter models per tier
+
+Copy `.omp/models.yml.sample` → `~/.omp/agent/models.yml` and uncomment **one model per tier**:
+
+| Tier | omp role | Used by | Canonical id |
+|---|---|---|---|
+| opus | `slow` | orchestrator (`/cycle`), verify, review | `claude-opus-4-6` |
+| sonnet | `default` / `task` | implementation agents | `claude-sonnet-4-5` |
+| haiku | `smol` | monitor, preflight, supervisor | `claude-haiku-4-5` |
+
+Uncomment the matching `equivalence.overrides` lines so each OpenRouter model coalesces to its
+canonical tier id. Set `OPENROUTER_API_KEY` in your env or `<repo>/.env`.
+
+### 2. Connect MCPs (omp format)
+
+Copy `.omp/mcp.json.sample` → `.omp/mcp.json` and fill in your context-source servers. Declare
+each in `.claude/config.md` § Context Sources (the orchestrator reads that table at runtime).
+
+### 3. Telemetry hook
+
+`.omp/hooks/log-event.ts` is the omp JS hook (replaces `.claude/hooks/log-event.py` for omp).
+omp auto-discovers hooks under `.omp/hooks/`. The JSONL schema matches the Python hook so the
+supervisor agent's detectors work unchanged. **Note:** omp does not yet expose the subagent name
+to hooks via a stable env var — per-agent event files may aggregate under `orchestrator` unless
+the orchestrator passes `OMP_AGENT_NAME` via spawn-prompt env.
+
+### 4. Run `/cycle`
+
+```bash
+omp          # launch from the repo root — omp discovers .omp/ + .claude/
+/cycle Add CSV export to the reports page
+```
+
+omp discovers agents from `.omp/agents/` (native, priority 100), skills from `.claude/skills/`
+(claude provider, priority 80), and loads `.omp/AGENTS.md` + `.omp/RULES.md` as context. The
+`modelRoles` in `.omp/config.yml` resolve every spawn through your OpenRouter picks.
+
+### 5. Inter-agent messaging (irc)
+
+Under omp, the supervisor's whispers and escalations travel over the **irc** tool instead of
+the file-based polling channels. irc delivers immediately, wakes idle recipients, and persists
+as `irc:incoming` messages in each recipient's session — no polling, no cursor tracking.
+
+| Channel | File path (Claude Code) | omp irc path |
+|---|---|---|
+| Whispers (supervisor → impl agent) | `agent_states/whispers/<id>.md` | `irc(op: "send", to: "<id>", …)` |
+| Escalations (supervisor → orchestrator) | `agent_states/escalations.jsonl` | `irc(op: "send", to: "Main", …)` |
+| Orchestrator collection | poll at 3 moments + cursor | `irc(op: "inbox")` at the same 3 moments |
+
+The `whispers` and `escalations` skills carry an "OMP IRC transport" section documenting the
+protocol; the file-based path remains as the Claude Code fallback. The severity ladder
+(`note` → `strong` → `pause`) is unchanged — it moves into the irc message body as a
+`[severity]` prefix.
 
 ---
 

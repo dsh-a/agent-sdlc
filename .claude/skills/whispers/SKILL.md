@@ -63,6 +63,43 @@ You do not write to your own whisper file. Only the supervisor writes whispers.
 - They do not carry binding *plan changes*. If the supervisor wants the orchestrator to revise depth or pipeline, it uses an `escalations.jsonl` entry (see `escalations` skill), not a whisper.
 - They are not durable across cycles. The whispers/ directory is archived to `cycle_reports/<feature>/supervisor/` at cycle end, then cleared.
 
+## OMP IRC transport (default under omp)
+
+When running under the Oh My Pi (omp) harness, whispers travel over the **irc** tool
+instead of the append-only file. irc delivers immediately (no polling), wakes idle
+recipients, and persists as `irc:incoming` messages in the recipient's session history.
+
+### Supervisor → implementation agent
+
+Instead of appending to `agent_states/whispers/<agent-id>.md`, the supervisor calls:
+
+```
+irc(op: "send", to: "<agent-id>", message: "[<severity>] <detector>: <body>")
+```
+
+The severity prefix (`[note]` / `[strong]` / `[pause]`) carries the ladder semantics inline.
+The recipient applies the same severity rules as the file path. `pause` is still paired with a
+`pause-request` escalation sent to the orchestrator via irc (see `escalations` skill).
+
+### Implementation agent receipt
+
+No polling. irc messages arrive as injected `irc:incoming` turns at the recipient's next step
+boundary. The agent reads the message, applies the severity rule, and logs compliance in its
+final return summary (same as the file path's step 4).
+
+### Audit trail
+
+File-path whispers archive to `cycle_reports/<feature>/supervisor/whispers/`. Under irc, the
+audit trail is each recipient's session JSONL (`history://<agent-id>`). The supervisor should
+also echo every whisper it emits to its own return summary so the orchestrator's run report
+captures them in one place.
+
+### When to fall back to the file path
+
+The file path is the Claude Code fallback (no irc tool available). Under omp, irc is always
+available to subagents (`isIrcEnabled` is true whenever `taskDepth > 0`), so the file path is
+only used if irc is explicitly disabled or unavailable.
+
 ---
 
 ## Supervisor-side format rules

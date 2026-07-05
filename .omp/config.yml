@@ -1,0 +1,46 @@
+# omp project settings — agent-sdlc (omp + OpenRouter target)
+#
+# This is the omp HARNESS settings layer. The framework's agent-readable runtime
+# config (model tiers, project commands, architecture rules, context sources)
+# lives in .claude/config.md — agents read it by path at runtime.
+#
+# Model tier → concrete model resolution:
+#   1. Copy .omp/models.yml.sample → ~/.omp/agent/models.yml
+#   2. Uncomment ONE OpenRouter model per tier (opus/sonnet/haiku)
+#   3. Uncomment its equivalence.override line so the canonical id below resolves
+#   4. Set OPENROUTER_API_KEY in your env or <repo>/.env
+
+modelRoles:
+  default: claude-sonnet-4-5   # sonnet tier — implementation agents
+  smol:    claude-haiku-4-5    # haiku tier  — monitor / preflight / supervisor
+  slow:    claude-opus-4-6     # opus tier   — orchestrator (/cycle), verify, review
+  task:    claude-sonnet-4-5   # spawned task subagents default to sonnet tier
+
+modelProviderOrder:
+  - openrouter
+  - anthropic
+
+# Auto-approve workspace writes + bash so the cycle pipeline runs autonomously.
+# Narrow to tools.approval.bash: prompt if you want per-command gating.
+tools:
+  approvalMode: write
+  approval:
+    bash: allow
+
+# The framework manages its own worktree isolation (cycle SKILL § Phase-3
+# worktree protocol). Disable omp's task isolation to avoid a second layer.
+task:
+  isolation:
+    mode: none
+
+compaction:
+  strategy: snapcompact
+  thresholdPercent: -1
+
+lsp:
+  enabled: true
+  lazy: true
+  diagnosticsOnWrite: true
+
+skills:
+  enableSkillCommands: true
