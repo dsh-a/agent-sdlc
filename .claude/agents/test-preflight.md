@@ -19,20 +19,20 @@ From the spawn prompt, extract:
 - **AC**: pre-extracted acceptance criteria from the PRD.
 - **Base ref**: the branch you should diff against (e.g., `feature/<name>`).
 
-Read each changed source file. Identify the **public symbols touched** — class names, method names, top-level functions, exported widget names, public enum members. Internal symbols don't matter for test contradictions.
+Read each changed source file. Identify the **public symbols touched** — class names, method names, top-level functions, exported component names, public enum members. Internal symbols don't matter for test contradictions.
 
 ---
 
 ## Step 2 — Locate referencing tests
 
-For each public symbol from Step 1, grep `test/` recursively for references. Cluster by test file and test name:
+For each public symbol from Step 1, grep the project's test tree (the **Test path glob** in `.claude/config.md` § Project Commands) recursively for references. Cluster by test file and test name:
 
 ```
-test/foo/foo_repository_test.dart
-  - "inserts row" → references FooRepository.insert
-  - "returns null on missing" → references FooRepository.find
-test/foo/foo_view_model_test.dart
-  - "loads on init" → references FooViewModel.load
+tests/Foo/FooRepositoryTests
+  - "inserts row" → references FooRepository.Insert
+  - "returns null on missing" → references FooRepository.Find
+tests/Foo/FooViewModelTests
+  - "loads on init" → references FooViewModel.Load
 ```
 
 If grep returns no hits, the worktree is greenfield for these symbols. Emit an empty classifications table and return — the orchestrator can short-circuit, but produce the empty header so the test agent's prompt parses uniformly.
@@ -62,9 +62,9 @@ Return this exact markdown block as your final message. The orchestrator will li
 
 | Test file | Test name | Symbol | Verdict | Reason |
 |---|---|---|---|---|
-| test/foo/foo_repository_test.dart | "returns null on missing" | FooRepository.find | delete-because-AC-supersedes | AC #3 requires throw NotFoundException instead of null return |
-| test/foo/foo_repository_test.dart | "inserts row" | FooRepository.insert | update | signature changed from insert(Foo) to insert(FooDto); behavior preserved |
-| test/foo/foo_view_model_test.dart | "loads on init" | FooViewModel.load | keep | no behavior change |
+| tests/Foo/FooRepositoryTests | "returns null on missing" | FooRepository.Find | delete-because-AC-supersedes | AC #3 requires throw NotFoundException instead of null return |
+| tests/Foo/FooRepositoryTests | "inserts row" | FooRepository.Insert | update | signature changed from Insert(Foo) to Insert(FooDto); behavior preserved |
+| tests/Foo/FooViewModelTests | "loads on init" | FooViewModel.Load | keep | no behavior change |
 ```
 
 If no references were found in Step 2, return:

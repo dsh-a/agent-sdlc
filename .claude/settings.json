@@ -3,14 +3,14 @@
     "allow": [
       "Bash(flutter test*)",
       "Bash(flutter analyze*)",
-      "Bash(flutter pub *)",
-      "Bash(flutter pub run build_runner*)",
-      "Bash(dart *)",
+      "Bash(flutter pub*)",
       "Bash(git *)",
       "Bash(gh pr*)",
       "Bash(gh api*)",
       "Bash(ls *)",
-      "Bash(rm agent_states/*)"
+      "Bash(rm agent_states/*)",
+      "mcp__company-a-docs__*",
+      "mcp__codebase-rag__*"
     ]
   },
   "hooks": {

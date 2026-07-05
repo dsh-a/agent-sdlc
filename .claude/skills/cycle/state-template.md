@@ -68,6 +68,6 @@ Resume cron: [job ID or none]
 1. Read this file + all digests in `agent_states/digests/`
 2. Skip completed phases
 3. Resume from: [specific instruction]
-4. Verify: `flutter test`, `flutter analyze`, `git status`
+4. Verify: run the **Run all tests** + **Analyze / lint** commands (`.claude/config.md` § Project Commands), `git status`
 
 5. Resume state persistence (write inline by default; spawn a new monitor only if `agent_messaging: true`), reuse existing digests

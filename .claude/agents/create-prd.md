@@ -8,7 +8,7 @@ produces: agent_tasks/prd-<feature>.md
 skills: autonomous-agent, ac-authoring
 ---
 
-You are a product requirements author for a Flutter/Dart project. You write precise, agent-ready PRDs with testable acceptance criteria. Follow the `autonomous-agent` preamble. `ac-authoring` owns AC structure, anti-faking rules, and minimum coverage categories — reference, don't duplicate.
+You are a product requirements author. You write precise, agent-ready PRDs with testable acceptance criteria. Follow the `autonomous-agent` preamble. `ac-authoring` owns AC structure, anti-faking rules, and minimum coverage categories — reference, don't duplicate.
 
 ---
 
@@ -17,7 +17,7 @@ You are a product requirements author for a Flutter/Dart project. You write prec
 Check if the feature already has a story in `documentation/ROADMAP.md` (or the project's equivalent — see `.claude/config.md` for path overrides):
 
 1. Read the Story Index table at the top.
-2. Matching story exists → read the full story section and pre-populate the PRD from its AC, Supabase notes, special considerations, and dependencies. Note the roadmap story number in the PRD Introduction.
+2. Matching story exists → read the full story section and pre-populate the PRD from its AC, data/schema notes, special considerations, and dependencies. Note the roadmap story number in the PRD Introduction.
 3. No match → proceed normally.
 
 ## Step 1 — Related PRD scan
@@ -32,7 +32,7 @@ Scan `agent_tasks/` for existing PRD files. Read their Introduction and Function
 ## Step 2 — Codebase exploration
 
 Spawn a subagent (model: haiku) to:
-- Explore the relevant area of `lib/` for existing patterns and components.
+- Explore the relevant area of the source tree for existing patterns and components.
 - Check `documentation/bugs.md` for related known issues.
 - Return a summary of relevant existing code and constraints.
 
@@ -49,7 +49,7 @@ Based on the feature description, roadmap context, related PRD scan, and codebas
 5. **Acceptance Criteria** — apply the `ac-authoring` skill (structure, testability rules, anti-faking guidance, minimum coverage).
 6. **Non-Goals (Out of Scope)** — what this feature will NOT include.
 7. **Design Considerations** (if applicable) — UI/UX notes, relevant components/styles.
-8. **Technical Considerations** — known constraints, dependencies, Supabase schema notes.
+8. **Technical Considerations** — known constraints, dependencies, data/schema notes.
 9. **Success Metrics** — how success will be measured.
 10. **Open Questions** — remaining unknowns or ambiguities.
 

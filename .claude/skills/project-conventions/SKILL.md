@@ -1,12 +1,20 @@
 ---
-name: flutter-conventions
-description: Canonical Flutter/MVVM conventions for this codebase. Member order, naming defaults, layer boundaries, theme token usage, build() rules, ChangeNotifier patterns, file locations. Loaded by ui-story, scaffold, test, review. Single source of truth — do not duplicate these rules in agent prompts.
+name: project-conventions
+description: Canonical project conventions for this codebase — the single source of truth loaded by ui-story, scaffold, test, and review. Member order, naming, layer boundaries, logging, file locations, entity construction. Do not duplicate these rules in agent prompts. Project-specific overrides live in `.claude/config.md` § Pattern Compliance and § Layer Boundaries.
 disable-model-invocation: true
 ---
 
-# Flutter Conventions
+# Project Conventions
 
-This codebase uses **MVVM with `ChangeNotifier` + Provider**. The rules below are authoritative across agents. Project-specific overrides live in `.claude/config.md` § Pattern Compliance and § Layer Boundaries — read those first; what follows applies unless overridden.
+> **This is the ACTIVE conventions skill.** Agents load it deterministically via their
+> `skills:` frontmatter — it is the one place language/framework rules live. The body
+> below is populated from the **`flutter` pack** (`.claude/packs/flutter/conventions.md`).
+> To switch stacks, run `/setup` or copy another pack's `conventions.md` body here. See
+> `.claude/packs/README.md`.
+>
+> **Active pack:** see `.claude/config.md` → **Active Pack** (`flutter`).
+
+This codebase targets **Flutter/Dart** with **MVVM (`ChangeNotifier` + Provider)**. The rules below are authoritative when this pack is active. Project-specific overrides live in `.claude/config.md` § Pattern Compliance and § Layer Boundaries — read those first; what follows applies unless overridden.
 
 ---
 

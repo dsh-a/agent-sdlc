@@ -4,134 +4,127 @@ disable-model-invocation: true
 
 # Setup — Initial Configuration
 
-You are helping a user configure the agent-sdlc pipeline for their Flutter/Dart project. Walk through each step interactively — ask questions, confirm choices, then generate the configuration.
+You are helping a user configure the agent-sdlc pipeline for their project. The pipeline is
+**language-agnostic**; a *pack* supplies the conventions for one stack. Walk through each
+step interactively — ask questions, confirm choices, then generate the configuration.
 
 ---
 
-## Step 1 — Detect project type
+## Step 1 — Detect project type and select a pack
 
-Inspect the project root:
-- Read `pubspec.yaml` for dependencies, Flutter SDK constraint, and dev dependencies
-- Check for `analysis_options.yaml` — note any lint rules or custom analyzer settings
-- Check for test configuration (`flutter_test` in dev_dependencies, any `test/` directory structure)
-- Check for code generation (`build_runner`, `freezed`, `json_serializable`, `drift`, `riverpod_generator`, etc. in dev_dependencies)
-- Check for existing state management packages (`provider`, `riverpod`, `bloc`, `get`, `mobx`, etc.)
-- Check for existing `.claude/config.md` — if it exists, inform the user and offer to update it or start fresh
+Inspect the project root to identify the stack:
 
-Summarize findings to the user: Flutter version constraint, state management, codegen tools, key packages.
+| Signal | Pack |
+|---|---|
+| `*.sln`, `*.csproj`, `Directory.Build.props` | `dotnet` |
+| `pubspec.yaml` | `flutter` |
+| `package.json` (+ `tsconfig.json`) | author a `node`/`typescript` pack |
+| something else | author a new pack (`.claude/packs/README.md`) |
 
----
+- List the available packs under `.claude/packs/`.
+- Read the relevant manifest(s) for dependencies, framework version, and tooling.
+- Detect the test framework, linter/analyzer, and any codegen step.
+- Check for an existing `.claude/config.md` — if present, offer to update it or start fresh.
 
-## Step 2 — Verify Flutter commands
+Summarize findings, then confirm the **Active Pack** with the user. If no matching pack
+exists, offer to scaffold one by copying `.claude/packs/dotnet/` and filling it in.
 
-Check that these commands are usable for the project:
+## Step 2 — Verify project commands
 
-| Command | Required | Purpose |
-|---|---|---|
-| `flutter test` | Yes | Run tests |
-| `flutter analyze` | Yes | Run static analysis |
-| `flutter pub run build_runner build` | If codegen detected | Run code generation |
-| `dart run` | No | Run Dart scripts |
+Confirm the build/test/analyze commands for the stack. Defaults for `flutter`:
 
-If `analysis_options.yaml` is missing or minimal, suggest adding one based on `package:flutter_lints` or `package:very_good_analysis`.
+| Purpose | Command |
+|---|---|
+| Run all tests | `flutter test` |
+| Run specific test file | `flutter test <path>` |
+| Analyze / lint | `flutter analyze` |
+| Code generation | `flutter pub run build_runner build --delete-conflicting-outputs` |
+| Test path glob | `test/**` |
 
-Wait for the user to confirm the toolchain is in place before continuing.
-
----
+Ask the user to confirm or correct each, plus the **Test path glob** and **Test
+anti-patterns** file (defaults to the active pack's). Wait for confirmation before continuing.
 
 ## Step 3 — Configure architecture rules
 
-Ask the user about their project's architecture:
+Ask about the project's architecture:
 
-1. **"What are your main source code layers?"**
-   Offer common Flutter patterns as examples:
-   - Domain / Data / UI (clean architecture)
-   - Feature-based (each feature has its own domain/data/ui subfolders)
-   - Flat (no explicit layers)
-   - Custom
+1. **"What are your main source layers?"** — offer common shapes (Clean/Onion: Domain /
+   Application / Infrastructure / Presentation; Vertical slices; Flat). Capture path patterns.
+2. **"What are the import rules between layers?"** — for each layer, which others it may
+   import from and which are forbidden. Remind: the domain layer should be pure (no framework/IO).
+3. **"What presentation / state-management pattern do you use?"** — e.g. MVC controllers,
+   Minimal APIs, MVVM, Blazor components, CQRS handlers.
+4. **"What DI pattern do you use?"** — e.g. built-in `IServiceCollection`, Autofac, manual factory.
 
-2. **"What are the import rules between layers?"**
-   For each layer identified, ask which other layers it may import from and which are forbidden.
-   Remind: domain layer should be pure Dart — no Flutter imports.
-
-3. **"What state management pattern do you use?"**
-   Examples: MVVM with ChangeNotifier + Provider, Riverpod, BLoC, GetX, MobX, plain setState
-
-4. **"What DI / dependency injection pattern do you use?"**
-   Examples: Provider/MultiProvider, get_it, Riverpod providers, manual factory, none
-
-Fill in the Architecture Review Rules section of config.md based on answers.
-
----
+Fill in § Layer Boundaries, § Pattern Compliance, and § Convention Checks of `config.md`.
 
 ## Step 4 — Choose model preset
 
-Explain the presets:
+- **personal** — mostly sonnet for implementation, haiku for lightweight tasks. Balanced. Default.
+- **team** — similar with a few upgrades.
+- **enterprise** — opus for planning/review agents, sonnet for implementation. Highest quality, higher cost.
 
-- **personal** — Mostly sonnet for implementation, haiku for lightweight tasks (pre-digest, monitor, adversarial testing). Good balance of cost and quality. Default.
-- **enterprise** — Opus for planning and review agents (create-prd, generate-tasks, verify, review, self-improve), sonnet for implementation. Highest quality, higher cost.
-
-Ask the user to choose. They can also customize individual agent models after setup.
-
----
+Ask the user to choose; they can override individual agent models later.
 
 ## Step 5 — Configure optional agents
 
 Ask: **"Should `/cycle` automatically run code review and verification after implementation?"**
+Default both enabled. Explain that when disabled, the cycle recommends running them manually.
 
-- Default: both enabled
-- User can disable either or both
-- Explain: when enabled, verify and review agents run autonomously during Phase 4A. When disabled, the cycle recommends running them manually.
+## Step 6 — Configure Context Sources (MCP / RAG plug-in points)
 
----
+Ask whether the team has external knowledge sources to wire in (a documentation MCP, a
+codebase-analysis / RAG service, an ADR store). For each:
 
-## Step 6 — Convention checks
+1. **id** and **type** (`mcp` / `skill`) and the tool/skill name.
+2. **consult_at** stages — `prd`, `tasks`, `predigest`, `implement`, `review`, `verify`.
+3. **required** — `optional` (default) or `required` (never for an unreleased source).
+4. **enabled** — `false` until the MCP server is actually connected in `.claude/.mcp.json`.
+5. a **query_hint**.
 
-Ask about code conventions, offering detected defaults where possible:
+Write these as rows in `config.md` § Context Sources, and remind the user to connect the
+servers in `.claude/.mcp.json` (template `.claude/.mcp.json.sample`) and to add the matching
+`mcp__<id>__*` permission in `.claude/settings.json`. See `.claude/skills/context-sources/SKILL.md`
+and `docs/CONTEXT-SOURCES.md`.
 
-1. **File naming**: `snake_case` (Dart default)
-2. **Line length**: 100 (default), 80, 120, or custom
-3. **Logging**: What logger does the project use? (e.g., `package:logging`, custom wrapper, `debugPrint`)
-4. **Comments**: `///` Dart doc comments (default) or project-specific convention
-5. **Private members**: Leading underscore convention (Dart default)
+## Step 7 — Generate config + activate the pack
 
----
+1. Generate `.claude/config.md` from all answers, following the existing template's structure
+   (Active Pack, Project Commands, Architecture Review Rules, Context Sources, model preset,
+   optional agents). If a config exists, show a diff and confirm before overwriting.
+2. **Activate the pack:** copy `.claude/packs/<active_pack>/conventions.md` body into
+   `.claude/skills/project-conventions/SKILL.md` (preserve its frontmatter), and the pack's
+   `ui-test-patterns.md` into `.claude/skills/ui-test-patterns/SKILL.md` if present.
 
-## Step 7 — Generate config file
+## Step 8 — Update permissions
 
-Based on all answers, generate `.claude/config.md` following the structure of the existing template. If a config file already exists, show a diff of what would change and ask for confirmation before overwriting.
+Remind the user to align `.claude/settings.json` Bash allowlist with the chosen toolchain
+(e.g. `Bash(flutter test*)`, `Bash(flutter analyze*)`) and add any `mcp__<source>__*` entries.
+(The agent cannot self-edit `settings.json` — the user applies this.)
 
-Write the file to `.claude/config.md`.
+## Step 9 — Scaffold pattern discovery
 
----
+Ask: **"Scan the codebase for recurring patterns to improve scaffold accuracy?"**
+- Yes → run `/setup-scaffold`.
+- No → the scaffold agent uses the language-neutral pattern shapes + the active pack's
+  `scaffold-snippets.md`, and can discover patterns on first use.
 
-## Step 8 — Scaffold pattern discovery
-
-Ask: **"Would you like to scan the codebase for recurring patterns to improve scaffold accuracy?"**
-
-- If yes: run `/setup-scaffold` (follow the steps in `.claude/skills/setup-scaffold/SKILL.md`)
-- If no: note that the scaffold agent will use the default Dart/Flutter pattern templates and can discover patterns on first use
-
----
-
-## Step 9 — Summary
-
-Present what was configured:
+## Step 10 — Summary
 
 ```
 Configuration complete:
 
   Config file:     .claude/config.md
-  Model preset:    [personal|enterprise]
+  Active pack:     [flutter | dotnet | ...]
+  Model preset:    [personal | team | enterprise]
   Architecture:    [layers summary]
-  State mgmt:      [pattern]
-  DI pattern:      [pattern]
-  Auto verify:     [enabled|disabled]
-  Auto review:     [enabled|disabled]
-  Scaffold:        [N pattern files created | using default templates]
+  Auto verify:     [enabled | disabled]
+  Auto review:     [enabled | disabled]
+  Context sources: [N configured — M enabled]
+  Scaffold:        [N pattern files created | using pack defaults]
 
 Next steps:
   - Review .claude/config.md and adjust any values
+  - Connect MCP servers in .claude/.mcp.json and update settings.json permissions
   - Run /cycle to start your first feature cycle
-  - Run /setup-scaffold later to discover project-specific patterns
 ```

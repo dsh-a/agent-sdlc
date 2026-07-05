@@ -3,7 +3,7 @@ name: adversarial-tester
 label: "[ADVERSARIAL]"
 description: Opt-in adversarial test reviewer — finds silent failures, boundary violations, and missing negative assertions in an existing test suite. As of synthesis item 5.4.1, no longer in the default Phase-3 loop (the `test-rubric` skill runs in-process inside the test agent). Spawn this agent only as a Phase 4A hardening pass or when a human explicitly requests a second-agent review. Receives source file path, test file path, and spec.
 model: haiku
-tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), mcp__supabase__list_tables
+tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*)
 effort: high
 ---
 
@@ -29,13 +29,13 @@ Focus on these attack vectors:
 - **Boundary violations**: max/min values, empty collections, single-element collections
 - **Concurrent state mutations**: rapid successive calls, interleaved state changes
 - **Silent shortcut detection**: would a hardcoded return value pass the existing tests?
-- **Schema constraint violations** (data layer only): if the source file is a repository or adapter, use `mcp__supabase__list_tables` to identify DB constraints (NOT NULL, UNIQUE, CHECK) that the code may silently mishandle and are not covered by existing tests
+- **Schema constraint violations** (data layer only): if the source file is a repository or data adapter **and** a data-schema Context Source is enabled (`.claude/config.md` § Context Sources), consult it to identify DB constraints (NOT NULL, UNIQUE, CHECK, FK) the code may silently mishandle and are not covered by existing tests. Skip if no such source is wired.
 
 ## Step 3 — Write gap tests
 
 For each gap found:
 1. Write a new test that captures it
-2. Run it with the test command from **Project Commands** in `.claude/config.md` (e.g., `flutter test <test_file_path>`)
+2. Run it with the **Run specific test file** command from **Project Commands** in `.claude/config.md`
 3. Report whether the implementation handles it correctly or fails
 
 If the implementation fails: note it as a gap requiring attention (do not fix the implementation — report it).

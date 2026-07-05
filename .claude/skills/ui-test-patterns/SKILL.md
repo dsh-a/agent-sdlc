@@ -1,12 +1,18 @@
 ---
-name: widget-test-patterns
-description: Flutter widget-test and ViewModel-test patterns — coverage matrix, setup helpers, golden tests, property-based tests, integration tests. Loaded by test and ui-story agents; single source for these patterns.
+name: ui-test-patterns
+description: UI / presentation-layer test patterns — coverage matrix, test-host setup, snapshot/golden tests, integration tests. Loaded by the test and ui-story agents; single source for these patterns. Populated per language pack.
 disable-model-invocation: true
 ---
 
 # Widget Test Patterns
 
-Conventions for testing Flutter Views and ViewModels in this codebase. Used by the `test` agent and the `ui-story` agent. Cross-references `flutter-conventions` for layer rules.
+> **This is the ACTIVE UI-test-patterns skill.** Loaded deterministically by the `test` and
+> `ui-story` agents. The body below is populated from the **`flutter` pack**
+> (`.claude/packs/flutter/ui-test-patterns.md`). To switch stacks, run `/setup` or copy
+> another pack's UI test patterns here.
+
+Conventions for testing Flutter Views and ViewModels. Used by the `test` and `ui-story`
+agents. Cross-references `project-conventions` for layer rules.
 
 ---
 
@@ -72,35 +78,21 @@ Coverage matrix:
 
 ## Golden tests
 
-Write golden tests only for Views with significant visual design or shared components. **Never auto-update goldens** — present the update command in your report for the user to run and review.
-
-Golden file location: `test/goldens/` mirroring the view path.
-
----
+Write golden tests only for Views with significant visual design or shared components. **Never auto-update goldens** — present the update command in your report for the user to run and review. Golden file location: `test/goldens/` mirroring the view path.
 
 ## Property-based tests
 
-For validation, numeric calculation, string transformation, or collection operations:
-
 ```dart
-for (final entry in {
-  5: false,
-  6: true,   // boundary
-  7: true,
-}.entries) {
+for (final entry in {5: false, 6: true /* boundary */, 7: true}.entries) {
   test('password of length ${entry.key} is ${entry.value ? "valid" : "invalid"}', () {
     expect(validatePassword('x' * entry.key).isValid, entry.value);
   });
 }
 ```
 
----
-
 ## Integration tests
 
-Write integration tests only for critical multi-screen flows. **Flag them in your report as requiring manual device execution — do not attempt to run them autonomously.** Live in `integration_test/`. Not run by pre-commit or CI by default.
-
----
+Write integration tests only for critical multi-screen flows. **Flag them in your report as requiring manual device execution.** Live in `integration_test/`.
 
 ## What NOT to do
 

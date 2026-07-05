@@ -4,6 +4,22 @@ This file is the central configuration for the agent-sdlc pipeline. Agents and s
 
 ---
 
+## Active Pack
+
+The language/framework pack this project uses. A pack supplies the conventions, test
+patterns, anti-patterns, and code idioms for one stack (`.claude/packs/<pack>/`). This field
+is informational + used by `/setup`; the *active* conventions are loaded deterministically
+from the `project-conventions` skill (see `.claude/packs/README.md` for the swap procedure).
+
+| Field | Value |
+|---|---|
+| active_pack | `flutter` |
+
+Available packs: `flutter` (default), `dotnet` (alternate template). Author a new one by
+copying `.claude/packs/dotnet/` — see `.claude/packs/README.md`.
+
+---
+
 ## Artifact Paths
 
 Every artifact is one of three classes:
@@ -125,7 +141,7 @@ Long-tail policy knobs. All default to conservative behavior.
 |---|---|---|
 | `analyzer_baseline` | `soft_warn` | `off` — no baseline tracking. `soft_warn` — record analyzer warnings at Phase 3 start; Phase 4A surfaces any new warnings introduced during the cycle but does not block. `hard_fail_if_exceeded` — same recording, but new warnings flip review verdict to REQUEST CHANGES. |
 
-Baseline is recorded into `cycle_reports/<feature>/analyzer-baseline.txt` at Phase 3 start by capturing `flutter analyze` (or the project's typecheck/lint command) output. Phase 4A re-runs and diffs.
+Baseline is recorded into `cycle_reports/<feature>/analyzer-baseline.txt` at Phase 3 start by capturing the **Analyze / lint** command (§ Project Commands) output. Phase 4A re-runs and diffs.
 
 ### Compact at phase boundaries (5.8.2)
 
@@ -156,7 +172,7 @@ Conservative defaults. Flags act as **additional** skip conditions on top of the
 | Flag | Default | Skips |
 |---|---|---|
 | `skip_predigest_if_files_lt` | 2 | Pre-digest spawn when the parent task's "Relevant Files" count is below this. (Codifies existing inline rule — small tasks don't need digestion.) |
-| `skip_preflight_if_no_existing_tests` | true | `test-preflight` spawn when grep of `test/` for the touched symbols returns no hits. (Codifies the greenfield short-circuit from 5.4.3.) |
+| `skip_preflight_if_no_existing_tests` | true | `test-preflight` spawn when grep of the **Test path glob** (§ Project Commands) for the touched symbols returns no hits. (Codifies the greenfield short-circuit from 5.4.3.) |
 | `skip_review_if_files_lt` | 0 | Review spawn when changed files below this threshold. `0` = always run review. |
 | `skip_supervisor_if_total_subtasks_lt` | 3 | Supervisor spawn for the cycle when the task list is small enough that observation overhead exceeds value. |
 
@@ -194,7 +210,7 @@ When enabled, these agents run autonomously during Phase 4A and their reports ar
 
 ## Project Commands
 
-Agents run these commands to test, lint, and generate code. Update to match your project's toolchain.
+Agents run these commands to test, lint, and generate code. Update to match your project's toolchain. Defaults below target the active pack (`flutter`).
 
 | Purpose | Command |
 |---|---|
@@ -202,8 +218,12 @@ Agents run these commands to test, lint, and generate code. Update to match your
 | Run specific test file | `flutter test <path>` |
 | Analyze / lint | `flutter analyze` |
 | Code generation | `flutter pub run build_runner build --delete-conflicting-outputs` |
+| Test path glob | `test/**` |
+| Test anti-patterns | `.claude/packs/flutter/test-antipatterns.md` |
 
-The `Code generation` command is optional — remove it if your project has no code generation step.
+- The `Code generation` command is optional — remove it if your project has no code generation step.
+- **Test path glob** is the path the silent-skip gate and preflight short-circuit scope to (default `test/**` for Flutter; .NET-style layouts use `tests/**`).
+- **Test anti-patterns** points at the regex list the cycle silent-skip gate greps changed test files against. It defaults to the active pack's file; override per-project here.
 
 ---
 
@@ -219,31 +239,54 @@ Define your project's architectural layers and import rules. The review agent ch
 |---|---|---|---|
 | Domain / Core | `lib/domain/` | Pure Dart, other domain modules | Flutter framework, data layer, `package:provider` |
 | Data / Infrastructure | `lib/data/` | Domain layer, external packages | UI layer |
-| UI / Presentation | `lib/ui/` | Domain layer via intermediaries (ViewModels, facades, use cases) | Direct data layer imports |
+| UI / Presentation | `lib/ui/` | Domain layer via intermediaries (ViewModels, facades, use cases) | Direct data-layer imports |
 
-Adapt path patterns to your project structure.
+Adapt path patterns to your project structure. (Defaults shown for the `flutter` pack — MVVM over Clean Architecture; the `dotnet` template uses `src/**/Domain|Application|Infrastructure/`.)
 
 ### Pattern Compliance
 
 Describe your project's architectural patterns. The review agent checks that changed files follow these patterns.
 
-- **State management**: _[describe your pattern — e.g., MVVM with ChangeNotifier + Provider, Riverpod, BLoC, GetX]_
+- **State management / presentation pattern**: MVVM with `ChangeNotifier` + Provider — ViewModels extend `ChangeNotifier`; Views observe via `context.watch`/`context.read`
 - **Views** never call repositories, services, or use cases directly — they go through a ViewModel or equivalent intermediary
-- **New dependencies** follow the project's DI pattern — _[describe your DI approach, e.g., Provider/MultiProvider, get_it, manual factory]_
-- **Interfaces/abstractions** are used at layer boundaries (e.g., `IRepository`, `IService`)
+- **New dependencies** follow the project's DI pattern — Provider / `MultiProvider`, wired in `lib/dependencies/`
+- **Interfaces/abstractions** are used at layer boundaries (e.g., `IRepository<T>`, `IService`)
 
 ### Convention Checks
 
 | Convention | Rule |
 |---|---|
 | Class naming | `PascalCase` |
-| Method/variable naming | `camelCase` |
-| File naming | `snake_case` |
+| Method / variable naming | `camelCase` |
+| File naming | `snake_case.dart` |
 | Private members | Leading underscore (`_field`, `_method`) |
 | Line length | 100 characters max |
-| Logging | Project logger (never `print` in production code) |
-| Error handling | Async functions have proper error handling at system boundaries (database calls, API calls, external services) |
+| Logging | Project `Logger` from package `logging` (never `print` in production code) |
+| Error handling | Async functions have proper error handling at system boundaries (Drift / Supabase / network / external services) |
 | Comments | `///` for public API documentation; inline comments explain _why_, not _what_ |
+
+---
+
+## Context Sources (MCP / RAG plug-in points)
+
+External knowledge the pipeline consults at specific stages — a documentation MCP, a
+codebase-analysis / RAG service, an ADR store, etc. The orchestrator reads this table and,
+at each listed stage, queries the enabled sources **once** and injects the result into the
+spawned agent's prompt (the same inject-downward mechanism used for known-pitfalls and the
+pre-digest). See `.claude/skills/context-sources/SKILL.md` for the full contract and
+`docs/CONTEXT-SOURCES.md` for setup. Connect the actual MCP servers in `.claude/.mcp.json`
+(template: `.claude/.mcp.json.sample`).
+
+| id | type | tool / skill | consult_at | required | enabled | query_hint |
+|---|---|---|---|---|---|---|
+| company-a-docs | mcp | `mcp__company-a-docs__search` | prd, tasks, implement, review | optional | `true` | feature name + domain keywords; engineering/product docs for the touched area |
+| codebase-rag | mcp | `mcp__codebase-rag__query` | tasks, implement, verify | optional | `false` | relevant file paths + public symbols; similar prior implementations & constraints |
+
+**Columns.**
+- **type** — `mcp` (a connected MCP server; the tool may be deferred — the consumer loads it via `ToolSearch` first) or `skill` (a local skill the orchestrator runs).
+- **consult_at** — pipeline stages where this source is queried. Vocabulary: `prd`, `tasks`, `predigest`, `implement`, `review`, `verify`. (`predigest` is excluded for cost by default — the pre-digest is a cheap summarizer.)
+- **required** — `optional`: unavailability degrades silently with a logged marker. `required`: unavailability surfaces a gate (and in autonomous mode logs `context-source <id>: DEGRADED` and proceeds). **Never mark an unreleased source `required`.**
+- **enabled** — `false` rows are skipped cleanly (e.g. `codebase-rag` until it is released and wired).
 
 ---
 

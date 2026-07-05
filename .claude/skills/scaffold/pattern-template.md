@@ -6,8 +6,8 @@ This document defines the standard structure for scaffold pattern files in `.cla
 
 ## File naming
 
-- Default / generic templates: `<pattern-name>.md` (e.g., `use-case.md`, `service.md`)
-- Project-specific patterns: `<descriptive-name>.md` (e.g., `drift-repository.md`, `supabase-service.md`)
+- Default / language-neutral shapes: `<pattern-name>.md` (e.g., `use-case.md`, `service.md`)
+- Project-specific patterns: `<descriptive-name>.md` (e.g., `efcore-repository.md`, `http-client-service.md`)
 
 ## Required sections
 
@@ -35,13 +35,13 @@ Every pattern file must include these sections:
 
 ## Template
 
-\`\`\`dart
-<Complete, copy-paste-ready Dart template with placeholders like <Name>, <Entity>, etc.>
+\`\`\`
+<Complete, copy-paste-ready template in the project's language, with placeholders like <Name>, <Entity>, etc. Pull the idiom from the active pack's scaffold-snippets.md.>
 \`\`\`
 
 ## Wiring
 
-<How to register this component — Provider, get_it, Riverpod, manual factory, etc.>
+<How to register this component — DI container, factory, etc.>
 
 ## Conventions
 
@@ -57,11 +57,11 @@ Every pattern file must include these sections:
 1. **Discover by example**: Find 2+ existing instances of the pattern in the codebase. Read them to extract the common structure.
 2. **Extract, don't invent**: The template should reflect what the project actually does, not what a textbook says. If the project uses a non-standard approach, capture that.
 3. **Include real paths**: Use the project's actual directory structure, not generic placeholders.
-4. **Mark as project-specific**: Set `Type: project-specific` and `Replaces: <template>` if it supersedes a default template.
-5. **Preserve the default template**: Don't delete default templates — just mark the project-specific file as replacing it. The scaffold agent checks for project-specific files first.
+4. **Mark as project-specific**: Set `Type: project-specific` and `Replaces: <shape>` if it supersedes a default shape.
+5. **Preserve the default shape**: Don't delete default shapes — just mark the project-specific file as replacing it. The scaffold agent checks for project-specific files first.
 
 ## Rules for the scaffold agent when reading pattern files
 
-1. **Priority order**: Project-specific pattern > default template > codebase exploration
-2. If a project-specific file exists with `Replaces: <template>`, use it instead of the default template
+1. **Priority order**: Project-specific pattern > default shape (+ pack snippets) > codebase exploration
+2. If a project-specific file exists with `Replaces: <shape>`, use it instead of the default shape
 3. If no pattern file matches, explore the codebase for existing examples before creating the component

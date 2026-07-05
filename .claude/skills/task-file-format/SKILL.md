@@ -25,13 +25,12 @@ The `generate-tasks` agent decomposes a PRD into a task file at `agent_tasks/tas
 - `test/path/to/file_test.dart` — Tests for `file.dart`
 
 ### Notes
-- Unit tests go in `test/` mirroring the `lib/` structure
-- Widget tests go in `test/` mirroring the `lib/ui/` structure
-- Use `flutter test [optional/path]` to run tests
+- Tests go in the project's test tree mirroring the source structure (per the **Test path glob** in `.claude/config.md` § Project Commands)
+- Use the **Run all tests** / **Run specific test file** commands (§ Project Commands) to run tests
 
 ## Tasks
 
-- [ ] 1.0 [kind: scaffold-syncable-entity] Parent Task Title
+- [ ] 1.0 [kind: scaffold-entity] Parent Task Title
     - [ ] 1.1 Sub-task description
     - [ ] 1.2 Sub-task description
 - [ ] 2.0 [kind: ui-story] Parent Task Title
@@ -51,7 +50,7 @@ Every parent task carries one `[kind: <name>]` tag. The orchestrator dispatches 
 | `coding` | `coding` agent (general code change — refactor, bug fix, domain/data logic, wiring; not a scaffold, UI, or test) |
 | `general-purpose` | `general-purpose` agent (last-resort escape hatch for work no other kind fits — the bare agent loads no skills, so prefer `coding` for any real code change) |
 | `scaffold` | `scaffold` agent (generic — picks pattern itself) |
-| `scaffold-syncable-entity` | `scaffold` agent, syncable-entity pattern |
+| `scaffold-entity` | `scaffold` agent, entity/model pattern |
 | `scaffold-facade` | `scaffold` agent, facade pattern |
 | `scaffold-service` | `scaffold` agent, service pattern |
 | `scaffold-use-case` | `scaffold` agent, use-case pattern |
@@ -67,9 +66,9 @@ Every parent task carries one `[kind: <name>]` tag. The orchestrator dispatches 
 - 4–6 parent tasks for typical features; 2–3 for smaller features.
 - Each parent task should be **independently mergeable and testable**.
 - Typical layering:
-  - Data layer (model, adapter, repository, DI wiring)
-  - Domain layer (use cases, facades)
-  - UI layer (ViewModel + View)
+  - Data / infrastructure layer (model, repository, DI wiring)
+  - Application / domain layer (use cases, facades, handlers)
+  - Presentation layer (controller / view-model + view)
   - Tests
   - Integration / wiring cleanup (if needed)
 

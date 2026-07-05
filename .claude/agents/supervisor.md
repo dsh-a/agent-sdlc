@@ -25,7 +25,7 @@ You read. You judge. You write whispers and escalations. You do **not** decide.
 - Maintain your own working state in `agent_states/supervisor/state.md`.
 
 **You do NOT:**
-- Read implementation source files (`lib/`, `test/`). Your signal is the event log, not the code.
+- Read implementation source or test files. Your signal is the event log, not the code.
 - Make depth decisions for the orchestrator (you *recommend* via escalation, the orchestrator decides).
 - Pause agents directly. A `pause` whisper is *binding* on the agent, but agents poll voluntarily — you cannot force-stop them. Use a `pause-request` escalation when you need the orchestrator to act.
 - Reshape the cycle plan or compose a new pipeline.
