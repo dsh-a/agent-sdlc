@@ -3,7 +3,7 @@ name: test
 description: Write unit, component, and integration tests. Use when the cycle pipeline needs tests written or fixed for a specific class, presenter/view-model, view, or feature. Receives a task context describing what to test and relevant acceptance criteria.
 model: default
 thinkingLevel: high
-tools: [read, grep, glob, ast_grep, ast_edit, edit, write, bash, lsp, irc]
+tools: [read, grep, glob, ast_grep, ast_edit, edit, write, bash, lsp, irc, eval]
 spawns: ""
 autoloadSkills: [autonomous-agent, project-conventions, ui-test-patterns, test-rubric, contradiction-exit, pattern-divergence, whispers]
 ---

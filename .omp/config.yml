@@ -35,12 +35,15 @@ tools:
 task:
   isolation:
     mode: auto
-  # Merge strategy: commit to omp/task/<id> branch, cherry-pick into parent
   mergeMode: branch
+  maxConcurrency: 4           # max parallel Phase-3 agents (tune to your CPU/budget)
+  maxRecursionDepth: 2       # agent spawning agent depth (implementer -> setup-scaffold)
+  agentIdleTtlMs: 600000     # 10 min — keep finished agents alive for irc follow-ups
 
 compaction:
   strategy: snapcompact
   thresholdPercent: -1
+  midTurnEnabled: true       # check thresholds between tool-loop requests (long Phase-3)
 
 lsp:
   enabled: true
@@ -57,3 +60,40 @@ autolearn:
   enabled: true
   autoContinue: false
   minToolCalls: 5
+
+# Advisor — second model reviews each orchestrator turn and can inject advice.
+# Catches planning mistakes, missed AC, scope drift. Uses the smol tier (cheap).
+# Enable per-session with --advisor or /advisor on.
+advisor:
+  enabled: false              # opt-in; enable when orchestrator context gets long
+  subagents: false
+  syncBacklog: off
+  immuneTurns: 3
+
+# Memory — cross-cycle learning. 'local' persists lessons to ~/.omp/agent/memory.
+# Feeds the orchestrator's context on resume and the self-improve agent.
+memory:
+  backend: local
+
+# Retry + model fallback — OpenRouter models rate-limit or go down.
+# modelFallback falls back to another available model when one is unavailable.
+retry:
+  enabled: true
+  maxRetries: 5
+  modelFallback: true
+
+# Context promotion — overflow recovery for small-context models.
+# Promotes to a larger-context sibling before falling back to compaction.
+contextPromotion:
+  enabled: true
+
+# Thinking budgets — token budgets per thinking level (used by agent thinkingLevel).
+thinkingBudgets:
+  low: 2048
+  medium: 8192
+  high: 16384
+  xhigh: 32768
+
+# Subagent service tier — inherit tracks the main agent's tier.
+tier:
+  subagent: inherit

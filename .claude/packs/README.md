@@ -21,18 +21,15 @@ packs/
 
 ## How a pack becomes active
 
-There is no runtime indirection — agents load the **`project-conventions` skill**
-deterministically via their `skills:` frontmatter. "Switching packs" means populating that
-skill (and the agent tool surface) from a pack:
-
 1. Set **Active Pack** in `.claude/config.md` (informational + used by `/setup`).
 2. Copy `packs/<lang>/conventions.md` body → `.claude/skills/project-conventions/SKILL.md`
    (keep its frontmatter). `/setup` does this for you.
 3. Point the cycle silent-skip gate at `packs/<lang>/test-antipatterns.md` (config
    § Project Commands → *Test anti-patterns*).
-4. Update each agent's `tools:` frontmatter to the pack's build/test/format commands
-   (this is static per-agent and cannot be config-driven — see `.claude/agents/README.md`).
-5. Update `.claude/config.md` § Project Commands and `.claude/settings.json` Bash allowlist.
+4. Update each agent's `tools:` frontmatter in `.omp/agents/` to the pack's build/test/format
+   commands (this is static per-agent and cannot be config-driven — see `.claude/agents/README.md`).
+5. Update `.claude/config.md` § Project Commands. Under omp, bash approval is controlled in
+   `.omp/config.yml` (`tools.approval.bash: allow`) — no per-pattern allowlist needed.
 
 ## Authoring a new pack
 

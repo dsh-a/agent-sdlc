@@ -9,13 +9,13 @@ language-agnostic: the core is stack-neutral and stack-specific rules live in a
 ```
 .omp/
   agents/            # 13 omp-native subagent definitions (frontmatter + body)
-  config.yml         # omp harness settings (modelRoles, approval, compaction, task)
+  config.yml         # omp harness settings (modelRoles, isolation, advisor, memory, retry, task, compaction)
   models.yml.sample  # OpenRouter provider config + per-tier model menu → copy to ~/.omp/agent/models.yml
   mcp.json.sample    # Context Sources MCP template → copy to .omp/mcp.json
   AGENTS.md          # this file — project context (auto-loaded by omp)
   RULES.md           # sticky hard rules (auto-loaded, always-apply)
   hooks/
-    log-event.ts     # telemetry hook (replaces .claude/hooks/log-event.py)
+    log-event.ts     # supplementary telemetry hook (native transcripts are primary)
 ```
 
 ## Where things live (hybrid — mid-migration to omp-native)
@@ -24,8 +24,7 @@ language-agnostic: the core is stack-neutral and stack-specific rules live in a
 - **Skills** — `.claude/skills/` (discovered by omp via the `claude` provider, priority 80)
 - **Packs** — `.claude/packs/` (language-specific conventions + test anti-patterns)
 - **Runtime config** — `.claude/config.md` (model tiers, project commands, architecture rules, context sources — agents read it by path)
-- **omp settings** — `.omp/config.yml` (modelRoles → OpenRouter, approval mode, compaction)
-- **Orchestrator** — `.claude/skills/cycle/SKILL.md` (the `/cycle` skill)
+- **omp settings** — `.omp/config.yml` (modelRoles → OpenRouter, native isolation, advisor, memory, retry/fallback, task concurrency, compaction, autolearn, thinking budgets)
 
 ## Model tiers → OpenRouter
 
@@ -46,7 +45,7 @@ Phase 1A  PRD creation       create-prd agent
 Phase 1C  Gate 1             user approves PRD
 Phase 2   Task generation    generate-tasks agent
 Phase 2B  Gate 2             user approves tasks
-Phase 3   Implementation     parallel agents in isolated worktrees
+Phase 3   Implementation     parallel isolated agents (omp native isolation + batch spawns + irc whispers)
 Phase 4A  Wrap-up            final tests, cycle report, verify/review
 Phase 4B  Release            push branch, open PR
 ```

@@ -89,6 +89,15 @@ Switching stacks = pointing **Active Pack** at a different `packs/<lang>/` and p
 | Agent | `adversarial-tester` | Opt-in second-pass test hardening |
 | Agent | `self-improve` | Applies pipeline improvements |
 
+**omp-native features wired in:** native task isolation (replaces manual worktrees), irc for
+whispers + escalations + monitor streaming, batch task spawns with `id`/`role`/`isolated`,
+`local://` files for on-demand shared context, native session transcripts for supervisor
+observation, `explore` bundled agent for codebase scouting, LSP-first code intelligence,
+`ast_grep`/`ast_edit` for structural edits, `todo` for phase tracking, `autolearn` for
+cross-cycle learning, `advisor` (opt-in second-model review), `memory.backend: local` for
+persistent lessons, `retry.modelFallback` for OpenRouter resilience, `contextPromotion` for
+overflow recovery, `compaction.midTurnEnabled` for long Phase-3 runs.
+
 ---
 
 ## Quick start
@@ -245,7 +254,7 @@ Phase 1A  Create PRD          (create-prd agent, you review + approve)
 Phase 1C  Gate 1              ("Proceed to tasks?")
 Phase 2   Generate task list  (generate-tasks agent, you review + approve)
 Phase 2B  Gate 2              ("Begin implementation?")
-Phase 3   Implementation      (parallel agents in isolated worktrees)
+Phase 3   Implementation      (parallel isolated agents, omp native isolation + batch spawns)
 Phase 4A  Wrap-up             (final tests, cycle report, verify + review)
 Phase 4B  Release             (push branch, open PR)
 ```

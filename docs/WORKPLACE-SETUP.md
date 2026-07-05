@@ -1,14 +1,13 @@
-# Workplace setup — onboarding guide
+# Workplace setup — onboarding guide (omp + OpenRouter)
 
-This walks a new engineer from zero to a first `/cycle` run on the `company-a` fork. The
-pipeline is language-agnostic; the default active pack is **.NET**.
+This walks a new engineer from zero to a first `/cycle` run. The pipeline is language-agnostic; the default active pack is **Flutter**.
 
 ---
 
 ## 0. Prerequisites
 
-- [Claude Code](https://claude.com/claude-code) installed and authenticated.
-- `python3` on PATH (for the telemetry hooks — built-in on macOS/Linux).
+- [omp](https://omp.sh) installed (`brew install omp` or download from omp.sh).
+- An OpenRouter account + API key ([openrouter.ai](https://openrouter.ai)).
 - Your project is a git repository.
 - Access to the team's MCP servers (e.g. `company-a-docs`) if you intend to wire them in.
 
@@ -16,95 +15,85 @@ pipeline is language-agnostic; the default active pack is **.NET**.
 
 ## 1. Install the pipeline
 
-From the fork, copy the `.claude/` directory into your project root:
+From the fork, copy `.claude/` and `.omp/` into your project root:
 
 ```bash
 cp -r /path/to/agent-sdlc/.claude/ /path/to/your-project/.claude/
+cp -r /path/to/agent-sdlc/.omp/ /path/to/your-project/.omp/
 ```
 
-This brings the orchestrator, the agent team, the skills, and the **packs**
-(`.claude/packs/dotnet`, `.claude/packs/flutter`).
+This brings the orchestrator, the agent team, the skills, the packs, and the omp adapter layer.
 
 ---
 
-## 2. Run `/setup`
+## 2. Pick your OpenRouter models
 
-In Claude Code, from your project root:
+Copy `.omp/models.yml.sample` → `~/.omp/agent/models.yml` and uncomment **one model per tier** (opus, sonnet, haiku). Uncomment the matching `equivalence.overrides` lines so each model coalesces to its canonical tier id. Set `OPENROUTER_API_KEY` in your env or `<repo>/.env`.
+
+| Tier | omp role | Used by | Canonical id |
+|---|---|---|---|
+| opus | `slow` | orchestrator (`/cycle`), verify, review | `claude-opus-4-6` |
+| sonnet | `default` / `task` | implementation agents | `claude-sonnet-4-5` |
+| haiku | `smol` | monitor, preflight, supervisor | `claude-haiku-4-5` |
+
+---
+
+## 3. Run `/setup`
+
+From your project root, launch omp and run the setup wizard:
+
+```bash
+omp
+```
+
+Then inside omp:
 
 ```
-/setup
+/skill:setup
 ```
 
-The wizard:
+The wizard detects your stack (`pubspec.yaml` → flutter, `*.sln`/`*.csproj` → dotnet, `package.json` → node), selects a pack, and generates `.claude/config.md` — Project Commands, Architecture Review Rules, Active Pack, Context Sources, and model preset. It also populates the active `project-conventions` skill from the chosen pack.
 
-1. **Detects your stack** (`*.sln`/`*.csproj` → dotnet, `pubspec.yaml` → flutter,
-   `package.json` → node) and confirms the **Active Pack**.
-2. Confirms **Project Commands** — build, test, run-one-test, analyze/lint, the **Test path
-   glob**, and the **Test anti-patterns** file.
-3. Captures **Architecture Review Rules** — your layers, import rules, presentation pattern, DI.
-4. Asks about **Context Sources** (step 4 below).
-5. Generates `.claude/config.md` and **populates** `project-conventions` from the pack.
-
-You can re-run `/setup` any time, or edit `.claude/config.md` directly — it is the single
-source of customization.
+You can also edit `.claude/config.md` directly — it is the single source of customization.
 
 ---
 
-## 3. Fill in your .NET conventions
+## 4. Connect MCPs (optional, recommended)
 
-The default `dotnet` pack ships **placeholders**. Open
-`.claude/skills/project-conventions/SKILL.md` (the active conventions) and fill in:
+Copy `.omp/mcp.json.sample` → `.omp/mcp.json` and fill in your context-source servers. Declare each in `.claude/config.md` § Context Sources with the stages it should be consulted at and `enabled: true`.
 
-- **Layer boundaries** — real path patterns + allowed/forbidden imports (also mirror these in
-  `.claude/config.md` § Layer Boundaries, which the `review` agent enforces).
-- **Test framework** — xUnit / NUnit / MSTest and your mocking library, in
-  `.claude/packs/dotnet/test-patterns.md`.
-- **Test anti-patterns** — confirm the regexes in
-  `.claude/packs/dotnet/test-antipatterns.md` match your framework (these block merges on
-  gated/swallowed/skipped assertions — getting them wrong silently disables the gate).
-
-The `flutter` pack (`.claude/packs/flutter/`) is a complete worked example to copy structure from.
+See [`CONTEXT-SOURCES.md`](CONTEXT-SOURCES.md) for the full contract.
 
 ---
 
-## 4. Wire in MCP context sources (optional, recommended)
-
-1. Copy the template: `cp .claude/.mcp.json.sample .claude/.mcp.json` and fill in your
-   servers (replace each `REPLACE_ME`). **Gitignore `.claude/.mcp.json`** — it may carry creds.
-2. Declare each source in `.claude/config.md` § Context Sources with the stages it should be
-   consulted at and `enabled: true`.
-   - `company-a-docs` ships enabled at `prd, tasks, implement, review`.
-   - `codebase-rag` ships **disabled** — leave it off until the service is released.
-3. See [`CONTEXT-SOURCES.md`](CONTEXT-SOURCES.md) for the full contract.
-
----
-
-## 5. Apply permissions (you must do this — the agent can't)
-
-The harness blocks an agent from widening its own permissions, so **you** edit
-`.claude/settings.json`:
-
-- Bash allowlist for your toolchain, e.g.:
-  `Bash(dotnet test*)`, `Bash(dotnet build*)`, `Bash(dotnet format*)`, `Bash(dotnet restore*)`,
-  `Bash(dotnet ef*)`, `Bash(git *)`, `Bash(gh pr*)`.
-- One entry per context source: `mcp__company-a-docs__*` (and `mcp__codebase-rag__*` when released).
-
-Keep the existing `hooks` block (telemetry) intact.
-
----
-
-## 6. First cycle
+## 5. First cycle
 
 ```
 /cycle Add CSV export to the reports page
 ```
 
-This runs **dry-run** by default: it produces a PRD, generates tasks, and presents a plan
-before implementing anything. Approve at Gate 1 ("Proceed to tasks?") and Gate 2 ("Begin
-implementation?"). Add `--exe` to execute straight through after planning.
+This runs **dry-run** by default: it produces a PRD, generates tasks, and presents a plan before implementing anything. Approve at Gate 1 ("Proceed to tasks?") and Gate 2 ("Begin implementation?"). Add `--exe` to execute straight through after planning.
 
-After Phase 4A, check the run report in `agent_tasks/reports/` (or your docs vault) — it
-includes a **Context Sources** section showing which sources were consulted or degraded.
+Under omp, the cycle uses:
+- **Native task isolation** — each Phase-3 agent gets its own workspace; omp merges task branches into the feature branch.
+- **irc** — supervisor whispers + escalations travel via irc (no file polling).
+- **Batch spawns** — independent tasks spawn as one `task()` call with a `tasks[]` array.
+- **`local://` files** — shared context written once, read on demand per agent (not injected as input tokens).
+- **Native transcripts** — the supervisor reads `history://<agent-id>` instead of hook-written event logs.
+
+After Phase 4A, check the run report in `agent_tasks/reports/` (or your docs vault) — it includes a **Context Sources** section showing which sources were consulted or degraded.
+
+---
+
+## 6. Optional: enable the advisor
+
+The omp advisor is a second model that reviews each orchestrator turn and can inject advice — catches planning mistakes, missed AC, scope drift. Uses the smol tier (cheap). Enable per-session:
+
+```
+/advisor on
+```
+
+Or launch with `--advisor`. The advisor is off by default; enable it when the orchestrator's context gets long or for complex multi-task cycles.
 
 ---
 
@@ -112,8 +101,9 @@ includes a **Context Sources** section showing which sources were consulted or d
 
 | Symptom | Fix |
 |---|---|
-| Agents prompt for permission on `dotnet …` | Add the Bash pattern to `.claude/settings.json` (step 5) |
-| `context-source <id>: unavailable` in the report | The MCP isn't connected — check `.claude/.mcp.json` and the `mcp__<id>__*` permission |
-| Conventions feel Flutter-y | The active pack/`project-conventions` wasn't populated — re-run `/setup` step 7 or copy from `packs/dotnet/conventions.md` |
-| Silent-skip gate never fires | The **Test anti-patterns** regexes don't match your framework — fix `packs/dotnet/test-antipatterns.md` |
-| Telemetry "not collected" in reports | Ensure the `hooks` block is in `settings.json` and `python3` is on PATH |
+| Model not found / auth error | Check `~/.omp/agent/models.yml` is filled in + `OPENROUTER_API_KEY` set in env or `.env` |
+| Agents not spawning | Check `.omp/agents/` exists and agents have `name` + `description` frontmatter |
+| `context-source <id>: unavailable` in report | The MCP isn't connected — check `.omp/mcp.json` and that the server is running |
+| Conventions feel wrong | The active pack/`project-conventions` wasn't populated — re-run `/setup` or copy from `packs/<lang>/conventions.md` |
+| Silent-skip gate never fires | The **Test anti-patterns** regexes don't match your framework — fix `packs/<lang>/test-antipatterns.md` |
+| Supervisor not emitting whispers | Check that implementation agents have `irc` in their tools and the supervisor was spawned with a valid `id` |

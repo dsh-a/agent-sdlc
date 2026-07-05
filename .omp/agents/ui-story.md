@@ -3,7 +3,7 @@ name: ui-story
 description: Implement a UI / presentation-layer feature. Use when the cycle pipeline needs a screen, component, or view-model built or modified. Receives a task description with acceptance criteria and produces implemented, tested UI code.
 model: default
 thinkingLevel: high
-tools: [read, grep, glob, ast_grep, ast_edit, edit, write, bash, lsp, irc]
+tools: [read, grep, glob, ast_grep, ast_edit, edit, write, bash, lsp, irc, browser]
 spawns: ""
 autoloadSkills: [autonomous-agent, scaffold, project-conventions, ui-test-patterns, minimalism, whispers]
 ---
