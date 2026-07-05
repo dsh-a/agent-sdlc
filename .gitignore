@@ -420,6 +420,9 @@ FodyWeavers.xsd
 .claude/improvements.md
 improvements-plan.md
 
+# Local MCP server config — may carry credentials. Commit .mcp.json.sample instead.
+.claude/.mcp.json
+
 # >>> agent-sdlc (managed — do not edit) >>>
 # Runtime artifacts: cycle state, telemetry event logs, Phase-3 worktrees.
 # Durable artifacts (agent_tasks/, documentation/) are committed; cycle/run

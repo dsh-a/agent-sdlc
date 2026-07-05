@@ -1,12 +1,13 @@
----
-name: widget-test-patterns
-description: Flutter widget-test and ViewModel-test patterns — coverage matrix, setup helpers, golden tests, property-based tests, integration tests. Loaded by test and ui-story agents; single source for these patterns.
-disable-model-invocation: true
----
+<!--
+PACK REFERENCE FILE (pack: flutter) — the original Flutter widget/ViewModel test patterns.
+Worked example for authoring a pack's UI test patterns. The ACTIVE skill agents load is
+`.claude/skills/ui-test-patterns/SKILL.md`; copy this body there to make Flutter active.
+-->
 
-# Widget Test Patterns
+# Widget Test Patterns (pack: flutter)
 
-Conventions for testing Flutter Views and ViewModels in this codebase. Used by the `test` agent and the `ui-story` agent. Cross-references `flutter-conventions` for layer rules.
+Conventions for testing Flutter Views and ViewModels. Used by the `test` and `ui-story`
+agents. Cross-references the active conventions skill for layer rules.
 
 ---
 
@@ -72,35 +73,21 @@ Coverage matrix:
 
 ## Golden tests
 
-Write golden tests only for Views with significant visual design or shared components. **Never auto-update goldens** — present the update command in your report for the user to run and review.
-
-Golden file location: `test/goldens/` mirroring the view path.
-
----
+Write golden tests only for Views with significant visual design or shared components. **Never auto-update goldens** — present the update command in your report for the user to run and review. Golden file location: `test/goldens/` mirroring the view path.
 
 ## Property-based tests
 
-For validation, numeric calculation, string transformation, or collection operations:
-
 ```dart
-for (final entry in {
-  5: false,
-  6: true,   // boundary
-  7: true,
-}.entries) {
+for (final entry in {5: false, 6: true /* boundary */, 7: true}.entries) {
   test('password of length ${entry.key} is ${entry.value ? "valid" : "invalid"}', () {
     expect(validatePassword('x' * entry.key).isValid, entry.value);
   });
 }
 ```
 
----
-
 ## Integration tests
 
-Write integration tests only for critical multi-screen flows. **Flag them in your report as requiring manual device execution — do not attempt to run them autonomously.** Live in `integration_test/`. Not run by pre-commit or CI by default.
-
----
+Write integration tests only for critical multi-screen flows. **Flag them in your report as requiring manual device execution.** Live in `integration_test/`.
 
 ## What NOT to do
 

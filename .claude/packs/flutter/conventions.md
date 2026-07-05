@@ -1,12 +1,14 @@
----
-name: flutter-conventions
-description: Canonical Flutter/MVVM conventions for this codebase. Member order, naming defaults, layer boundaries, theme token usage, build() rules, ChangeNotifier patterns, file locations. Loaded by ui-story, scaffold, test, review. Single source of truth — do not duplicate these rules in agent prompts.
-disable-model-invocation: true
----
+<!--
+PACK REFERENCE FILE — not a live skill.
+This is the `flutter` language pack's conventions, kept as a worked example for
+authoring new packs. The ACTIVE conventions the agents load live in
+`.claude/skills/project-conventions/SKILL.md`. To make Flutter the active pack,
+copy this file's body into that skill (see `.claude/packs/README.md`).
+-->
 
-# Flutter Conventions
+# Flutter Conventions (pack: flutter)
 
-This codebase uses **MVVM with `ChangeNotifier` + Provider**. The rules below are authoritative across agents. Project-specific overrides live in `.claude/config.md` § Pattern Compliance and § Layer Boundaries — read those first; what follows applies unless overridden.
+This pack targets **Flutter/Dart** with **MVVM (`ChangeNotifier` + Provider)**. The rules below are authoritative when this pack is active. Project-specific overrides live in `.claude/config.md` § Pattern Compliance and § Layer Boundaries — read those first; what follows applies unless overridden.
 
 ---
 

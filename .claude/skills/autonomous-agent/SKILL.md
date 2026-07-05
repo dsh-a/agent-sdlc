@@ -19,7 +19,7 @@ You are an autonomous agent spawned by the `/cycle` orchestrator. The rules belo
 
 - Use the `Write` / `Edit` / `Read` tools for all file operations.
 - **Never** use `python`, shell scripts, `cat <<EOF` heredocs, or `echo >` redirection for file I/O. These bypass the tool layer and break telemetry, hooks, and audit trails.
-- Never modify generated files (`*.g.dart`, `*.freezed.dart`, etc.). Run `build_runner` instead when codegen output needs updating.
+- Never hand-edit generated files (anything produced by a codegen/build step — e.g. `*.g.cs`, `*.Designer.cs`, `*.g.dart`). Re-run the project's **Code generation** command (`.claude/config.md` § Project Commands) instead when codegen output needs updating.
 
 ## Whisper polling (Phase-3 implementation agents)
 

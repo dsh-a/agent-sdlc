@@ -21,44 +21,44 @@ Read `.claude/skills/scaffold/pattern-template.md` for the required structure of
 
 ## Step 2 — Inventory existing pattern files
 
-Read files in two locations:
-- `.claude/agents/scaffold/` (excluding `templates/`) — files with `Type: project-specific` are previously discovered patterns for this project
-- `.claude/agents/scaffold/templates/` — files with `Type: template` are default templates shipped with agent-sdlc
+Read `.claude/agents/scaffold/`:
+- Files with `Type: project-specific` are previously discovered patterns for this project.
+- The remaining files are the language-neutral default pattern shapes shipped with agent-sdlc (paired with the active pack's `scaffold-snippets.md` for the idiom).
 
-Note which default templates have been superseded by a project-specific file (matched via the `Replaces` header).
+Note which default shapes have been superseded by a project-specific file (matched via the `Replaces` header).
 
 In `update` mode: also read the project-specific files to compare against current codebase state.
 
 ## Step 3 — Scan the codebase
 
-Search `lib/` for recurring patterns. For each pattern category below, find 2+ existing instances:
+Search the source tree for recurring patterns. For each pattern category below, find 2+ existing instances (the examples are language-neutral; map them to the active pack's idioms):
 
-### Domain patterns
-- **Use cases / interactors**: Classes with a single `execute()` public method that orchestrate a business operation
+### Domain / application patterns
+- **Use cases / interactors / handlers**: Classes with a single public entry method that orchestrate a business operation
 - **Facades**: Classes aggregating multiple repositories or services for a feature area
-- **Models / entities**: Data classes, often with `copyWith()`, `toJson()`/`fromJson()`, and optionally a `Syncable` mixin
+- **Models / entities**: Data classes, often with a copy/`with` idiom and serialization
 
-### Data patterns
-- **Repositories**: Classes implementing an `IRepository` interface, abstracting data access (Drift, Supabase, Hive, etc.)
-- **Adapters**: Classes implementing a `ModelAdapter` interface, converting between domain models and data layer types
-- **Services**: Classes wrapping infrastructure concerns (auth, connectivity, platform APIs, external services)
+### Data / infrastructure patterns
+- **Repositories**: Classes implementing a repository interface, abstracting data access
+- **Adapters / mappers**: Classes converting between domain models and data-layer types
+- **Services**: Classes wrapping infrastructure concerns (auth, connectivity, platform/external APIs)
 
 ### Design patterns
-- **Interfaces / contracts**: `abstract interface class` definitions at layer boundaries (repository interfaces, service contracts)
+- **Interfaces / contracts**: abstractions at layer boundaries (repository interfaces, service contracts)
 - **Commands**: Request objects paired with handlers or dispatchers
-- **Observers / events**: Domain events, event handlers, or stream-based pub/sub mechanisms
-- **Strategies**: Interchangeable algorithms behind a common abstract class or interface
+- **Observers / events**: Domain events, event handlers, or pub/sub mechanisms
+- **Strategies**: Interchangeable algorithms behind a common abstraction
 
-### UI patterns
-- **ViewModels**: `ChangeNotifier` (or equivalent) classes exposing state and actions to views
-- **Views / screens**: Widget classes consuming a ViewModel via Provider, Riverpod, BLoC, etc.
-- **Reusable widgets**: Shared UI components with a recurring structure
+### Presentation patterns
+- **Controllers / view-models / presenters**: Classes exposing state and actions to the UI
+- **Views / pages / components**: UI classes consuming a presentation object
+- **Reusable components**: Shared UI components with a recurring structure
 
 For each discovered pattern, extract:
 1. **Common structure**: class shape, constructor dependencies, method signatures
-2. **File location convention**: where these files live in `lib/`
-3. **Naming convention**: how files and classes are named (e.g., `_view_model.dart`, `_repository.dart`)
-4. **Wiring pattern**: how they're registered (Provider, get_it, Riverpod, manual factory)
+2. **File location convention**: where these files live in the source tree
+3. **Naming convention**: how files and types are named
+4. **Wiring pattern**: how they're registered (DI container, factory, etc.)
 5. **Test pattern**: where and how tests are structured for this type
 
 ## Step 4 — Present findings
@@ -67,7 +67,7 @@ Present a summary to the user:
 
 ```
 Discovered patterns:
-  - [pattern name] — [N] instances found (e.g., lib/data/repositories/user_repository.dart)
+  - [pattern name] — [N] instances found (e.g., src/Data/Repositories/UserRepository.cs)
     → Will create: .claude/agents/scaffold/[name].md
     → Replaces default template: [template name] (or "new — no default template")
 
@@ -90,10 +90,10 @@ For each approved pattern:
 
 1. Read the 2+ example files identified in Step 3
 2. Extract the common template following the standard in `pattern-template.md`
-3. Write to `.claude/agents/scaffold/<pattern-name>.md` (never write into `templates/`)
-4. If this pattern matches a default template, set `Replaces: <template-name>` in the header
+3. Write to `.claude/agents/scaffold/<pattern-name>.md`
+4. If this pattern matches a default shape, set `Replaces: <shape-name>` in the header
 
-Do NOT modify files in `.claude/agents/scaffold/templates/` — that directory is a symlink to the framework repo and is read-only. Project-specific files in the parent directory take priority via the `Replaces` header.
+Treat the shipped language-neutral pattern shapes as defaults — a project-specific file with a `Replaces` header takes priority over the shape it names.
 
 ## Step 6 — Summary
 
@@ -101,10 +101,10 @@ Present what was created:
 
 ```
 Pattern files created:
-  - .claude/agents/scaffold/<name>.md (replaces: <default template>)
+  - .claude/agents/scaffold/<name>.md (replaces: <default shape>)
   - .claude/agents/scaffold/<name>.md (new pattern)
 
-Default templates still active (no project equivalent found):
+Default shapes still active (no project equivalent found):
   - use-case.md, facade.md, ...
 
 Next steps:

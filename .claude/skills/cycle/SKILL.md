@@ -145,6 +145,17 @@ Before spawning a named implementation agent, optionally spawn a **haiku** agent
 
 **Prompt budget**: haiku prompts <200 words (single task, no background). Implementation agent prompts: task context + digest only — no instructions, those live in the agent definition.
 
+### Context Sources retrieval
+
+A reusable step invoked at five stages (`prd`, `tasks`, `implement`, `review`, `verify`). The full contract is in the `context-sources` skill; the mechanics:
+
+1. Read `.claude/config.md` § Context Sources. Select rows where `enabled` is `true` **and** `consult_at` contains the current stage. If none, skip silently.
+2. For each selected `mcp` source: load its tool via `ToolSearch` if deferred, then query it once with the row's `query_hint` plus concrete context (feature name, the task's Relevant Files, touched symbols). For `skill` sources, run the named skill.
+3. Prepend the trimmed result to the agent's spawn prompt as a `## Context: <id>` block, and instruct the agent to echo `context-sources-consulted: <ids|none>` in its handoff.
+4. **Degrade gracefully.** Unavailable (no tool match / error / timeout): `optional` → write `context-source <id>: unavailable` to the run report and proceed; `required` → gate the user (interactive) or log `context-source <id>: DEGRADED` and proceed (autonomous). Never block on an `optional` source. `enabled: false` rows are never queried.
+
+This is the same inject-downward pattern as Pre-digestion and Known pitfalls. `predigest` is intentionally **not** a consult stage by default (the pre-digest is a cheap summarizer).
+
 ### Handoff validation
 
 At every agent handoff, the orchestrator confirms the agent's frontmatter `produces:` file exists at the expected path. Missing = agent failure: re-spawn (Phase 1A / 2), escalate (Phase 3), or run **Stall salvage** (Phase 4A — already wired).
@@ -221,9 +232,12 @@ Before entering Phase 1A, route per the active `--mode`:
 
 Spawn the `create-prd` agent (model: sonnet) with the feature description. The agent explores the codebase, checks the roadmap, scans existing PRDs, and returns a complete PRD draft and file path.
 
+Run **Context Sources retrieval** for stage `prd` (see § Context Sources retrieval) and prepend any `## Context: <id>` blocks to the prompt below.
+
 ```
 Agent(subagent_type: "create-prd", model: "sonnet",
-      prompt: "Feature: [description]. [Any roadmap story number or context].")
+      prompt: "[Context blocks if any]
+               Feature: [description]. [Any roadmap story number or context].")
 ```
 
 Confirm the PRD file exists at the agent's `produces:` path. Missing = re-spawn or escalate.
@@ -251,9 +265,12 @@ Approved → Phase 2. Changes → apply, re-ask.
 
 Spawn the `generate-tasks` agent (model: sonnet) with the PRD file path. The agent assesses the codebase, decomposes the PRD, and returns a complete task file and path.
 
+Run **Context Sources retrieval** for stage `tasks` and prepend any `## Context: <id>` blocks to the prompt below.
+
 ```
 Agent(subagent_type: "generate-tasks", model: "sonnet",
-      prompt: "PRD: [prd-file-path]")
+      prompt: "[Context blocks if any]
+               PRD: [prd-file-path]")
 ```
 
 Confirm the task file exists at the agent's `produces:` path. Missing = re-spawn or escalate.
@@ -278,13 +295,13 @@ You delegate and track. You do not write code. If you ever complete work that sh
 
 ### Analyzer baseline (5.8.1)
 
-If `analyzer_baseline` in `.claude/config.md` § Hygiene flags is `soft_warn` or `hard_fail_if_exceeded`, capture the baseline at Phase 3 start:
+If `analyzer_baseline` in `.claude/config.md` § Hygiene flags is `soft_warn` or `hard_fail_if_exceeded`, capture the baseline at Phase 3 start by running the **Analyze / lint** command from `.claude/config.md` § Project Commands and redirecting its output:
 
 ```
-flutter analyze > cycle_reports/<feature>/analyzer-baseline.txt 2>&1 || true
+<analyze-lint command> > cycle_reports/<feature>/analyzer-baseline.txt 2>&1 || true
 ```
 
-(Adapt the command to the project's typecheck/lint from `.claude/config.md` § Project Commands.) Phase 4A re-runs the same command and diffs. New warnings in the diff:
+Phase 4A re-runs the same command and diffs. New warnings in the diff:
 - `soft_warn` → flagged in the run report under a new "Analyzer drift" section; cycle proceeds.
 - `hard_fail_if_exceeded` → review verdict flips to REQUEST CHANGES regardless of other findings; the diff is included in the review report.
 
@@ -294,7 +311,7 @@ If `known_pitfalls_path` in `.claude/config.md` § Hygiene flags points at an ex
 
 ```markdown
 ## <Short title>
-Globs: lib/data/**/*.dart, test/data/**
+Globs: src/**/Infrastructure/**, tests/**/Data*
 Severity: warn | hard
 Body:
 [One paragraph describing the pitfall and how to avoid it. Cite a real incident if available.]
@@ -399,9 +416,12 @@ For each parent task (independent in parallel, dependent when ready), first **cr
 
    Read the **Model Allocation** table in `.claude/config.md` for each agent's assigned model under the active preset. If no config file exists, default to sonnet for all implementation agents.
 
+   Run **Context Sources retrieval** for stage `implement` (see § Context Sources retrieval) once for the parent task — query with the task's Relevant Files + touched symbols — and reuse the result across every agent spawned for this task (do not re-query per sub-agent). Prepend any `## Context: <id>` blocks to the prompt.
+
    ```
    Agent(subagent_type: "scaffold", model: "[per config]",
          prompt: "[worktree-startup preamble — Phase-3 worktree protocol]
+                  [Context blocks if any]
                   PRD: [prd-path]
                   Source files: [paths from Relevant Files, rooted at the worktree]
                   AC (pre-extracted): [AC items from PRD]
@@ -412,7 +432,7 @@ For each parent task (independent in parallel, dependent when ready), first **cr
    - Agent marks sub-tasks `[x]` as it completes them
    - On failure/ambiguity: report to orchestrator, continue independent sub-tasks
 
-3. **Pre-flight contradiction classifier** (haiku, runs in the same task worktree after implementer commits, before test agent). Skip when `skip_preflight_if_no_existing_tests` is `true` (Per-phase skip flags in `.claude/config.md`, default true) **and** grep of `test/` for any public symbol the implementer touched returns no hits — true greenfield needs no classification.
+3. **Pre-flight contradiction classifier** (haiku, runs in the same task worktree after implementer commits, before test agent). Skip when `skip_preflight_if_no_existing_tests` is `true` (Per-phase skip flags in `.claude/config.md`, default true) **and** grep of the **Test path glob** (`.claude/config.md` § Project Commands) for any public symbol the implementer touched returns no hits — true greenfield needs no classification.
 
    ```
    Agent(subagent_type: "test-preflight", model: "haiku",
@@ -527,14 +547,8 @@ Existing-code bugs (not agent-written code):
 Per parent task, when all sub-tasks pass:
 1. **Clean-check** — assert `git status --porcelain` in the **main checkout** is empty. The orchestrator writes no implementation code, so a dirty main checkout means an agent leaked outside its worktree: abort the merge, report to the user, do not proceed.
 2. Run test + typecheck/lint commands (from **Project Commands** in `.claude/config.md`) in the task worktree.
-3. **Silent-skip gate** — grep the diff of test files (`git diff feature/[name]...HEAD -- 'test/**'` inside the worktree) for these patterns. Any hit blocks the merge:
-   ```
-   if \(find\w*\.isNotEmpty            # gated assertion
-   if \(finder\.evaluate\(\)           # same shape, different API
-   try \{[^}]*expect[^}]*\} catch      # swallowed expect
-   \.skip\(|@Skip\(|xit\(|xtest\(      # skipped tests
-   ```
-   On hit: emit `RESCUE silent-skip [task-id]: [file:line + pattern] | resolution: re-spawn test agent | artifact: [worktree path]` to monitor, then re-spawn the **test** agent in the same worktree with the offending file + matched pattern in its prompt. One retry allowed; a second hit escalates per L3 of the ladder. Scope is `test/` only — `lib/` matches are not flagged (legitimate production patterns).
+3. **Silent-skip gate** — grep the diff of test files (`git diff feature/[name]...HEAD -- '<test-glob>'` inside the worktree, where `<test-glob>` is the **Test path glob** from `.claude/config.md` § Project Commands) for the regex patterns in the active pack's **Test anti-patterns** file (`.claude/config.md` § Project Commands → *Test anti-patterns*; one regex per line, `#`-comments stripped). Any hit blocks the merge.
+   On hit: emit `RESCUE silent-skip [task-id]: [file:line + pattern] | resolution: re-spawn test agent | artifact: [worktree path]` to monitor, then re-spawn the **test** agent in the same worktree with the offending file + matched pattern in its prompt. One retry allowed; a second hit escalates per L3 of the ladder. Scope is the test glob only — production-code matches are not flagged (legitimate production patterns).
 4. Green and gate clean → ensure the task work is committed on `cycle/[story]/task-[N.0]` (conventional format), merge that branch into `feature/[name]`, mark parent `[x]`, update monitor, then **tear down the worktree**: `git worktree remove --force .claude/worktrees/[story]-task-[N.0]` and `git branch -D cycle/[story]/task-[N.0]`.
 5. Red tests → escalation ladder from L1
 
@@ -583,10 +597,12 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    If both are enabled, issue the two `Agent` calls in a **single message** so they run concurrently — verify and review share no state and must not gate each other.
 
+   Run **Context Sources retrieval** for stages `verify` and `review` (see § Context Sources retrieval) and prepend any `## Context: <id>` blocks to the respective prompts below.
+
    **Compute verify depth (5.6.6).** Before spawning verify, gather the inputs from cycle state and the git diff:
    - `files_changed_count` = `git diff [base] --name-only | wc -l`
-   - `test_files_touched` = any changed path starts with `test/`
-   - `domain_or_migration_files_touched` = any changed path under `lib/data/`, `lib/domain/`, or matches `**/migrations/**`
+   - `test_files_touched` = any changed path matches the **Test path glob** (`.claude/config.md` § Project Commands)
+   - `domain_or_migration_files_touched` = any changed path under a domain/data layer (per `.claude/config.md` § Layer Boundaries) or matches `**/migrations/**`
    - `deviations_non_empty` = cycle state `## Deviations` has entries
    - `phase3_retry_count` = count of `ESCALATION` lines (any level) in cycle state
    - `phase3_contradiction_exits` = count of `RESCUE contradiction-loop` entries in cycle state's `## Rescues`
@@ -603,7 +619,8 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    If `verify` is **enabled**: spawn the `verify` agent with the PRD path, source file paths, test file paths, pre-extracted AC, **and the computed depth**:
    ```
    Agent(subagent_type: "verify", model: [per config Model Allocation],
-         prompt: "PRD: [prd-path]. Source files: [paths]. Test files: [paths].
+         prompt: "[Context blocks if any]
+                  PRD: [prd-path]. Source files: [paths]. Test files: [paths].
                   AC: [pre-extracted]. Branch: [branch-name]. Depth: <lite|standard|deep>.
                   Report path: agent_tasks/reports/verify-[prd-stem]-[date].md — write your report there.
                   Work autonomously — no user interaction.")
@@ -612,7 +629,8 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    If `review` is **enabled**: spawn the `review` agent with the branch name:
    ```
    Agent(subagent_type: "review", model: [per config Model Allocation],
-         prompt: "Branch: [branch-name]. PRD: [prd-path].
+         prompt: "[Context blocks if any]
+                  Branch: [branch-name]. PRD: [prd-path].
                   Report path: agent_tasks/reports/review-[feature]-[date].md — write your report there.
                   Work autonomously — no user interaction.")
    ```

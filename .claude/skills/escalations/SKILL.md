@@ -35,7 +35,7 @@ One file per cycle: `agent_states/escalations.jsonl`. Append-only. One JSON obje
   ...,
   "type": "pause-request",
   "reason": "spiral detector: 3 consecutive edits failed analyze",
-  "events_seen": ["edit:lib/foo.dart", "edit:lib/foo.dart", "edit:lib/foo.dart"],
+  "events_seen": ["edit:src/Foo.cs", "edit:src/Foo.cs", "edit:src/Foo.cs"],
   "recommendation": "escalate to L3 (opus fresh attempt) or surface to user"
 }
 ```

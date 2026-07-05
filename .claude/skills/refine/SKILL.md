@@ -16,7 +16,7 @@ If `$ARGUMENTS` is empty, ask the user for a path to a story file (e.g. `documen
 
 - **Story file is destructively rewritten** as discovery happens. The `## Refinement log` appendix and `## Open questions` queue are append-only across passes.
 - **Splits are non-destructive.** New child files; parent retains original prose and gains a visible split notice. Never delete content from a parent.
-- **Codebase grounds every concrete claim.** A path, widget name, schema column, or "currently X" assertion must be verified before it survives refinement.
+- **Codebase grounds every concrete claim.** A path, type/component name, schema column, or "currently X" assertion must be verified before it survives refinement.
 - **DoR is advisory.** Emit the verdict; do not block any other workflow on it.
 - **Dialogue, not monologue.** Surface ambiguities as questions to the user. Do not invent answers.
 - **Persist the question queue** to the story file after every batch so the dialogue is resumable across sessions.
@@ -37,7 +37,7 @@ To keep the main thread cheap, delegate read-heavy and mechanical work to subage
 | 7 | Writing child files (mechanical carve-up after user confirms allocation) | main thread | inherit | low |
 | 8 | Index table maintenance | main thread | inherit | low |
 
-**Forbidden reads:** `app_database.g.dart` and any other `.g.dart` (codegen, can be 10k+ lines). Read `schema.dart` instead. Pass this rule to any spawned subagent.
+**Forbidden reads:** generated/codegen files (can be 10k+ lines — e.g. `*.g.cs`, `*.Designer.cs`, `*.g.dart`). Read the hand-authored source/schema definition instead. Pass this rule to any spawned subagent.
 
 When spawning the Explore subagent, pass `model: "haiku"` and a self-contained prompt that lists every claim to verify and the expected output format (a structured grounding table). Do not let the subagent read generated files.
 
@@ -74,9 +74,9 @@ Claim types to extract:
 
 | Claim type | How the subagent verifies |
 |---|---|
-| File path (`lib/.../foo.dart`) | `Glob` / `Read` |
-| Class / widget / function name | `grep -r "class Foo\|Foo("` |
-| Schema column / table | Read `lib/data/database/schema.dart` (NEVER `.g.dart`) |
+| File path (`src/.../Foo.cs`) | `Glob` / `Read` |
+| Class / component / function name | `grep -r "class Foo\|Foo("` |
+| Schema column / table | Read the hand-authored schema/model definition (NEVER generated files) |
 | "Currently X is at Y" / "X is a Z" | grep + structural comparison |
 | Cross-story reference (e.g. "used by 1.6") | Read the referenced story file if present |
 
@@ -88,7 +88,7 @@ Verify the following claims about the codebase. For each, return one of:
   CONTRADICTED — claim is wrong (cite actual state)
   NOT-FOUND — referenced thing does not exist
 
-Forbidden reads: any *.g.dart file.
+Forbidden reads: any generated/codegen file.
 Output a markdown table only — no prose.
 
 Claims:
@@ -192,8 +192,8 @@ The `## Refinement log` section lives at the bottom of the story file. Each refi
 ### 2026-04-28 — Pass 1
 
 **Grounding:**
-- VERIFIED: `ExerciseSearchModal` exists at `lib/ui/routine_builder/views/exercise_search_modal.dart`
-- CONTRADICTED: story claimed `_routineExerciseSets` is a `Map<String, ExerciseSet>` — actual type is `Map<String, List<ExerciseSet>>`. User confirmed story prose was outdated; rewrote.
+- VERIFIED: `OrderSearchPanel` exists at `src/Web/Components/Orders/OrderSearchPanel.cs`
+- CONTRADICTED: story claimed `_orderLines` is a `Dictionary<string, OrderLine>` — actual type is `Dictionary<string, List<OrderLine>>`. User confirmed story prose was outdated; rewrote.
 
 **Questions answered:**
 - Q (Scope): What does the AI `[⚡]` button look like when out of scope? → Hidden entirely on this screen until 1.8 ships. Story updated.
@@ -221,8 +221,8 @@ When a question cannot be answered without investigation (a design decision need
 ```markdown
 ## Open spikes
 
-- **[SPIKE-1] Drift schema impact of version-badge field**
-  Question: should `routine.version` be a stored int column or derived from a save_count tracked elsewhere? Impacts migration scope.
+- **[SPIKE-1] Schema impact of version-badge field**
+  Question: should `Order.Version` be a stored int column or derived from a save_count tracked elsewhere? Impacts migration scope.
   Blocks: AC "version badge persists across sessions"
   Time-box: 2 hours
 ```
@@ -250,8 +250,8 @@ If **S** fails (story is too large), propose a split. Present the split plan to 
 
 ```
 Proposed split of 1.51:
-  1.51.1 — Shared widget extraction (ExerciseSearchPanel, SimilarExerciseSheet, AdjustAllSheet, DropZone)
-  1.51.2 — ViewModel data-model migration (Map→List, new methods)
+  1.51.1 — Shared component extraction (OrderSearchPanel, SimilarOrderSheet, AdjustAllSheet, DropZone)
+  1.51.2 — View-model data-model migration (Map→List, new methods)
   1.51.3 — Two-pane layout + structural panel (dual-mode, search integration)
   1.51.4 — Right canvas + chip nav + phase sections
 Confirm split, adjust, or cancel?
@@ -262,8 +262,8 @@ If the user confirms the split shape, **do not write child files yet**. First pr
 ```
 Proposed prose allocation for split:
 
-  → 1.51.1 (Shared widget extraction):
-     - Component inventory rows: ExerciseSearchPanel, SimilarExerciseSheet, AdjustAllSheet, DropZone
+  → 1.51.1 (Shared component extraction):
+     - Component inventory rows: OrderSearchPanel, SimilarOrderSheet, AdjustAllSheet, DropZone
      - Special Considerations bullets 3, 4, 5, 6
      - ACs: (none directly — extraction is pre-work)
 
@@ -282,7 +282,7 @@ Proposed prose allocation for split:
      - ACs: 2, 3, 4, 5, 8, 9, 14, 17, 19, 20
 
   → Stays in parent only (archival):
-     - Original "Why here" rationale, Supabase callout, the original unsplit AC list
+     - Original "Why here" rationale, data/schema callout, the original unsplit AC list
 
 Confirm allocation, edit, or cancel?
 ```
@@ -297,8 +297,8 @@ Only after the user confirms allocation, write the children:
 2. **Parent:** prepend a visible split block immediately after the frontmatter:
    ```markdown
    > **Split on 2026-04-28** into:
-   > - [1.51.1 — Shared widget extraction](./1.51.1.md)
-   > - [1.51.2 — ViewModel data-model migration](./1.51.2.md)
+   > - [1.51.1 — Shared component extraction](./1.51.1.md)
+   > - [1.51.2 — View-model data-model migration](./1.51.2.md)
    > - [1.51.3 — Two-pane layout + structural panel](./1.51.3.md)
    > - [1.51.4 — Right canvas + chip nav + phase sections](./1.51.4.md)
    >
@@ -393,6 +393,6 @@ Stop after this output. Do not auto-loop on children, do not auto-invoke other s
 - Treat the story file as canonical. After every Step 4 batch, the file is the source of truth for in-progress refinement state.
 - Resumability: on re-invocation with `status: REFINING`, read `## Open questions` (active queue) and the latest `## Refinement log` entry. Do not re-ask checked items unless the user requests a fresh pass.
 - Never modify ROADMAP.md. The user migrates stories out of ROADMAP.md by hand.
-- Never read or modify generated files (`*.g.dart`).
+- Never read or modify generated/codegen files.
 - When in doubt about destructive vs. clarifying: if the original prose is no longer recoverable from the result, it is destructive and must be logged.
-- Token efficiency: all greps and code reads go through the haiku Explore subagent in Step 2. The main thread should not run grep/Read against `lib/` directly.
+- Token efficiency: all greps and code reads go through the haiku Explore subagent in Step 2. The main thread should not run grep/Read against the source tree directly.

@@ -65,6 +65,14 @@ Every `depth-recommendation` the supervisor emitted, with the orchestrator's dec
 |---|---|---|---|
 | — | — | — | — |
 
+## Context Sources
+
+Outcome of each Context Source consulted this cycle (per `.claude/config.md` § Context Sources). One row per (stage, source). `unavailable` / `DEGRADED` markers from graceful degradation land here. Empty = none enabled.
+
+| Stage | Source | Outcome |
+|---|---|---|
+| — | — | consulted / unavailable / DEGRADED / disabled |
+
 ## Analyzer drift (5.8.1)
 
 When `analyzer_baseline` is enabled, this section captures any new analyzer warnings introduced during the cycle (diff of Phase 4A analyze output vs. `cycle_reports/<feature>/analyzer-baseline.txt`). Empty = clean.

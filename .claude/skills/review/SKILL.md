@@ -37,5 +37,5 @@ Agent(subagent_type: "review", model: "sonnet",
 
 ## What this shim does NOT do
 
-- Re-implement the review steps. The agent owns Steps 0–7 with `flutter-conventions` and `review-report-format` skills loaded.
+- Re-implement the review steps. The agent owns Steps 0–7 with `project-conventions` and `review-report-format` skills loaded.
 - Apply non-critical fixes. The agent auto-applies Critical + Warning per `review-report-format`; Suggestions are listed only.
