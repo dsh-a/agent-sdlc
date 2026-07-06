@@ -48,7 +48,7 @@ If the AC says something **must NOT happen** under some condition, is there a `v
 Run these once across the entire test file (or files) you wrote.
 
 ### 6. Silent-skip patterns (mechanical grep)
-Grep your new test files for the active pack's **Test anti-patterns** (`.claude/config.md` § Project Commands → *Test anti-patterns*; default `.claude/packs/<pack>/test-antipatterns.md`). The family of hard fails these encode:
+Grep your new test files for the active pack's **Test anti-patterns** (`.omp/agent-config.md` § Project Commands → *Test anti-patterns*; default `.claude/packs/<pack>/test-antipatterns.md`). The family of hard fails these encode:
 
 - An assertion **gated behind a runtime check** (`if (collection.Any()) Assert…`, `if (find...isNotEmpty)`) — never fails when the thing is missing.
 - A **swallowed assertion** (`try { …Assert… } catch`) — turns failure into a silent pass.
@@ -58,7 +58,7 @@ Grep your new test files for the active pack's **Test anti-patterns** (`.claude/
 Fail → remove the guard (let the assertion fail loudly when the precondition isn't met), or rewrite as an explicit "expect absence" assertion when "absence" is the actual AC.
 
 ### 7. Schema constraints (data layer only)
-If any source file under test is a repository, adapter, or DAO in the data/infrastructure layer **and** a data-schema Context Source is enabled (`.claude/config.md` § Context Sources):
+If any source file under test is a repository, adapter, or DAO in the data/infrastructure layer **and** a data-schema Context Source is enabled (`.omp/agent-config.md` § Context Sources):
 - Consult it to identify NOT NULL / UNIQUE / CHECK / FK constraints on the touched table.
 - For each constraint not currently asserted by a test, add a violation test (or note it as a deliberate gap in the report).
 

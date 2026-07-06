@@ -45,4 +45,4 @@ services.AddScoped<PlaceOrderHandler>();
 
 > Codegen: .NET typically has no separate codegen step. If yours does (e.g. source
 > generators, `dotnet ef migrations`), set it as the **Code generation** command in
-> `.claude/config.md` § Project Commands.
+> `.omp/agent-config.md` § Project Commands.

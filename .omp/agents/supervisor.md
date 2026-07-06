@@ -89,7 +89,7 @@ For the agent named in your prompt:
 
 ### Step 3 — Apply detectors
 
-Five detectors, all running on every check. Threshold placeholders from `.claude/config.md` § Supervisor thresholds.
+Five detectors, all running on every check. Threshold placeholders from `.omp/agent-config.md` § Supervisor thresholds.
 
 **`spiral`** — same file edited ≥3 times in the recent transcript window without a Read between, OR `exit:error` appears ≥3 times consecutively. Spiral = the agent is making the same change repeatedly without learning.
 

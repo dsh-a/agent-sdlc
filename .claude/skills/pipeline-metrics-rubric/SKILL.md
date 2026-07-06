@@ -52,7 +52,7 @@ The self-improve agent reads run reports + verify audits and identifies recurrin
 - **Stall / disable frequency.** Tally `supervisor-stall` and `supervisor-disabled` rescue types across the last 5 cycles. ≥3 of 5 → **P0**.
 - **Uptime trend.** Run-report Agent Telemetry: cycles flagged "degraded" (<90% uptime) recurring → P0.
 - **Whisper precision (OQ-4 stub).** When agent return summaries include a "Whispers seen and response" line, sample and grade post-hoc. Feed grades back as a recommendation when a detector is consistently noisy.
-- **Threshold tuning.** Detector firing `pause` (3-strike) in <5% of cycles → too lax (raise sensitivity). >50% → too aggressive (lower). Edit `.claude/config.md` § Supervisor Thresholds.
+- **Threshold tuning.** Detector firing `pause` (3-strike) in <5% of cycles → too lax (raise sensitivity). >50% → too aggressive (lower). Edit `.omp/agent-config.md` § Supervisor Thresholds.
 - **Recommendation accept ratio.** Group `## Supervisor recommendations` rows by detector. Accept ratio <20% across last 5 cycles → noisy detector; adjust thresholds or disable.
 
 ### Mode + depth patterns (5.6.4 / 5.6.6)

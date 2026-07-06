@@ -33,4 +33,4 @@ Agent(subagent_type: "ui-story", model: "sonnet",
 ## What this shim does NOT do
 
 - Re-implement Step 1–8. The agent owns the workflow with `project-conventions`, `ui-test-patterns`, `whispers`, and `scaffold` skills loaded.
-- Decide presentation-layer conventions. The agent reads `project-conventions` and project overrides in `.claude/config.md` automatically.
+- Decide presentation-layer conventions. The agent reads `project-conventions` and project overrides in `.omp/agent-config.md` automatically.

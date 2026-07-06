@@ -8,7 +8,7 @@ copy this file's body into that skill (see `.claude/packs/README.md`).
 
 # Flutter Conventions (pack: flutter)
 
-This pack targets **Flutter/Dart** with **MVVM (`ChangeNotifier` + Provider)**. The rules below are authoritative when this pack is active. Project-specific overrides live in `.claude/config.md` § Pattern Compliance and § Layer Boundaries — read those first; what follows applies unless overridden.
+This pack targets **Flutter/Dart** with **MVVM (`ChangeNotifier` + Provider)**. The rules below are authoritative when this pack is active. Project-specific overrides live in `.omp/agent-config.md` § Pattern Compliance and § Layer Boundaries — read those first; what follows applies unless overridden.
 
 ---
 
@@ -126,4 +126,4 @@ Test patterns live in the `test` skill / agent. Two cross-cutting rules anchored
 - Per-pattern scaffolding detail (use the `scaffold` skill and `.claude/agents/scaffold/*.md`).
 - Widget-test patterns (use the `test` skill / agent).
 - Architecture-review rubric (use `review` agent's checklist).
-- Project-specific overrides (live in `.claude/config.md` § Pattern Compliance).
+- Project-specific overrides (live in `.omp/agent-config.md` § Pattern Compliance).

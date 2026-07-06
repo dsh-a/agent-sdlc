@@ -25,7 +25,7 @@ Read each changed source file. Identify the **public symbols touched** — class
 
 ## Step 2 — Locate referencing tests
 
-For each public symbol from Step 1, grep the project's test tree (the **Test path glob** in `.claude/config.md` § Project Commands) recursively for references. Cluster by test file and test name:
+For each public symbol from Step 1, grep the project's test tree (the **Test path glob** in `.omp/agent-config.md` § Project Commands) recursively for references. Cluster by test file and test name:
 
 ```
 tests/Foo/FooRepositoryTests

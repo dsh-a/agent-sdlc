@@ -57,11 +57,11 @@ If AC was provided in your spawn prompt, use it directly. Otherwise read the PRD
 
 ## Step 2 — Locate the test suite
 
-Use test paths from your spawn prompt if provided; otherwise search the **Test path glob** (`.claude/config.md` § Project Commands). Catalog: test file → behaviors verified.
+Use test paths from your spawn prompt if provided; otherwise search the **Test path glob** (`.omp/agent-config.md` § Project Commands). Catalog: test file → behaviors verified.
 
 ## Step 3 — Locate the implementation
 
-Use source paths from your spawn prompt if provided; otherwise search the project source tree (per § Layer Boundaries in `.claude/config.md`). Read each to understand what was implemented.
+Use source paths from your spawn prompt if provided; otherwise search the project source tree (per § Layer Boundaries in `.omp/agent-config.md`). Read each to understand what was implemented.
 
 ## Step 4 — Audit AC → test coverage
 
@@ -69,10 +69,10 @@ For each AC, apply the `ac-audit-rubric` skill: assign a verdict (PASS / WEAK / 
 
 ## Step 4b — Scope-creep audit (skip if `Depth: lite`)
 
-1. `git diff [base_branch] --name-only` to list all changed files (read `base_branch` from `.claude/config.md` § Branch Configuration; default `main`).
+1. `git diff [base_branch] --name-only` to list all changed files (read `base_branch` from `.omp/agent-config.md` § Branch Configuration; default `main`).
 2. For each: **In scope** (PRD-required) or **Out of scope** (refactors, deps, unrelated fixes).
 3. Flag out-of-scope changes — the primary source of agent-introduced regressions.
-4. **Data-layer schema check (context-gated):** if any changed files are in the data/infrastructure layer **and** a data-schema Context Source is enabled (`.claude/config.md` § Context Sources), consult it and verify the live schema matches the code's model definitions. Flag mismatches as schema drift. If no such source is wired, skip and note it as not performed.
+4. **Data-layer schema check (context-gated):** if any changed files are in the data/infrastructure layer **and** a data-schema Context Source is enabled (`.omp/agent-config.md` § Context Sources), consult it and verify the live schema matches the code's model definitions. Flag mismatches as schema drift. If no such source is wired, skip and note it as not performed.
 5. **Pattern-divergence check (5.4.5):** for each directory in the diff touching the test tree, scan whether the diff introduces a new mocking library, setup style, or async style alongside an existing one. If yes, look for a matching `deviation:` (`migrated …` or `kept directory's pattern …`). No matching deviation → silent split; mark affected ACs INCOMPLETE.
 
 ## Step 5 — Append the audit report
@@ -93,7 +93,7 @@ Check `__snapshots__/`, `test/snapshots/`, `test/goldens/`, or framework-specifi
 
 ## Step 9 — Run final checks
 
-Read **Project Commands** in `.claude/config.md`:
+Read **Project Commands** in `.omp/agent-config.md`:
 1. Typecheck + lint commands → report results.
 2. Test command (full suite, not just feature tests) → report results.
 

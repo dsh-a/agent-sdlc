@@ -15,7 +15,7 @@ Scaffold a command when the task requires encapsulating a request as an object �
 | Handler | `<domain layer>/<feature>/Commands/<Name>Handler.<ext>` |
 | Test | `<test tree>/<feature>/Commands/<Name>HandlerTests.<ext>` |
 
-Adapt paths to the project's structure (per `.claude/config.md` § Layer Boundaries).
+Adapt paths to the project's structure (per `.omp/agent-config.md` § Layer Boundaries).
 
 ## Dependencies
 
@@ -36,7 +36,7 @@ Use the active pack's `scaffold-snippets.md` for the concrete idiom. Shape:
 
 ## Wiring
 
-Register the handler in the DI container (per `.claude/config.md` § Pattern Compliance). Invokers submit commands without knowing which handler processes them.
+Register the handler in the DI container (per `.omp/agent-config.md` § Pattern Compliance). Invokers submit commands without knowing which handler processes them.
 
 ## Conventions
 

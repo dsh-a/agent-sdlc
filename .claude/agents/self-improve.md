@@ -44,7 +44,7 @@ Add a note to the most recent run report in `agent_tasks/reports/`:
 
 ## Step 5b — Aggregate bugs (5.8.4)
 
-If `.claude/config.md` § Hygiene flags has `aggregate_bugs_into` set to a non-empty path (default `documentation/bugs.md`):
+If `.omp/agent-config.md` § Hygiene flags has `aggregate_bugs_into` set to a non-empty path (default `documentation/bugs.md`):
 
 1. Scan every run report in `agent_tasks/reports/` for `## Bugs discovered` (or "Bugs discovered" sub-section) entries.
 2. For each entry, compute a stable title hash (the first line of the entry, trimmed and lowercased).

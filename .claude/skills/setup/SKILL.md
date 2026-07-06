@@ -24,7 +24,7 @@ Inspect the project root to identify the stack:
 - List the available packs under `.claude/packs/`.
 - Read the relevant manifest(s) for dependencies, framework version, and tooling.
 - Detect the test framework, linter/analyzer, and any codegen step.
-- Check for an existing `.claude/config.md` — if present, offer to update it or start fresh.
+- Check for an existing `.omp/agent-config.md` — if present, offer to update it or start fresh.
 
 Summarize findings, then confirm the **Active Pack** with the user. If no matching pack
 exists, offer to scaffold one by copying `.claude/packs/dotnet/` and filling it in.
@@ -89,7 +89,7 @@ and `docs/CONTEXT-SOURCES.md`.
 
 ## Step 7 — Generate config + activate the pack
 
-1. Generate `.claude/config.md` from all answers, following the existing template's structure
+1. Generate `.omp/agent-config.md` from all answers, following the existing template's structure
    (Active Pack, Project Commands, Architecture Review Rules, Context Sources, model preset,
    optional agents). If a config exists, show a diff and confirm before overwriting.
 2. **Activate the pack:** copy `.claude/packs/<active_pack>/conventions.md` body into
@@ -116,7 +116,7 @@ Ask: **"Scan the codebase for recurring patterns to improve scaffold accuracy?"*
 ```
 Configuration complete:
 
-  Config file:     .claude/config.md
+  Config file:     .omp/agent-config.md
   omp settings:    .omp/config.yml
   Active pack:     [flutter | dotnet | ...]
   Model preset:    [personal | team | enterprise]
@@ -127,7 +127,7 @@ Configuration complete:
   Scaffold:        [N pattern files created | using pack defaults]
 
 Next steps:
-  - Review .claude/config.md and .omp/config.yml and adjust any values
+  - Review .omp/agent-config.md and .omp/config.yml and adjust any values
   - Copy .omp/models.yml.sample → ~/.omp/agent/models.yml and pick your OpenRouter models
   - Connect MCP servers in .omp/mcp.json
   - Run /cycle to start your first feature cycle

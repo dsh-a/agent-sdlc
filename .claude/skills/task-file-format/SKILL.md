@@ -25,7 +25,7 @@ The `generate-tasks` agent decomposes a PRD into a task file at `agent_tasks/tas
 - `test/path/to/file_test.dart` — Tests for `file.dart`
 
 ### Notes
-- Tests go in the project's test tree mirroring the source structure (per the **Test path glob** in `.claude/config.md` § Project Commands)
+- Tests go in the project's test tree mirroring the source structure (per the **Test path glob** in `.omp/agent-config.md` § Project Commands)
 - Use the **Run all tests** / **Run specific test file** commands (§ Project Commands) to run tests
 
 ## Tasks

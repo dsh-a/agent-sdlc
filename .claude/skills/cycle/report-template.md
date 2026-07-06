@@ -67,7 +67,7 @@ Every `depth-recommendation` the supervisor emitted, with the orchestrator's dec
 
 ## Context Sources
 
-Outcome of each Context Source consulted this cycle (per `.claude/config.md` § Context Sources). One row per (stage, source). `unavailable` / `DEGRADED` markers from graceful degradation land here. Empty = none enabled.
+Outcome of each Context Source consulted this cycle (per `.omp/agent-config.md` § Context Sources). One row per (stage, source). `unavailable` / `DEGRADED` markers from graceful degradation land here. Empty = none enabled.
 
 | Stage | Source | Outcome |
 |---|---|---|

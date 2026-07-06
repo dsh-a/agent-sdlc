@@ -29,13 +29,13 @@ Focus on these attack vectors:
 - **Boundary violations**: max/min values, empty collections, single-element collections
 - **Concurrent state mutations**: rapid successive calls, interleaved state changes
 - **Silent shortcut detection**: would a hardcoded return value pass the existing tests?
-- **Schema constraint violations** (data layer only): if the source file is a repository or data adapter **and** a data-schema Context Source is enabled (`.claude/config.md` § Context Sources), consult it to identify DB constraints (NOT NULL, UNIQUE, CHECK, FK) the code may silently mishandle and are not covered by existing tests. Skip if no such source is wired.
+- **Schema constraint violations** (data layer only): if the source file is a repository or data adapter **and** a data-schema Context Source is enabled (`.omp/agent-config.md` § Context Sources), consult it to identify DB constraints (NOT NULL, UNIQUE, CHECK, FK) the code may silently mishandle and are not covered by existing tests. Skip if no such source is wired.
 
 ## Step 3 — Write gap tests
 
 For each gap found:
 1. Write a new test that captures it
-2. Run it with the **Run specific test file** command from **Project Commands** in `.claude/config.md`
+2. Run it with the **Run specific test file** command from **Project Commands** in `.omp/agent-config.md`
 3. Report whether the implementation handles it correctly or fails
 
 If the implementation fails: note it as a gap requiring attention (do not fix the implementation — report it).

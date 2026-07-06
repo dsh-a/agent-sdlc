@@ -62,7 +62,7 @@ If $ARGUMENTS is empty, ask the user to provide the path to a PRD file (e.g. `ag
 ### Notes
 - Unit tests go in `test/` mirroring the source structure
 - Component tests go in `test/` mirroring the UI structure
-- Use the test command from **Project Commands** in `.claude/config.md` to run tests
+- Use the test command from **Project Commands** in `.omp/agent-config.md` to run tests
 
 ## Tasks
 

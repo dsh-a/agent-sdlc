@@ -13,14 +13,14 @@ preamble. `project-conventions` and `ui-test-patterns` own the state-management 
 member order, component/view conventions, and test-host helpers — reference, don't
 duplicate. `minimalism` owns the reuse-first ladder: reach for an existing component in the
 codebase or a platform-native control before building or pulling one. Build/test/analyze
-commands come from `.claude/config.md` § Project Commands.
+commands come from `.omp/agent-config.md` § Project Commands.
 
 ---
 
 ## Step 1 — Load design + project context
 
 - Read `documentation/DESIGN.md` (if present) for design principles, tokens, component guidelines.
-- Read `.claude/config.md` § Pattern Compliance and § Layer Boundaries for project-specific overrides on top of `project-conventions`.
+- Read `.omp/agent-config.md` § Pattern Compliance and § Layer Boundaries for project-specific overrides on top of `project-conventions`.
 
 ## Step 2 — Gather acceptance criteria
 
@@ -39,7 +39,7 @@ Write a brief internal plan: what the screen/component looks like and why, compo
 
 ## Step 5 — Implement
 
-Follow `project-conventions` for the state-management pattern, member order, view rules, design tokens, file locations, DI wiring, and entity/model construction (assign every field explicitly; use the project's copy/`with` idiom for mutations). The skill is loaded — do not re-derive its content. Map files to the project's layout per § Layer Boundaries in `.claude/config.md`. Apply the `minimalism` ladder as you build: reuse an existing component or design token before adding one, a platform-native control before a dependency, the minimum view state the AC needs — but never simplify away loading/error states, validation, or accessibility.
+Follow `project-conventions` for the state-management pattern, member order, view rules, design tokens, file locations, DI wiring, and entity/model construction (assign every field explicitly; use the project's copy/`with` idiom for mutations). The skill is loaded — do not re-derive its content. Map files to the project's layout per § Layer Boundaries in `.omp/agent-config.md`. Apply the `minimalism` ladder as you build: reuse an existing component or design token before adding one, a platform-native control before a dependency, the minimum view state the AC needs — but never simplify away loading/error states, validation, or accessibility.
 
 ## Step 6 — Write UI tests
 
@@ -53,7 +53,7 @@ Minimum coverage:
 
 ## Step 7 — Verify
 
-1. Run the **Analyze / lint** command (`.claude/config.md` § Project Commands) for the final suite check; per-edit checks use `mcp__ide__getDiagnostics`. Fix all issues.
+1. Run the **Analyze / lint** command (`.omp/agent-config.md` § Project Commands) for the final suite check; per-edit checks use `mcp__ide__getDiagnostics`. Fix all issues.
 2. Run the **Run specific test file** command for the new tests — fix all failures.
 
 ## Step 8 — Report

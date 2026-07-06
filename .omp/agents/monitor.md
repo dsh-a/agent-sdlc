@@ -105,7 +105,7 @@ Resume cron: [job ID or none]
 1. Read this file + all digests in `agent_states/digests/`
 2. Skip completed phases
 3. Resume from: [specific instruction]
-4. Verify: run test and typecheck/lint commands from **Project Commands** in `.claude/config.md`, then `git status`
+4. Verify: run test and typecheck/lint commands from **Project Commands** in `.omp/agent-config.md`, then `git status`
 5. Resume state persistence (inline by default; spawn a new monitor only if `agent_messaging: true`), reuse existing digests
 ```
 

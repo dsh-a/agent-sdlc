@@ -7,7 +7,7 @@
 - **Structure:** Arrange / Act / Assert, one logical assertion target per test.
 - **Test path:** mirror source under `tests/` (e.g. `src/Orders/OrderService.cs` →
   `tests/Orders.Tests/OrderServiceTests.cs`). Configure the test glob in
-  `.claude/config.md` § Project Commands.
+  `.omp/agent-config.md` § Project Commands.
 - **Fixtures:** share setup via `IClassFixture<T>` / collection fixtures / builders; do not
   re-instantiate dependencies in every test.
 - **Async:** test `async` code with `async Task` tests and `await` — never `.Result`/`.Wait()`.

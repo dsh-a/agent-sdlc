@@ -111,16 +111,16 @@ cp -r .claude/ /path/to/your-project/.claude/
 ### 2. Run `/setup`
 
 `/setup` detects your stack (`*.sln`/`*.csproj` → dotnet, `pubspec.yaml` → flutter,
-`package.json` → node, …), selects a pack, and generates `.claude/config.md` — Project
+`package.json` → node, …), selects a pack, and generates `.omp/agent-config.md` — Project
 Commands, Architecture Review Rules, Active Pack, Context Sources, and model preset. It also
 populates the active `project-conventions` skill from the chosen pack.
 
-You can also edit `.claude/config.md` directly — it is the single source of customization.
+You can also edit `.omp/agent-config.md` directly — it is the single source of customization.
 
 ### 3. Connect your MCPs (optional but recommended)
 
 Copy `.claude/.mcp.json.sample` → `.claude/.mcp.json` and fill in your servers (e.g.
-`company-a-docs`). Declare each in `.claude/config.md` § Context Sources with the stages it
+`company-a-docs`). Declare each in `.omp/agent-config.md` § Context Sources with the stages it
 should be consulted at. See [`docs/CONTEXT-SOURCES.md`](docs/CONTEXT-SOURCES.md). The
 `codebase-rag` source ships **disabled** until it is released.
 
@@ -172,7 +172,7 @@ canonical tier id. Set `OPENROUTER_API_KEY` in your env or `<repo>/.env`.
 ### 2. Connect MCPs (omp format)
 
 Copy `.omp/mcp.json.sample` → `.omp/mcp.json` and fill in your context-source servers. Declare
-each in `.claude/config.md` § Context Sources (the orchestrator reads that table at runtime).
+each in `.omp/agent-config.md` § Context Sources (the orchestrator reads that table at runtime).
 
 ### 3. Telemetry (native transcripts + supplementary hook)
 
@@ -287,7 +287,7 @@ Resume a paused cycle: `/cycle --exe agent_states/cycle-state-[feature-name].md`
 
 ## Customizing
 
-`.claude/config.md` is the primary customization point (run `/setup`, or edit directly).
+`.omp/agent-config.md` is the primary customization point (run `/setup`, or edit directly).
 
 | What to customize | Where |
 |---|---|

@@ -23,7 +23,7 @@ language-agnostic: the core is stack-neutral and stack-specific rules live in a
 - **Agents** — `.omp/agents/` (omp-native frontmatter; bodies sourced from `.claude/agents/`)
 - **Skills** — `.claude/skills/` (discovered by omp via the `claude` provider, priority 80)
 - **Packs** — `.claude/packs/` (language-specific conventions + test anti-patterns)
-- **Runtime config** — `.claude/config.md` (model tiers, project commands, architecture rules, context sources — agents read it by path)
+- **Runtime config** — `.omp/agent-config.md` (model tiers, project commands, architecture rules, context sources — agents read it by path)
 - **omp settings** — `.omp/config.yml` (modelRoles → OpenRouter, native isolation, advisor, memory, retry/fallback, task concurrency, compaction, autolearn, thinking budgets)
 
 ## Model tiers → OpenRouter
@@ -55,5 +55,5 @@ Phase 4B  Release            push branch, open PR
 - Stack-specific content goes in a pack (`.claude/packs/<lang>/`), never in a core agent/skill.
 - Agent files in `.omp/agents/` — change behavior by editing the body (sourced from `.claude/agents/`).
 - Skill files in `.claude/skills/` — `/cycle` and other entry-point skills.
-- `.claude/config.md` — the only file users customize per-project; keep it machine-readable (tables).
+- `.omp/agent-config.md` — the only file users customize per-project; keep it machine-readable (tables).
 - When adding a new agent or skill, update README.md and the relevant sub-README.

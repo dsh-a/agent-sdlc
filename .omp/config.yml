@@ -2,7 +2,7 @@
 #
 # This is the omp HARNESS settings layer. The framework's agent-readable runtime
 # config (model tiers, project commands, architecture rules, context sources)
-# lives in .claude/config.md — agents read it by path at runtime.
+# lives in .omp/agent-config.md — agents read it by path at runtime.
 #
 # Model tier → concrete model resolution:
 #   1. Copy .omp/models.yml.sample → ~/.omp/agent/models.yml

@@ -44,7 +44,7 @@ Created the `.omp/` native adapter layer and wired OpenRouter as the model provi
 
 ### Config alignment
 
-- `.claude/config.md` Model Versions table: `opus → claude-opus-4-6`, `sonnet → claude-sonnet-4-5`, `haiku → claude-haiku-4-5` (omp canonical ids)
+- `.omp/agent-config.md` Model Versions table: `opus → claude-opus-4-6`, `sonnet → claude-sonnet-4-5`, `haiku → claude-haiku-4-5` (omp canonical ids)
 
 ### Docs
 
@@ -264,7 +264,7 @@ Cycle SKILL entry point: initialize `todo` with 7 pipeline phases. Mark `in_prog
 1. **Hook agent-id**: omp doesn't expose the subagent name to hooks via a stable env var. The hook falls back to "orchestrator". Non-fatal because the supervisor reads native transcripts (always correctly keyed by `id`).
 2. **`.claude/agents/` stale**: the `.claude/agents/` versions of monitor + supervisor still have file-based references. They're the Claude Code fallback; the `.omp/agents/` versions are omp-primary. Cycle SKILL path refs now point to `.omp/agents/`.
 3. **Claude Code compat**: untested and likely broken at the spawn layer. Accepted per the branch's purpose.
-4. **`.claude/config.md` path**: stays at `.claude/config.md` (agents read it by file path — works under omp). Renaming to `.omp/` is a follow-up.
+4. **`.omp/agent-config.md` path**: stays at `.omp/agent-config.md` (agents read it by file path — works under omp). Renaming to `.omp/` is a follow-up.
 
 ---
 
@@ -319,7 +319,7 @@ Decision: keep `.claude/agents/` and other Claude Code files in place (omp ignor
 
 - **Custom omp extensions (JS/TS hooks beyond logging)** — the current `.omp/hooks/log-event.ts` is a telemetry hook. omp hooks can also block/modify tool calls (`tool_call` event), inject context (`context` event), register slash commands, and register custom message renderers. Potential uses: a hook that auto-approves specific bash patterns based on the active pack (replacing the Claude Code per-pattern allowlist), a hook that injects known-pitfalls matching the current file context, a hook that blocks edits to generated files.
 
-- **`.claude/config.md` → `.omp/agent-config.md` rename** — 42 references across agents, skills, and packs point at `.claude/config.md`. Moving it to `.omp/agent-config.md` would fully purge the `.claude/` path from the omp-first branch. Deferred because it's a large find-replace with no behavioral change; worth doing before merging to `main`.
+- **`.omp/agent-config.md` → `.omp/agent-config.md` rename** — 42 references across agents, skills, and packs point at `.omp/agent-config.md`. Moving it to `.omp/agent-config.md` would fully purge the `.claude/` path from the omp-first branch. Deferred because it's a large find-replace with no behavioral change; worth doing before merging to `main`.
 
 - **omp `collab` (multi-agent collaboration)** — omp has a collab feature for real-time multi-agent collaboration. The cycle's Phase-3 parallel agents currently run as independent isolated spawns with no shared state. Collab could let parallel agents share a live context (e.g., two implementers working on interdependent tasks see each other's progress in real time via irc broadcast). Needs investigation — may conflict with the isolation model.
 

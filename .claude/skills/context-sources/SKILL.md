@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Context Sources
 
-A **Context Source** is external knowledge the pipeline pulls in at a specific stage: a documentation MCP (e.g. `company-a-docs`), a codebase-analysis / RAG service (e.g. `codebase-rag`), an ADR store, a design-system index, etc. Sources are declared in `.claude/config.md` § Context Sources and connected as MCP servers in `.omp/mcp.json` (template `.omp/mcp.json.sample`).
+A **Context Source** is external knowledge the pipeline pulls in at a specific stage: a documentation MCP (e.g. `company-a-docs`), a codebase-analysis / RAG service (e.g. `codebase-rag`), an ADR store, a design-system index, etc. Sources are declared in `.omp/agent-config.md` § Context Sources and connected as MCP servers in `.omp/mcp.json` (template `.omp/mcp.json.sample`).
 
 This skill defines the **contract**. The orchestrator implements it; agents only consume the injected text.
 
@@ -60,7 +60,7 @@ A source is unavailable if the MCP call errors or times out.
 ## Adding a new source
 
 1. Connect the MCP server in `.omp/mcp.json` (see `.omp/mcp.json.sample`).
-2. Add a row to `.claude/config.md` § Context Sources (id, type, tool, `consult_at`, `required`, `enabled`, `query_hint`).
+2. Add a row to `.omp/agent-config.md` § Context Sources (id, type, tool, `consult_at`, `required`, `enabled`, `query_hint`).
 3. If the source is for data-layer schema checks, the `review` / `verify` / `test-rubric` agents already have a **context-gated data-schema check** that activates when such a source is enabled.
 
 No agent or orchestrator code changes are needed — the registry drives everything.

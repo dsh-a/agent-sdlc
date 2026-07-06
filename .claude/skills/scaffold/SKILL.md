@@ -35,7 +35,7 @@ Priority order:
 2. **Default pattern** — `.claude/agents/scaffold/<name>.md` (language-neutral shape) + the active pack's `scaffold-snippets.md` for the idiom. Use as a starting point, adapt to the codebase.
 3. **No pattern file** — explore the source tree for 1–2 existing examples of the same type, extract conventions.
 
-Also read `.claude/config.md` § Architecture Review Rules for layer boundaries.
+Also read `.omp/agent-config.md` § Architecture Review Rules for layer boundaries.
 
 **Bootstrap.** If no project-specific pattern files exist at all, autonomously spawn a setup-scaffold pass before proceeding:
 
@@ -58,6 +58,6 @@ Follow the loaded pattern file end-to-end. It owns the per-type detail (file loc
 
 ## Step 5 — Verify
 
-- Run the **Analyze / lint** command (`.claude/config.md` § Project Commands)
+- Run the **Analyze / lint** command (`.omp/agent-config.md` § Project Commands)
 - Confirm the project compiles cleanly
 - List remaining steps the user needs (tests, additional wiring, schema migrations if deferred)

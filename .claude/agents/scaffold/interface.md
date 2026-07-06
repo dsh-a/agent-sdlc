@@ -14,7 +14,7 @@ Scaffold an interface when the task requires defining a contract between layers 
 | Implementation | `<data layer>/<feature>/<Name>Repository.<ext>` |
 | Test | `<test tree>/<feature>/<Name>RepositoryTests.<ext>` |
 
-Adapt paths to the project's structure (per `.claude/config.md` § Layer Boundaries). Service interfaces follow the same pattern under the services area.
+Adapt paths to the project's structure (per `.omp/agent-config.md` § Layer Boundaries). Service interfaces follow the same pattern under the services area.
 
 ## Dependencies
 
@@ -37,7 +37,7 @@ Use the active pack's `scaffold-snippets.md` (§ Interface / contract) for the c
 
 ## Wiring
 
-Bind the interface to its implementation in the DI container (per `.claude/config.md` § Pattern Compliance). Consumers depend on the interface, never the implementation directly.
+Bind the interface to its implementation in the DI container (per `.omp/agent-config.md` § Pattern Compliance). Consumers depend on the interface, never the implementation directly.
 
 ## Conventions
 

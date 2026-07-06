@@ -33,6 +33,6 @@ This branch (`feature/omp-openrouter`) targets **Oh My Pi (omp)** with models ro
 - Put **stack-specific** content in a pack (`.claude/packs/<lang>/`), never in a core agent/skill.
 - Agent files in `.omp/agents/` — change behavior by editing the body.
 - Skill files in `.claude/skills/` — `/cycle` and other entry-point skills.
-- `.claude/config.md` — the only file users customize per-project; keep it machine-readable (tables).
+- `.omp/agent-config.md` — the only file users customize per-project; keep it machine-readable (tables).
 - When adding a new agent or skill, update README.md and the relevant sub-README.
 - Internal framework R&D notes are archived under `docs/internal/`.

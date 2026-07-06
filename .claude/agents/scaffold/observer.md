@@ -15,7 +15,7 @@ Scaffold an observer when the task requires a publish-subscribe mechanism — re
 | Handler / listener | `<domain layer>/<feature>/Events/<Name>Handler.<ext>` |
 | Test | `<test tree>/<feature>/Events/<Name>HandlerTests.<ext>` |
 
-Adapt paths to the project's structure (per `.claude/config.md` § Layer Boundaries).
+Adapt paths to the project's structure (per `.omp/agent-config.md` § Layer Boundaries).
 
 ## Dependencies
 
@@ -38,7 +38,7 @@ Use the active pack's `scaffold-snippets.md` for the concrete idiom. Shape:
 
 ## Wiring
 
-Register event-handler mappings in the DI container or event-bus dispatcher (per `.claude/config.md` § Pattern Compliance). If using a stream/bus, expose it and inject it wherever events are published or consumed.
+Register event-handler mappings in the DI container or event-bus dispatcher (per `.omp/agent-config.md` § Pattern Compliance). If using a stream/bus, expose it and inject it wherever events are published or consumed.
 
 ## Conventions
 

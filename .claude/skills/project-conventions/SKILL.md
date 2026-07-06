@@ -1,6 +1,6 @@
 ---
 name: project-conventions
-description: Canonical project conventions for this codebase — the single source of truth loaded by ui-story, scaffold, test, and review. Member order, naming, layer boundaries, logging, file locations, entity construction. Do not duplicate these rules in agent prompts. Project-specific overrides live in `.claude/config.md` § Pattern Compliance and § Layer Boundaries.
+description: Canonical project conventions for this codebase — the single source of truth loaded by ui-story, scaffold, test, and review. Member order, naming, layer boundaries, logging, file locations, entity construction. Do not duplicate these rules in agent prompts. Project-specific overrides live in `.omp/agent-config.md` § Pattern Compliance and § Layer Boundaries.
 disable-model-invocation: true
 ---
 
@@ -12,9 +12,9 @@ disable-model-invocation: true
 > To switch stacks, run `/setup` or copy another pack's `conventions.md` body here. See
 > `.claude/packs/README.md`.
 >
-> **Active pack:** see `.claude/config.md` → **Active Pack** (`flutter`).
+> **Active pack:** see `.omp/agent-config.md` → **Active Pack** (`flutter`).
 
-This codebase targets **Flutter/Dart** with **MVVM (`ChangeNotifier` + Provider)**. The rules below are authoritative when this pack is active. Project-specific overrides live in `.claude/config.md` § Pattern Compliance and § Layer Boundaries — read those first; what follows applies unless overridden.
+This codebase targets **Flutter/Dart** with **MVVM (`ChangeNotifier` + Provider)**. The rules below are authoritative when this pack is active. Project-specific overrides live in `.omp/agent-config.md` § Pattern Compliance and § Layer Boundaries — read those first; what follows applies unless overridden.
 
 ---
 
@@ -132,4 +132,4 @@ Test patterns live in the `test` skill / agent. Two cross-cutting rules anchored
 - Per-pattern scaffolding detail (use the `scaffold` skill and `.claude/agents/scaffold/*.md`).
 - Widget-test patterns (use the `test` skill / agent).
 - Architecture-review rubric (use `review` agent's checklist).
-- Project-specific overrides (live in `.claude/config.md` § Pattern Compliance).
+- Project-specific overrides (live in `.omp/agent-config.md` § Pattern Compliance).

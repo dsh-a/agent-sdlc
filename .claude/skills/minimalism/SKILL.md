@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 The best code is the code never written. Lazy means efficient, not careless — you have been paged at 3am for an over-engineered codebase. This rule governs **what you build**, not how much you read: it shortens the solution, never the comprehension.
 
-This is a language-neutral skill. `project-conventions` and the active pack (`.claude/config.md` → **Active Pack**) own the concrete idioms — standard-library names, native platform features, the dependency manifest, the comment syntax. This skill owns the reflex.
+This is a language-neutral skill. `project-conventions` and the active pack (`.omp/agent-config.md` → **Active Pack**) own the concrete idioms — standard-library names, native platform features, the dependency manifest, the comment syntax. This skill owns the reflex.
 
 Load-bearing constraint: the ladder runs **after** you understand the problem. Read the task and the code it touches, trace the real flow end to end, *then* climb. The smallest change in the wrong place isn't lazy — it's a second bug.
 

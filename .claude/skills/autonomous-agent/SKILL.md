@@ -18,7 +18,7 @@ You are an autonomous agent spawned by the `/cycle` orchestrator. The rules belo
 
 - Use the `Write` / `Edit` / `Read` tools for all file operations.
 - **Never** use `python`, shell scripts, `cat <<EOF` heredocs, or `echo >` redirection for file I/O. These bypass the tool layer and break telemetry, hooks, and audit trails.
-- Never hand-edit generated files (anything produced by a codegen/build step — e.g. `*.g.dart`, `*.freezed.dart`, or another stack's output such as `*.g.cs`). Re-run the project's **Code generation** command (`.claude/config.md` § Project Commands) instead when codegen output needs updating.
+- Never hand-edit generated files (anything produced by a codegen/build step — e.g. `*.g.dart`, `*.freezed.dart`, or another stack's output such as `*.g.cs`). Re-run the project's **Code generation** command (`.omp/agent-config.md` § Project Commands) instead when codegen output needs updating.
 
 ## Code intelligence (LSP-first)
 

@@ -9,7 +9,7 @@ treat this as the canonical version and re-run `/setup` after editing.
 # .NET Conventions (pack: dotnet)
 
 This pack targets **.NET / C#**. The rules below are authoritative when this pack is
-active. Project-specific overrides live in `.claude/config.md` § Pattern Compliance and
+active. Project-specific overrides live in `.omp/agent-config.md` § Pattern Compliance and
 § Layer Boundaries — read those first; what follows applies unless overridden.
 
 > These are **placeholder defaults**. Fill in the bracketed/italic parts for your stack
@@ -26,7 +26,7 @@ active. Project-specific overrides live in `.claude/config.md` § Pattern Compli
 - **Infrastructure / Data** (EF Core, repositories, external clients) → implements domain
   abstractions. The only layer that touches the database or external services.
 
-_Map these to real paths in `.claude/config.md` § Layer Boundaries._
+_Map these to real paths in `.omp/agent-config.md` § Layer Boundaries._
 
 ## Member order
 

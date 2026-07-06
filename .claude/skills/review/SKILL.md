@@ -14,7 +14,7 @@ The branch or PR to review: **$ARGUMENTS**
 
 1. Resolve target:
    - If `$ARGUMENTS` looks like a PR number (`#123` or `123`) → use `gh pr diff [number]` as the changeset source.
-   - If a branch name → use `git diff [base]...[branch]` (read `base` from `.claude/config.md` § Branch Configuration; default `main`).
+   - If a branch name → use `git diff [base]...[branch]` (read `base` from `.omp/agent-config.md` § Branch Configuration; default `main`).
    - If empty → default to the current branch; confirm with the user.
 
 2. Spawn the `review` agent:

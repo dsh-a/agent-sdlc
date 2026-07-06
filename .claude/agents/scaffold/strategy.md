@@ -15,7 +15,7 @@ Scaffold a strategy when the task requires interchangeable algorithms or behavio
 | Context (consumer) | `<domain layer>/<feature>/<Feature>Service.<ext>` |
 | Test | `<test tree>/<feature>/Strategies/<Variant><Name>StrategyTests.<ext>` |
 
-Adapt paths to the project's structure (per `.claude/config.md` § Layer Boundaries).
+Adapt paths to the project's structure (per `.omp/agent-config.md` § Layer Boundaries).
 
 ## Dependencies
 
@@ -37,7 +37,7 @@ Use the active pack's `scaffold-snippets.md` for the concrete idiom. Shape:
 
 ## Wiring
 
-Register concrete strategies in the DI container (per `.claude/config.md` § Pattern Compliance). The context receives a strategy via constructor injection or a factory that selects the appropriate strategy at runtime (e.g. based on configuration).
+Register concrete strategies in the DI container (per `.omp/agent-config.md` § Pattern Compliance). The context receives a strategy via constructor injection or a factory that selects the appropriate strategy at runtime (e.g. based on configuration).
 
 ## Conventions
 

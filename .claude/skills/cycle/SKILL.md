@@ -4,13 +4,13 @@ disable-model-invocation: true
 
 # Cycle — SDLC Feature Pipeline
 
-You are the orchestrator. You run at the opus tier (resolve through `.claude/config.md` § Model Versions; under omp this is `modelRoles.slow`). Manage gates, delegate to agents, make judgment calls. You do not write implementation code — spawn agents for that.
+You are the orchestrator. You run at the opus tier (resolve through `.omp/agent-config.md` § Model Versions; under omp this is `modelRoles.slow`). Manage gates, delegate to agents, make judgment calls. You do not write implementation code — spawn agents for that.
 
 Feature or PRD: **$ARGUMENTS**
 
 ## Configuration
 
-Read `.claude/config.md` at startup for model allocation, effort settings, artifact paths, optional agent settings, and cycle options. Use these values throughout — do not use hardcoded defaults when the config file exists. If no config file exists, fall back to: sonnet for implementation agents, haiku for pre-digest and monitor, opus for orchestrator.
+Read `.omp/agent-config.md` at startup for model allocation, effort settings, artifact paths, optional agent settings, and cycle options. Use these values throughout — do not use hardcoded defaults when the config file exists. If no config file exists, fall back to: sonnet for implementation agents, haiku for pre-digest and monitor, opus for orchestrator.
 
 When passing `model:` to Agent calls, resolve the label (opus/sonnet/haiku) through the **Model Versions** table in config.md. Pass the specific model ID (e.g. `claude-opus-4-6`) rather than the alias label. If no Model Versions table exists, pass the alias label as-is.
 
@@ -28,7 +28,7 @@ Active cycle states:
 
 Only runtime artifacts are ignored. `agent_tasks/` (live PRD + task files) and `documentation/` are **durable** — they travel with the feature branch and must stay committed. Cycle reports and run reports are written to the external docs vault (see config **Artifact Paths**) and never land in the project repo at all.
 
-**Vault link guard** — read the **Docs Vault** section of `.claude/config.md`. If `vault_root` is non-empty, wire the vault before any report is written this cycle:
+**Vault link guard** — read the **Docs Vault** section of `.omp/agent-config.md`. If `vault_root` is non-empty, wire the vault before any report is written this cycle:
 1. Resolve `app_slug` (config value, else the basename of the repo root).
 2. Ensure the vault targets exist: `mkdir -p "{vault_root}/cycle_reports/{app_slug}" "{vault_root}/reports/{app_slug}"`.
 3. For each pair `cycle_reports → {vault_root}/cycle_reports/{app_slug}` and `agent_tasks/reports → {vault_root}/reports/{app_slug}`: if the repo path is already the correct symlink, skip; if it is a real directory, move its contents into the vault target then `rm -rf` it; finally `ln -s` the vault target to the repo path.
@@ -151,7 +151,7 @@ Write each piece of shared background to a `local://` file once. Subagents share
 
 A reusable step invoked at five stages (`prd`, `tasks`, `implement`, `review`, `verify`). The full contract is in the `context-sources` skill; the mechanics:
 
-1. Read `.claude/config.md` § Context Sources. Select rows where `enabled` is `true` **and** `consult_at` contains the current stage. If none, skip silently.
+1. Read `.omp/agent-config.md` § Context Sources. Select rows where `enabled` is `true` **and** `consult_at` contains the current stage. If none, skip silently.
 2. For each selected `mcp` source: load its tool via `ToolSearch` if deferred, then query it once with the row's `query_hint` plus concrete context (feature name, the task's Relevant Files, touched symbols). For `skill` sources, run the named skill.
 3. Write the trimmed result to `local://ctx-sources.md` (append per source). Each agent's `assignment` references this file if it needs context-source data. Instruct the agent to echo `context-sources-consulted: <ids|none>` in its handoff.
 
@@ -167,10 +167,10 @@ At every agent handoff, the orchestrator confirms the agent's frontmatter `produ
 
 All work on feature branches, never directly on the base branch.
 
-- **Naming**: read `feature_branch_pattern` from the **Branch Configuration** table in `.claude/config.md`. Default: `feature/[short-description]`, `fix/...`, or `refactor/...`
-- **Create at Phase 2B**: `git checkout -b feature/[name] [base_branch]` — where `[base_branch]` is the `base_branch` value from `.claude/config.md`
+- **Naming**: read `feature_branch_pattern` from the **Branch Configuration** table in `.omp/agent-config.md`. Default: `feature/[short-description]`, `fix/...`, or `refactor/...`
+- **Create at Phase 2B**: `git checkout -b feature/[name] [base_branch]` — where `[base_branch]` is the `base_branch` value from `.omp/agent-config.md`
 - **Parallel tasks**: each isolated agent gets its own workspace from `feature/[name]` HEAD. omp creates `omp/task/<id>` branches and cherry-picks into `feature/[name]` on completion. See **Phase-3 isolation** (§ Agent spawn rules).
-- **Merge order**: dependency order. Run the test and typecheck/lint commands (from **Project Commands** in `.claude/config.md`) after each merge.
+- **Merge order**: dependency order. Run the test and typecheck/lint commands (from **Project Commands** in `.omp/agent-config.md`) after each merge.
 - **Conflicts**: sonnet agent resolves. Ambiguous conflicts → escalate to user.
 - **After Phase 4**: do NOT merge into the base branch. User decides after `/verify` + `/review`.
 
@@ -182,7 +182,7 @@ State directory: `agent_states/` (ephemeral — deleted on completion).
 
 ### State persistence
 
-The orchestrator keeps `agent_states/cycle-state-<feature>.md` current throughout the cycle, using the template and verb list in `.omp/agents/monitor.md`. **Two modes**, selected by `agent_messaging` in `.claude/config.md` § Cycle Options (default `false`):
+The orchestrator keeps `agent_states/cycle-state-<feature>.md` current throughout the cycle, using the template and verb list in `.omp/agents/monitor.md`. **Two modes**, selected by `agent_messaging` in `.omp/agent-config.md` § Cycle Options (default `false`):
 
 - **`agent_messaging: false` (default) — inline.** *You*, the orchestrator, write the state file directly. The monitor's verb list (`GATE`, `SPAWNED`, `PARENT`, `RESCUE`, `DEVIATIONS`, `SCOPE_CHANGE`, `SUPERVISOR_HEALTH`, …) is your **checklist of what to record when**. This is the normal path and is **not** a degradation — never log it as a rescue. No background monitor is spawned. Inline is also the only mode that works without the irc tool / agent-teams.
 - **`agent_messaging: true` — delegated.** Spawn the background monitor once at Phase 3 start. The monitor blocks on `irc(op: "wait", from: "Main", timeoutMs: 0)` to receive verbs in real time — send each verb via `irc(op: "send", to: "<monitor-id>", message: "<verb>")`. It writes the state file so your context stays lean:
@@ -214,7 +214,7 @@ Inspect $ARGUMENTS:
 | Task file (`agent_tasks/tasks-*.md`) | Phase 2 review |
 | Story number (e.g., `1.6`) | Phase 1A (pre-populate from `documentation/ROADMAP.md`) |
 | Feature description (text) | Phase 1A (check ROADMAP.md for match first) |
-| Empty | Check `agent_states/` for active/paused cycles. If none: read `feature_idea_on_empty` from `.claude/config.md` Cycle Options. If true, read the Feature Ideas path from config (default `documentation/FEATURES.md`) and present any unstarted items — offer to start a cycle for one, or run `/feature-idea` to capture a new idea. If FEATURES.md doesn't exist, has no unstarted items, or `feature_idea_on_empty` is false, ask for a feature description. |
+| Empty | Check `agent_states/` for active/paused cycles. If none: read `feature_idea_on_empty` from `.omp/agent-config.md` Cycle Options. If true, read the Feature Ideas path from config (default `documentation/FEATURES.md`) and present any unstarted items — offer to start a cycle for one, or run `/feature-idea` to capture a new idea. If FEATURES.md doesn't exist, has no unstarted items, or `feature_idea_on_empty` is false, ask for a feature description. |
 
 Create/update state file immediately after determining entry point.
 
@@ -309,7 +309,7 @@ You delegate and track. You do not write code. If you ever complete work that sh
 
 ### Analyzer baseline (5.8.1)
 
-If `analyzer_baseline` in `.claude/config.md` § Hygiene flags is `soft_warn` or `hard_fail_if_exceeded`, capture the baseline at Phase 3 start by running the **Analyze / lint** command from `.claude/config.md` § Project Commands and redirecting its output:
+If `analyzer_baseline` in `.omp/agent-config.md` § Hygiene flags is `soft_warn` or `hard_fail_if_exceeded`, capture the baseline at Phase 3 start by running the **Analyze / lint** command from `.omp/agent-config.md` § Project Commands and redirecting its output:
 
 ```
 <analyze-lint command> > cycle_reports/<feature>/analyzer-baseline.txt 2>&1 || true
@@ -321,7 +321,7 @@ Phase 4A re-runs the same command and diffs. New warnings in the diff:
 
 ### Known pitfalls (5.8.3)
 
-If `known_pitfalls_path` in `.claude/config.md` § Hygiene flags points at an existing file, read it once at Phase 3.3 (before spawning implementation agents). File format:
+If `known_pitfalls_path` in `.omp/agent-config.md` § Hygiene flags points at an existing file, read it once at Phase 3.3 (before spawning implementation agents). File format:
 
 ```markdown
 ## <Short title>
@@ -335,7 +335,7 @@ For each parent task, match the task's "Relevant Files" paths against each entry
 
 ### Compact at phase boundaries (5.8.2)
 
-If `auto_compact_at_boundaries` in `.claude/config.md` § Hygiene flags is `on`, invoke `/compact` at:
+If `auto_compact_at_boundaries` in `.omp/agent-config.md` § Hygiene flags is `on`, invoke `/compact` at:
 - **Phase 2→3 transition** — after Gate 2 is approved, before any Phase 3 spawn.
 - **Phase 3→4A transition** — after the last parent task merges, before the Phase 4A wrap-up runs.
 
@@ -353,13 +353,13 @@ task(agent: "explore", context: "Run the /setup-scaffold skill in scan mode.",
 
 Run this in the background — it does not block Phase 3 from continuing. Scaffold agents spawned later will pick up the pattern files once they exist.
 
-Initialize state persistence per **§ State persistence**: by default (`agent_messaging: false`) write the state file inline — no agent spawned. Only when `agent_messaging: true`, spawn the background monitor here (model: monitor row from **Model Allocation** table in `.claude/config.md`).
+Initialize state persistence per **§ State persistence**: by default (`agent_messaging: false`) write the state file inline — no agent spawned. Only when `agent_messaging: true`, spawn the background monitor here (model: monitor row from **Model Allocation** table in `.omp/agent-config.md`).
 
 **The supervisor (item 5.5.1)** runs distinct from monitor (monitor: deterministic state archival; supervisor: heuristic observation). OQ-9 (consolidation) is deferred pending real telemetry.
 
 The supervisor is **not** a long-lived daemon and needs **no** agent-messaging. The orchestrator drives it by spawning a fresh, short-lived check per cadence tick (below); each spawn does exactly one check for one agent and exits, with continuity persisted on disk in `agent_states/supervisor/state.md`. This is what makes supervision work in environments without the irc tool / agent-teams.
 
-**Skip the supervisor entirely** when the task file has fewer than `skip_supervisor_if_total_subtasks_lt` sub-tasks (Per-phase skip flags in `.claude/config.md`, default 3) — observation overhead exceeds value on small task lists. Log the skip as `SUPERVISOR_HEALTH status:disabled spawns:0 stalls:0 heartbeat:none disabled_at:[ts] reason:skip-flag` so the run report reflects it.
+**Skip the supervisor entirely** when the task file has fewer than `skip_supervisor_if_total_subtasks_lt` sub-tasks (Per-phase skip flags in `.omp/agent-config.md`, default 3) — observation overhead exceeds value on small task lists. Log the skip as `SUPERVISOR_HEALTH status:disabled spawns:0 stalls:0 heartbeat:none disabled_at:[ts] reason:skip-flag` so the run report reflects it.
 
 **Cadence — when to spawn a check.** No messaging required; it's control-flow driven. The orchestrator spawns a `CHECK <agent-id>` at these triggers:
 1. **On wave boundary** — after spawning a parallel wave, and each time control returns from a completing background agent, spawn a check for every *still-active* agent-id. This catches mid-run `spiral` / `stall` / `drift` while other agents keep working.
@@ -560,8 +560,8 @@ Existing-code bugs (not agent-written code):
 
 Per parent task, when all sub-tasks pass:
 1. **Clean-check** — assert `git status --porcelain` in the main checkout is empty. The orchestrator writes no implementation code, so a dirty main checkout means something leaked: abort, report to the user.
-2. Run test + typecheck/lint commands (from **Project Commands** in `.claude/config.md`) in the main checkout (omp has already merged the task branch).
-3. **Silent-skip gate** — grep the diff of test files (`git diff [base]...HEAD -- '<test-glob>'`, where `<test-glob>` is the **Test path glob** from `.claude/config.md` § Project Commands) for the regex patterns in the active pack's **Test anti-patterns** file. Any hit blocks.
+2. Run test + typecheck/lint commands (from **Project Commands** in `.omp/agent-config.md`) in the main checkout (omp has already merged the task branch).
+3. **Silent-skip gate** — grep the diff of test files (`git diff [base]...HEAD -- '<test-glob>'`, where `<test-glob>` is the **Test path glob** from `.omp/agent-config.md` § Project Commands) for the regex patterns in the active pack's **Test anti-patterns** file. Any hit blocks.
    On hit: emit `RESCUE silent-skip [task-id]: [file:line + pattern] | resolution: re-spawn test agent | artifact: none` to monitor, then re-spawn the `test` agent (isolated) with the offending file + matched pattern. One retry; a second hit escalates per L3.
 4. Green and gate clean → mark parent `[x]`, update monitor. omp has already merged the task branch and cleaned up the workspace — no manual `git worktree remove` or `git branch -D` needed.
 5. Red tests → escalation ladder from L1
@@ -593,7 +593,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
 ### 4A — Wrap-up (MANDATORY — execute immediately, do not stop or ask; step 7 MUST execute even if the user skips 4B)
 
-1. Run test + typecheck/lint commands from **Project Commands** in `.claude/config.md` (final full suite). **Analyzer drift check (5.8.1):** if `analyzer_baseline` is `soft_warn` or `hard_fail_if_exceeded`, diff the current analyze output against `cycle_reports/<feature>/analyzer-baseline.txt` recorded at Phase 3 start. Append the diff (or "None") to the run report's `## Analyzer drift` section. Under `hard_fail_if_exceeded`, force the review verdict to REQUEST CHANGES if the diff is non-empty.
+1. Run test + typecheck/lint commands from **Project Commands** in `.omp/agent-config.md` (final full suite). **Analyzer drift check (5.8.1):** if `analyzer_baseline` is `soft_warn` or `hard_fail_if_exceeded`, diff the current analyze output against `cycle_reports/<feature>/analyzer-baseline.txt` recorded at Phase 3 start. Append the diff (or "None") to the run report's `## Analyzer drift` section. Under `hard_fail_if_exceeded`, force the review verdict to REQUEST CHANGES if the diff is non-empty.
 2. Mark ALL tasks and sub-tasks `[x]` in the task file (final sweep)
 3. Generate cycle report → `cycle_reports/[feature-name]-[YYYY-MM-DD].md`:
    - Summary (what was implemented, per parent task)
@@ -603,11 +603,11 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    - Scope changes (copy the cycle state's **Scope changes** section verbatim; write "None" if empty)
 4. Present cycle report to user inline
 5. Generate run report → `agent_tasks/reports/report-prd-[feature-name]-[YYYY-MM-DD].md` using template `.claude/skills/cycle/report-template.md`. **Agent Audit**, **Rescues**, and **Agent Telemetry** sections are required. Copy the **Rescues** list from the cycle state file verbatim into the run report's `## Rescues` section (write "None" if cycle state has no rescues). For Agent Telemetry, read all files in `agent_states/events/` and aggregate one row per `agent_id` — fields: `agent_type`, tool-call count, breakdown by `tool`, error count (`exit:error`), wallclock (last `ts` − first), and `stop_reason` from any `subagent_stop` line. If `agent_states/events/` is empty or missing, write *"Telemetry not collected — enable hooks per README."* in place of the table. If >10 reports exist, summarize oldest into `agent_tasks/agent_metrics.md`.
-6. **Autonomous verify & review** — read `.claude/config.md` Optional Agents section.
+6. **Autonomous verify & review** — read `.omp/agent-config.md` Optional Agents section.
 
    **Mode override:** in `--mode hotfix`, **skip the review spawn entirely** and spawn only `verify` at **lite** depth (see 5.6.6). In `--mode lean` and `--mode full`, behave as below.
 
-   **Skip flag:** when `skip_review_if_files_lt` (Per-phase skip flags in `.claude/config.md`, default 0/off) is > 0 and `git diff [base] --name-only | wc -l` is below it, also skip review. Note the skip in the run report's Agent Audit (`review: skipped — files changed N < threshold M`).
+   **Skip flag:** when `skip_review_if_files_lt` (Per-phase skip flags in `.omp/agent-config.md`, default 0/off) is > 0 and `git diff [base] --name-only | wc -l` is below it, also skip review. Note the skip in the run report's Agent Audit (`review: skipped — files changed N < threshold M`).
 
    If both are enabled, issue the two `Agent` calls in a **single message** so they run concurrently — verify and review share no state and must not gate each other.
 
@@ -615,8 +615,8 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    **Compute verify depth (5.6.6).** Before spawning verify, gather the inputs from cycle state and the git diff:
    - `files_changed_count` = `git diff [base] --name-only | wc -l`
-   - `test_files_touched` = any changed path matches the **Test path glob** (`.claude/config.md` § Project Commands)
-   - `domain_or_migration_files_touched` = any changed path under a domain/data layer (per `.claude/config.md` § Layer Boundaries) or matches `**/migrations/**`
+   - `test_files_touched` = any changed path matches the **Test path glob** (`.omp/agent-config.md` § Project Commands)
+   - `domain_or_migration_files_touched` = any changed path under a domain/data layer (per `.omp/agent-config.md` § Layer Boundaries) or matches `**/migrations/**`
    - `deviations_non_empty` = cycle state `## Deviations` has entries
    - `phase3_retry_count` = count of `ESCALATION` lines (any level) in cycle state
    - `phase3_contradiction_exits` = count of `RESCUE contradiction-loop` entries in cycle state's `## Rescues`
@@ -669,7 +669,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
 ### 4B — Release (after gate passes; user confirmation required for PARTIAL)
 
-8. Push branch, `gh pr create` targeting the `pr_target` from `.claude/config.md`
+8. Push branch, `gh pr create` targeting the `pr_target` from `.omp/agent-config.md`
 9. Update roadmap (skip if cycle didn't originate from a roadmap story):
    - `documentation/ROADMAP.md`: set story Status to `DONE` in Story Index
    - Move story's full section to `documentation/roadmap_completed.md` under the appropriate Phase heading. Mark all AC `[x]`.

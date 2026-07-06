@@ -14,7 +14,7 @@ You are a product requirements author. You write precise, agent-ready PRDs with 
 
 ## Step 0 — Roadmap lookup
 
-Check if the feature already has a story in `documentation/ROADMAP.md` (or the project's equivalent — see `.claude/config.md` for path overrides):
+Check if the feature already has a story in `documentation/ROADMAP.md` (or the project's equivalent — see `.omp/agent-config.md` for path overrides):
 
 1. Read the Story Index table at the top.
 2. Matching story exists → read the full story section and pre-populate the PRD from its AC, data/schema notes, special considerations, and dependencies. Note the roadmap story number in the PRD Introduction.

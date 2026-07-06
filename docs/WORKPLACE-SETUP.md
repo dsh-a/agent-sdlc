@@ -52,15 +52,15 @@ Then inside omp:
 /skill:setup
 ```
 
-The wizard detects your stack (`pubspec.yaml` → flutter, `*.sln`/`*.csproj` → dotnet, `package.json` → node), selects a pack, and generates `.claude/config.md` — Project Commands, Architecture Review Rules, Active Pack, Context Sources, and model preset. It also populates the active `project-conventions` skill from the chosen pack.
+The wizard detects your stack (`pubspec.yaml` → flutter, `*.sln`/`*.csproj` → dotnet, `package.json` → node), selects a pack, and generates `.omp/agent-config.md` — Project Commands, Architecture Review Rules, Active Pack, Context Sources, and model preset. It also populates the active `project-conventions` skill from the chosen pack.
 
-You can also edit `.claude/config.md` directly — it is the single source of customization.
+You can also edit `.omp/agent-config.md` directly — it is the single source of customization.
 
 ---
 
 ## 4. Connect MCPs (optional, recommended)
 
-Copy `.omp/mcp.json.sample` → `.omp/mcp.json` and fill in your context-source servers. Declare each in `.claude/config.md` § Context Sources with the stages it should be consulted at and `enabled: true`.
+Copy `.omp/mcp.json.sample` → `.omp/mcp.json` and fill in your context-source servers. Declare each in `.omp/agent-config.md` § Context Sources with the stages it should be consulted at and `enabled: true`.
 
 See [`CONTEXT-SOURCES.md`](CONTEXT-SOURCES.md) for the full contract.
 
@@ -99,7 +99,7 @@ Or launch with `--advisor`. The advisor is off by default; enable it when the or
 
 omp profiles isolate user-level MCP config and model roles per engineer. Each profile has
 its own `~/.omp/profiles/<name>/agent/` directory (MCP servers, auth). Project-level config
-(`.omp/config.yml`, `.omp/agents/`, `.claude/config.md`) is shared across all profiles.
+(`.omp/config.yml`, `.omp/agents/`, `.omp/agent-config.md`) is shared across all profiles.
 
 ```bash
 omp --profile alice    # launch with alice's MCP connections + model roles
