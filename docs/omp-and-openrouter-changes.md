@@ -9,14 +9,13 @@ Branch base: `develop` (`999ce44`). All changes are uncommitted-to-main; the bra
 ## Summary
 
 | Metric | Value |
-|---|---|
-| Commits | 7 |
-| Files changed | 32 |
-| Lines added | ~1949 |
-| Lines removed | ~467 |
+| Commits | 9 |
+| Files changed | 42 |
+| Lines added | ~2055 |
+| Lines removed | ~496 |
 | New `.omp/` files | 19 |
 | omp-native agents | 13 |
-| omp config settings | 20+ |
+| omp config settings | 25+ |
 
 ---
 
@@ -254,7 +253,7 @@ Cycle SKILL entry point: initialize `todo` with 7 pipeline phases. Mark `in_prog
 | self-improve | read, grep, glob, ast_grep, ast_edit, edit, write, lsp |
 | supervisor | read, write, glob, grep, bash, irc |
 | test-preflight | read, grep, glob |
-| test | read, grep, glob, ast_grep, ast_edit, edit, write, bash, lsp, irc, eval |
+| test | read, grep, glob, ast_grep, ast_edit, edit, write, bash, lsp, irc, eval, debug |
 | ui-story | read, grep, glob, ast_grep, ast_edit, edit, write, bash, lsp, irc, browser |
 | verify | read, grep, glob, ast_grep, ast_edit, write, edit, bash, lsp, web_search, eval |
 
@@ -263,6 +262,46 @@ Cycle SKILL entry point: initialize `todo` with 7 pipeline phases. Mark `in_prog
 ## Known limitations
 
 1. **Hook agent-id**: omp doesn't expose the subagent name to hooks via a stable env var. The hook falls back to "orchestrator". Non-fatal because the supervisor reads native transcripts (always correctly keyed by `id`).
-2. **`.claude/agents/` stale**: the `.claude/agents/` versions of monitor + supervisor still have file-based references. They're the Claude Code fallback; the `.omp/agents/` versions are omp-primary.
+2. **`.claude/agents/` stale**: the `.claude/agents/` versions of monitor + supervisor still have file-based references. They're the Claude Code fallback; the `.omp/agents/` versions are omp-primary. Cycle SKILL path refs now point to `.omp/agents/`.
 3. **Claude Code compat**: untested and likely broken at the spawn layer. Accepted per the branch's purpose.
 4. **`.claude/config.md` path**: stays at `.claude/config.md` (agents read it by file path — works under omp). Renaming to `.omp/` is a follow-up.
+
+---
+
+## Commit 8: `b334dce` — Stale ref cleanup + OpenRouter routing + debug + checkpoint + profiles
+
+### Category A — stale reference cleanup (8 files, refs updated not deleted)
+
+Decision: keep `.claude/agents/` and other Claude Code files in place (omp ignores them for agent discovery). Only update path references that the cycle SKILL or templates read by path.
+
+| File | What changed |
+|---|---|
+| `.claude/skills/cycle/SKILL.md` | `.claude/agents/monitor.md` → `.omp/agents/monitor.md`; `.claude/agents/self-improve.md` → `.omp/agents/self-improve.md` |
+| `.claude/skills/cycle/monitor.md` | `SendMessage` → `irc(op: "wait")`; worktree paths → isolated workspace paths |
+| `.claude/skills/cycle/state-template.md` | Worktree path column → task branch; dropped escalation cursor section (irc inbox replaces it) |
+| `.claude/skills/cycle/report-template.md` | `PostToolUse` hook refs → omp native transcripts (`<id>.jsonl` + `history://<id>`) |
+| `.claude/skills/setup/SKILL.md` | `.claude/.mcp.json` → `.omp/mcp.json`; dropped permission allowlist step; added omp settings confirmation step; updated summary with omp next steps |
+| `README.md` customizing table | `.claude/settings.json` → `.omp/config.yml`; added OpenRouter models, task isolation, advisor/memory rows |
+
+### Category B — OpenRouter routing optimizations
+
+**`.omp/models.yml.sample`** — per-model `compat` blocks added:
+- `openRouterRouting.only: [anthropic]` on Claude models — pins to Anthropic upstream, prevents quality degradation from fallback providers
+- `cacheControlFormat: anthropic` on Claude models — enables prompt caching on OpenRouter's `anthropic/*` models, reduces cost on repeated system prompts (significant for the cycle orchestrator)
+- `openRouterRouting.order` on non-Anthropic models — provider preference order
+
+**`.omp/config.yml`** — `providers.openrouterVariant` setting:
+- `nitro`: fastest inference (good for haiku tier — latency-sensitive monitor/preflight)
+- `floor`: cheapest (cost optimization for lightweight agents)
+- `online`: highest availability (avoid rate limits during parallel Phase-3 waves)
+- `exacto`: exact model match (no provider fallback — strictest quality)
+- `default`: standard routing
+
+### Category C — new omp tool integrations
+
+| Feature | Where | What it does |
+|---|---|---|
+| `debug` tool | `.omp/agents/test.md` | Step through failing tests with breakpoints, inspect variables, evaluate expressions — instead of reading code and guessing |
+| `checkpoint`/`rewind` | `.claude/skills/cycle/SKILL.md` | Orchestrator checkpoints before risky ops (L3 reverts, scope changes, complex merges); rewinds on failure instead of full cycle restart |
+| Profiles | `docs/WORKPLACE-SETUP.md` | `omp --profile <name>` for team workflows — isolated MCP + model roles per engineer, shared pipeline config |
+| `statusLine` | `.omp/config.yml` | `preset: full` — show model + cwd + git branch in TUI |
