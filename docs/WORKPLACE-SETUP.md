@@ -110,6 +110,20 @@ Use profiles when team members have different OpenRouter accounts, different MCP
 (e.g., personal docs vs. team docs), or different model tier preferences (one on Claude,
 another on GPT). The pipeline config is shared; only user-level settings are isolated.
 
+## 8. Sharing sessions
+
+omp can export, share, fork, and resume sessions. After a cycle completes:
+
+```bash
+/session export   # save the full orchestrator transcript as a shareable file
+/session share    # generate a share link for another engineer to review
+/session fork     # fork the session to try a different approach without losing the original
+```
+
+A completed cycle's session transcript is a conversational artifact alongside the cycle
+report and run report. Use `/session export` before `/cycle` cleanup to preserve the
+orchestrator's decision-making for team review or post-mortem analysis.
+
 ---
 
 ## Troubleshooting

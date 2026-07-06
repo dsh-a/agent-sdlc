@@ -48,8 +48,12 @@ Current branch:
 
 Dry-run by default. Completes Phases 1–2 and Phase 3 dependency analysis, then presents a plan (agent assignments, models, parallelism) without spawning implementation agents.
 
-Pass `--exe` to execute: `/cycle --exe Add workout templates`
-
+**Under omp**, the dry-run maps to omp's native plan mode. Launch the session with `--plan`:
+```bash
+omp --plan
+/cycle Add CSV export to the reports page
+```
+omp plan mode restricts tools to `read`/`search`/`find`/`lsp`/`web_search` — no writes, no task spawns — preventing accidental implementation during dry-run. This is the equivalent of running `/cycle` without `--exe`, but enforced at the harness level. When `--plan` is active, skip the `--exe` flag entirely (plan mode cannot spawn agents).
 Also accepts PRD paths, task file paths, or state files (for resume). Resuming from a state file implies `--exe`.
 
 Pass `--manual` to use manual mode: `/cycle --manual agent_tasks/tasks-prd-feature.md`

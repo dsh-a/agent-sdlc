@@ -86,6 +86,7 @@ providers:
       # Uncomment ONE. For this tier, consider providers.openrouterVariant: nitro
       # (fastest inference — these agents are latency-sensitive) or floor (cheapest).
       # Uncomment ONE:
+
       # - id: anthropic/claude-haiku-4.5
       #   name: Claude Haiku 4.5 (OpenRouter)
       #   input: [text, image]
@@ -123,3 +124,13 @@ equivalence:
     # openrouter/anthropic/claude-haiku-4.5: claude-haiku-4-5
     # openrouter/google/gemini-2.5-flash: claude-haiku-4-5
     # openrouter/deepseek/deepseek-chat: claude-haiku-4-5
+
+# ── OpenRouter extraBody (optional, per-model) ─────────────────────────
+# The compat.extraBody field sends arbitrary top-level fields to OpenRouter
+# on every request. Use for team-specific gateway hints or controller selectors.
+# Add to any model's compat block (see the opus tier models above for the slot):
+#
+#   compat:
+#     extraBody:
+#       gateway: m1-01        # route to a specific provider pool
+#       controller: mlx       # pin to a specific provider controller
