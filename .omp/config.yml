@@ -20,6 +20,15 @@ modelProviderOrder:
   - openrouter
   - anthropic
 
+# OpenRouter variant — global speed/availability preference.
+# nitro: fastest (good for haiku tier — latency-sensitive monitor/preflight)
+# floor: cheapest (cost optimization for lightweight agents)
+# online: highest availability (avoid rate limits during parallel Phase-3 waves)
+# exacto: exact model match (no provider fallback — strictest quality)
+# default: standard routing
+providers:
+  openrouterVariant: default
+
 # Auto-approve workspace writes + bash so the cycle pipeline runs autonomously.
 # Narrow to tools.approval.bash: prompt if you want per-command gating.
 tools:
@@ -88,6 +97,16 @@ contextPromotion:
   enabled: true
 
 # Thinking budgets — token budgets per thinking level (used by agent thinkingLevel).
+thinkingBudgets:
+  low: 2048
+  medium: 8192
+  high: 16384
+  xhigh: 32768
+
+# Status line — show cycle phase from the todo tool in the TUI.
+# The 'full' preset shows model + cwd + git branch; add todo phase via custom segments.
+statusLine:
+  preset: full
 thinkingBudgets:
   low: 2048
   medium: 8192

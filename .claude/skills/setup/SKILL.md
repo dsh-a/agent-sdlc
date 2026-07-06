@@ -79,12 +79,12 @@ codebase-analysis / RAG service, an ADR store). For each:
 1. **id** and **type** (`mcp` / `skill`) and the tool/skill name.
 2. **consult_at** stages — `prd`, `tasks`, `predigest`, `implement`, `review`, `verify`.
 3. **required** — `optional` (default) or `required` (never for an unreleased source).
-4. **enabled** — `false` until the MCP server is actually connected in `.claude/.mcp.json`.
+4. **enabled** — `false` until the MCP server is actually connected in `.omp/mcp.json`.
 5. a **query_hint**.
 
 Write these as rows in `config.md` § Context Sources, and remind the user to connect the
-servers in `.claude/.mcp.json` (template `.claude/.mcp.json.sample`) and to add the matching
-`mcp__<id>__*` permission in `.claude/settings.json`. See `.claude/skills/context-sources/SKILL.md`
+servers in `.omp/mcp.json` (template `.omp/mcp.json.sample`). Under omp, MCP tools are
+auto-discovered — no permission allowlist needed. See `.claude/skills/context-sources/SKILL.md`
 and `docs/CONTEXT-SOURCES.md`.
 
 ## Step 7 — Generate config + activate the pack
@@ -96,11 +96,13 @@ and `docs/CONTEXT-SOURCES.md`.
    `.claude/skills/project-conventions/SKILL.md` (preserve its frontmatter), and the pack's
    `ui-test-patterns.md` into `.claude/skills/ui-test-patterns/SKILL.md` if present.
 
-## Step 8 — Update permissions
+## Step 8 — Confirm omp settings
 
-Remind the user to align `.claude/settings.json` Bash allowlist with the chosen toolchain
-(e.g. `Bash(flutter test*)`, `Bash(flutter analyze*)`) and add any `mcp__<source>__*` entries.
-(The agent cannot self-edit `settings.json` — the user applies this.)
+Remind the user that `.omp/config.yml` controls bash approval (`tools.approval.bash: allow`),
+task isolation, model roles, and other omp harness settings. The framework defaults are
+sensible for most projects — adjust only if needed (e.g., `task.maxConcurrency` for a
+smaller machine, `advisor.enabled: true` for complex cycles). No per-pattern Bash allowlist
+is needed under omp (unlike Claude Code's `.claude/settings.json`).
 
 ## Step 9 — Scaffold pattern discovery
 
@@ -115,6 +117,7 @@ Ask: **"Scan the codebase for recurring patterns to improve scaffold accuracy?"*
 Configuration complete:
 
   Config file:     .claude/config.md
+  omp settings:    .omp/config.yml
   Active pack:     [flutter | dotnet | ...]
   Model preset:    [personal | team | enterprise]
   Architecture:    [layers summary]
@@ -124,7 +127,7 @@ Configuration complete:
   Scaffold:        [N pattern files created | using pack defaults]
 
 Next steps:
-  - Review .claude/config.md and adjust any values
-  - Connect MCP servers in .claude/.mcp.json and update settings.json permissions
+  - Review .claude/config.md and .omp/config.yml and adjust any values
+  - Copy .omp/models.yml.sample → ~/.omp/agent/models.yml and pick your OpenRouter models
+  - Connect MCP servers in .omp/mcp.json
   - Run /cycle to start your first feature cycle
-```

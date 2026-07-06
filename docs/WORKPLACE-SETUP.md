@@ -95,6 +95,21 @@ The omp advisor is a second model that reviews each orchestrator turn and can in
 
 Or launch with `--advisor`. The advisor is off by default; enable it when the orchestrator's context gets long or for complex multi-task cycles.
 
+## 7. Team workflows (profiles)
+
+omp profiles isolate user-level MCP config and model roles per engineer. Each profile has
+its own `~/.omp/profiles/<name>/agent/` directory (MCP servers, auth). Project-level config
+(`.omp/config.yml`, `.omp/agents/`, `.claude/config.md`) is shared across all profiles.
+
+```bash
+omp --profile alice    # launch with alice's MCP connections + model roles
+omp --profile bob      # launch with bob's — different OpenRouter models, same pipeline
+```
+
+Use profiles when team members have different OpenRouter accounts, different MCP servers
+(e.g., personal docs vs. team docs), or different model tier preferences (one on Claude,
+another on GPT). The pipeline config is shared; only user-level settings are isolated.
+
 ---
 
 ## Troubleshooting

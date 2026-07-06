@@ -34,7 +34,7 @@ Silent substitutions and recoveries during the cycle (copied verbatim from cycle
 
 ## Agent Telemetry
 
-Aggregated from `agent_states/events/*.jsonl` (PostToolUse + SubagentStop hooks). One row per `agent_id`. If `agent_states/events/` is empty or missing, write: *"Telemetry not collected — enable hooks per README."*
+Aggregated from omp native session transcripts (`<id>.jsonl` artifacts + `history://<id>`) or the supplementary hook log (`agent_states/events/*.jsonl`). One row per `agent_id`. If no transcripts or event logs exist, write: *"Telemetry not collected."*
 
 | Agent ID | Type | Tool calls | Breakdown | Errors | Wallclock | Stop reason |
 |---|---|---|---|---|---|---|

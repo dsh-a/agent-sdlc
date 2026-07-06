@@ -6,6 +6,19 @@
 #
 # Verify current model ids at https://openrouter.ai/models before use.
 # Prices below are illustrative — confirm on OpenRouter.
+#
+# OpenRouter routing + caching:
+#   - openRouterRouting.only: pin to specific upstream providers (quality control)
+#   - openRouterRouting.order: prefer providers in order (fallback preference)
+#   - cacheControlFormat: anthropic enables prompt caching on anthropic/* models
+#     (reduces cost on repeated system prompts — significant for the cycle orchestrator)
+#
+# OpenRouter variant (set in .omp/config.yml → providers.openrouterVariant):
+#   - default: standard routing
+#   - nitro: fastest inference (higher cost, lower latency — good for haiku tier)
+#   - floor: cheapest available (cost optimization — good for haiku tier)
+#   - online: highest availability (avoid rate limits during parallel Phase-3 waves)
+#   - exacto: exact model match (no provider fallback — strictest quality)
 
 providers:
   openrouter:
@@ -15,6 +28,8 @@ providers:
     authHeader: true
     models:
       # ── opus tier (slow role: orchestrator, verify, review) ──────────
+      # Uncomment ONE. For Claude models, cacheControlFormat: anthropic enables
+      # prompt caching (reduces cost on the orchestrator's repeated system prompt).
       # Uncomment ONE:
       # - id: anthropic/claude-opus-4.1
       #   name: Claude Opus 4.1 (OpenRouter)
@@ -22,12 +37,19 @@ providers:
       #   input: [text, image]
       #   contextWindow: 200000
       #   maxTokens: 32000
+      #   compat:
+      #     openRouterRouting:
+      #       only: [anthropic]        # pin to Anthropic upstream — no quality degradation
+      #     cacheControlFormat: anthropic
       # - id: openai/gpt-5-codex
       #   name: GPT-5 Codex (OpenRouter)
       #   reasoning: true
       #   input: [text, image]
       #   contextWindow: 200000
       #   maxTokens: 16000
+      #   compat:
+      #     openRouterRouting:
+      #       order: [openai]          # prefer OpenAI upstream
       # - id: x-ai/grok-4
       #   name: Grok 4 (OpenRouter)
       #   reasoning: true
@@ -43,6 +65,10 @@ providers:
       #   input: [text, image]
       #   contextWindow: 200000
       #   maxTokens: 16000
+      #   compat:
+      #     openRouterRouting:
+      #       only: [anthropic]
+      #     cacheControlFormat: anthropic
       # - id: openai/gpt-5.1
       #   name: GPT-5.1 (OpenRouter)
       #   reasoning: true
@@ -57,12 +83,18 @@ providers:
       #   maxTokens: 65536
 
       # ── haiku tier (smol role: monitor, preflight, supervisor) ────────
+      # Uncomment ONE. For this tier, consider providers.openrouterVariant: nitro
+      # (fastest inference — these agents are latency-sensitive) or floor (cheapest).
       # Uncomment ONE:
       # - id: anthropic/claude-haiku-4.5
       #   name: Claude Haiku 4.5 (OpenRouter)
       #   input: [text, image]
       #   contextWindow: 200000
       #   maxTokens: 8192
+      #   compat:
+      #     openRouterRouting:
+      #       only: [anthropic]
+      #     cacheControlFormat: anthropic
       # - id: google/gemini-2.5-flash
       #   name: Gemini 2.5 Flash (OpenRouter)
       #   reasoning: true

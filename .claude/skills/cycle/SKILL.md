@@ -178,7 +178,7 @@ State directory: `agent_states/` (ephemeral — deleted on completion).
 
 ### State persistence
 
-The orchestrator keeps `agent_states/cycle-state-<feature>.md` current throughout the cycle, using the template and verb list in `.claude/agents/monitor.md`. **Two modes**, selected by `agent_messaging` in `.claude/config.md` § Cycle Options (default `false`):
+The orchestrator keeps `agent_states/cycle-state-<feature>.md` current throughout the cycle, using the template and verb list in `.omp/agents/monitor.md`. **Two modes**, selected by `agent_messaging` in `.claude/config.md` § Cycle Options (default `false`):
 
 - **`agent_messaging: false` (default) — inline.** *You*, the orchestrator, write the state file directly. The monitor's verb list (`GATE`, `SPAWNED`, `PARENT`, `RESCUE`, `DEVIATIONS`, `SCOPE_CHANGE`, `SUPERVISOR_HEALTH`, …) is your **checklist of what to record when**. This is the normal path and is **not** a degradation — never log it as a rescue. No background monitor is spawned. Inline is also the only mode that works without the irc tool / agent-teams.
 - **`agent_messaging: true` — delegated.** Spawn the background monitor once at Phase 3 start. The monitor blocks on `irc(op: "wait", from: "Main", timeoutMs: 0)` to receive verbs in real time — send each verb via `irc(op: "send", to: "<monitor-id>", message: "<verb>")`. It writes the state file so your context stays lean:
@@ -213,6 +213,15 @@ Inspect $ARGUMENTS:
 | Empty | Check `agent_states/` for active/paused cycles. If none: read `feature_idea_on_empty` from `.claude/config.md` Cycle Options. If true, read the Feature Ideas path from config (default `documentation/FEATURES.md`) and present any unstarted items — offer to start a cycle for one, or run `/feature-idea` to capture a new idea. If FEATURES.md doesn't exist, has no unstarted items, or `feature_idea_on_empty` is false, ask for a feature description. |
 
 Create/update state file immediately after determining entry point.
+
+**Checkpoint recovery (omp).** Under omp, you can checkpoint your session before risky operations (escalation ladder L3 revert, mid-cycle scope changes, complex merges). If the operation fails, `rewind` to the checkpoint instead of restarting the cycle:
+```
+checkpoint(action: "set", label: "pre-L3-revert-task-2.0")
+# ... attempt the operation ...
+# if it fails:
+rewind(to: "pre-L3-revert-task-2.0")
+```
+This is faster than resume-from-state-file when the failure is recent and the state file hasn't been updated yet. Use checkpoints at: before each escalation ladder step, before mid-cycle scope changes, before complex dependency-order merges.
 
 **Phase tracking (todo tool).** Initialize the `todo` tool with the pipeline phases as a visible progress tracker. Mark each phase `in_progress` when entering, `done` when complete. This gives the user real-time progress in the TUI alongside the cycle state file:
 ```
@@ -484,7 +493,7 @@ Six layered mechanisms, evaluated as you spawn and collect each check (the caden
 3. **Rescue logging on outage.** Already provided by (2) — `supervisor-stall` is in the rescue type enum.
 4. **Circuit breaker.** Maintain the **Supervisor health** section in cycle state (via monitor's `SUPERVISOR_HEALTH` verb). If `supervisor_check_failures` increments 3 times within a 5-minute window, **disable** the supervisor for the rest of the cycle: emit `RESCUE supervisor-disabled [supervisor]: 3 check failures in 5m | resolution: degraded mode | artifact: cycle-state` and forward `SUPERVISOR_HEALTH status:disabled spawns:[n] stalls:[n] heartbeat:[last] disabled_at:[now] reason:circuit-breaker`. Stop spawning supervisor checks; the cycle continues in degraded mode (no whispers, no escalations — falls back to today's behavior).
 5. **Run-report check success rate.** When you build the cycle run report at Phase 4A, populate the **Supervisor health** subsection of the Agent Telemetry block from cycle state: `supervisor_checks` attempted, `supervisor_check_failures`, and success rate. Classify the cycle as **degraded** if success rate < 90% or status is `disabled`.
-6. **`self-improve` hook.** Documented in `.claude/agents/self-improve.md` Step 2 (Effectiveness patterns → Supervisor health). When `supervisor-stall` or `supervisor-disabled` appears in ≥ 3 of the last 5 cycles, `self-improve` raises a P0 recommendation.
+6. **`self-improve` hook.** Documented in `.omp/agents/self-improve.md` Step 2 (Effectiveness patterns → Supervisor health). When `supervisor-stall` or `supervisor-disabled` appears in ≥ 3 of the last 5 cycles, `self-improve` raises a P0 recommendation.
 
 ### Plan-revision flow (5.5.6)
 

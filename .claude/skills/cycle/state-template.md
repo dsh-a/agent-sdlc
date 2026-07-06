@@ -23,7 +23,7 @@ Status: [active | paused | finished]
 ## Parent task status
 | Task | Status | Model | Notes |
 |---|---|---|---|
-| 1.0 | [pending/in-progress/complete/failed/blocked] | [model] | [commit hash, worktree path, or blocker] |
+| 1.0 | [pending/in-progress/complete/failed/blocked] | [model] | [commit hash, task branch, or blocker] |
 
 ## Blockers
 - [task-id]: [description] — status: [waiting/resolved]
@@ -51,9 +51,6 @@ Stalls: [n]
 Last heartbeat: [YYYY-MM-DDTHH:MM:SSZ or none]
 Disabled at: [ts or n/a]
 Disabled reason: [text or n/a]
-
-## Escalation cursor
-Last processed line in agent_states/escalations.jsonl: [n or 0]
 
 ## Scope changes
 - ts: [YYYY-MM-DDTHH:MM:SSZ] | type: [added|removed|modified] | ac: [ac-id] | text: [AC text] | reason: [why]

@@ -294,10 +294,13 @@ Resume a paused cycle: `/cycle --exe agent_states/cycle-state-[feature-name].md`
 | Stack / language | `config.md` → **Active Pack** + the pack under `.claude/packs/` |
 | Build/test/lint commands | `config.md` → **Project Commands** |
 | Layer boundaries & patterns | `config.md` → **Architecture Review Rules** |
-| MCP / RAG plug-ins | `config.md` → **Context Sources** + `.claude/.mcp.json` |
-| Model spending | `config.md` → **Model Allocation** preset |
+| MCP / RAG plug-ins | `config.md` → **Context Sources** + `.omp/mcp.json` |
+| Model spending | `config.md` → **Model Allocation** + `.omp/config.yml` → `modelRoles` |
 | Auto verify/review | `config.md` → **Optional Agents** |
 | Conventions (naming, layers) | `.claude/skills/project-conventions/SKILL.md` (from the pack) |
-| Permissions | `.claude/settings.json` |
+| Permissions / approval | `.omp/config.yml` → `tools.approval` |
+| OpenRouter models | `.omp/models.yml.sample` → `~/.omp/agent/models.yml` |
+| Task isolation / concurrency | `.omp/config.yml` → `task.*` |
+| Advisor / memory / autolearn | `.omp/config.yml` → `advisor.*`, `memory.*`, `autolearn.*` |
 
 No agent or skill files need editing for routine customization — they read from `config.md`.
