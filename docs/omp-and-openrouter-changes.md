@@ -9,10 +9,10 @@ Branch base: `develop` (`999ce44`). All changes are uncommitted-to-main; the bra
 ## Summary
 
 | Metric | Value |
-| Commits | 9 |
-| Files changed | 42 |
-| Lines added | ~2055 |
-| Lines removed | ~496 |
+| Commits | 11 |
+| Files changed | ~103 |
+| Lines added | ~2195 |
+| Lines removed | ~636 |
 | New `.omp/` files | 19 |
 | omp-native agents | 13 |
 | omp config settings | 25+ |
@@ -307,24 +307,29 @@ Decision: keep `.claude/agents/` and other Claude Code files in place (omp ignor
 | `statusLine` | `.omp/config.yml` | `preset: full` — show model + cwd + git branch in TUI |
 
 
+
+## Commit 9: `84c11e4` — Plan mode + session export + TTSR + extraBody + protective hook + memory tools
+
+| Feature | Where | What it does |
+|---|---|---|
+| Plan mode mapping | cycle SKILL | Dry-run maps to `omp --plan`; restricts tools to read/search/find/lsp/web_search |
+| Session export | WORKPLACE-SETUP | `/session export/share/fork` for team review + post-mortem |
+| TTSR phase rules | .omp/RULES.md | Four phase-specific rules re-injected near current turn after context growth |
+| OpenRouter extraBody | models.yml.sample | Gateway hints, controller selectors for team-specific routing |
+| Protective hook | .omp/hooks/protect.ts | Blocks edits to generated files; prompts on dangerous bash |
+| Memory tools | self-improve agent | +recall +reflect; cross-cycle patterns from memory backend |
+
 ---
 
-## Next items to explore
+## Commit 10: `1395ce8` — Rename `.claude/config.md` → `.omp/agent-config.md`
 
-- **omp `plan` mode mapping** — the cycle already has a dry-run (Phases 1–2 + dependency analysis, then present a plan). omp's native plan mode (`--plan` / `plan` agent) is a read-only planning surface that restricts tools to `read`/`search`/`find`/`lsp`/`web_search`. Could map the cycle's dry-run to omp's plan mode so the orchestrator's planning phase is tool-restricted natively, preventing accidental implementation during dry-run.
+- 137 references updated across 61 files (agents, skills, packs, templates, docs, README, context files)
+- Pure mechanical rename; zero behavioral change
+- Fully purges the `.claude/` path from the framework's runtime config
 
-- **omp `session export/share/fork`** — omp can export, share, fork, and resume sessions. A completed cycle's session could be exported and shared with another engineer for review, or forked to try a different approach without losing the original. The cycle report + run report are file-based artifacts; session export would give a conversational artifact (the full orchestrator transcript) alongside them.
+---
 
-- **omp `marketplace` skills** — omp has a skills marketplace for installable skill packs. The framework's skills (whispers, escalations, autonomous-agent, minimalism, etc.) could be packaged as a marketplace skill pack that other omp users install into their projects, decoupling the framework from the `.claude/skills/` directory.
+## Deferred
 
-- **Custom omp extensions (JS/TS hooks beyond logging)** — the current `.omp/hooks/log-event.ts` is a telemetry hook. omp hooks can also block/modify tool calls (`tool_call` event), inject context (`context` event), register slash commands, and register custom message renderers. Potential uses: a hook that auto-approves specific bash patterns based on the active pack (replacing the Claude Code per-pattern allowlist), a hook that injects known-pitfalls matching the current file context, a hook that blocks edits to generated files.
-
-- **`.omp/agent-config.md` → `.omp/agent-config.md` rename** — 42 references across agents, skills, and packs point at `.omp/agent-config.md`. Moving it to `.omp/agent-config.md` would fully purge the `.claude/` path from the omp-first branch. Deferred because it's a large find-replace with no behavioral change; worth doing before merging to `main`.
-
-- **omp `collab` (multi-agent collaboration)** — omp has a collab feature for real-time multi-agent collaboration. The cycle's Phase-3 parallel agents currently run as independent isolated spawns with no shared state. Collab could let parallel agents share a live context (e.g., two implementers working on interdependent tasks see each other's progress in real time via irc broadcast). Needs investigation — may conflict with the isolation model.
-
-- **omp `ttsr` (time-traveling stream rules)** — omp has time-traveling stream rules that re-attach rules near the current turn after context growth. The framework's `RULES.md` is already sticky (always-apply), but `ttsr` could be used to re-inject phase-specific rules (e.g., "you are in Phase 3 — do not edit the PRD") at the right moments without polluting the opening context.
-
-- **OpenRouter `extraBody` for gateway hints** — the `compat.extraBody` field in `models.yml` can send arbitrary top-level fields to OpenRouter (gateway hints, controller selectors). Could be used for team-specific routing preferences (e.g., route to a specific provider pool during business hours, a cheaper pool after hours).
-
-- **omp `learn` / `retain` / `reflect` tools** — omp has memory tools (`learn`, `retain`, `recall`, `reflect`) that work with the memory backend. The `self-improve` agent currently reads run reports + managed-skills. It could also use `recall` to pull cross-cycle patterns from memory and `reflect` to synthesize improvement recommendations from accumulated lessons.
+- **Marketplace skills** — packaging framework skills as an installable omp marketplace pack. Pending marketplace docs + packaging investigation.
+- **Collab** — multi-agent collaboration for Phase-3 parallel agents. Pending investigation of interaction with omp's native isolation model.
