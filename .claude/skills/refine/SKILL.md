@@ -1,4 +1,6 @@
 ---
+name: refine
+description: Refine a user story toward INVEST compliance and Definition-of-Ready. Interactive dialogue — explores the codebase, builds a question queue, maintains a refinement log, and emits a DoR verdict. Can split stories that are too large.
 disable-model-invocation: true
 ---
 

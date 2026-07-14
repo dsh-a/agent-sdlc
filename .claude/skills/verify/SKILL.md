@@ -1,3 +1,8 @@
+---
+name: verify
+description: Independent acceptance criteria coverage audit. Delegates to the verify agent to evaluate whether the implementation and test suite genuinely satisfy the PRD's acceptance criteria. Complements review (which focuses on code quality).
+disable-model-invocation: true
+---
 # Verify
 
 User-facing shim for the `verify` agent. The agent owns the independent AC audit; this skill is what `/verify` invokes.

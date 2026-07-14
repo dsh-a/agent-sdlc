@@ -1,4 +1,5 @@
 ---
+name: autonomous-agent
 description: Shared preamble for autonomous Phase-3 agents — autonomy rules, file-I/O rules, LSP-first code intelligence, ast_grep/ast_edit for structural edits, irc whisper handling, contradiction-exit emission. Loaded by test, ui-story, scaffold, verify, review, create-prd, generate-tasks, self-improve, supervisor, test-preflight.
 disable-model-invocation: true
 ---

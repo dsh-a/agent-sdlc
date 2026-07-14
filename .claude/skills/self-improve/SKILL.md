@@ -1,3 +1,8 @@
+---
+name: self-improve
+description: Analyze past cycle runs and tune agent/skill instructions. Extracts patterns from run reports, proposes improvements to agent prompts, skill files, and pipeline thresholds. Supports scoping by economy, effectiveness, or specific report.
+disable-model-invocation: true
+---
 # Self-Improve
 
 User-facing shim for the `self-improve` agent. The agent owns the pipeline-tuning analysis; this skill is what `/self-improve` invokes.

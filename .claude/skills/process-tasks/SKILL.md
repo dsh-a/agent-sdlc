@@ -1,3 +1,8 @@
+---
+name: process-tasks
+description: Step through a task list manually — one sub-task at a time with user approval gates after each. The manual-mode alternative to /cycle for when you want fine-grained control over each implementation step.
+disable-model-invocation: true
+---
 # Process Task List (Manual Mode)
 
 > **Note:** This skill is the manual, step-by-step mode of the `/cycle` pipeline. You can invoke it directly or via `/cycle --manual [task-file]`. For autonomous execution with parallel agents, state persistence, and error recovery, use `/cycle` (without `--manual`) instead.

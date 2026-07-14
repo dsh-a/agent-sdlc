@@ -1,4 +1,6 @@
 ---
+name: review
+description: Independent code review shim. Delegates to the review agent for architecture review, convention compliance, code quality, and test review. Covers layer-boundary checks, complexity, duplication, over-engineering, error handling, and security.
 disable-model-invocation: true
 ---
 

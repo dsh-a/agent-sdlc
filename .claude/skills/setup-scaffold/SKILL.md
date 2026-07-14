@@ -1,4 +1,6 @@
 ---
+name: setup-scaffold
+description: Scan the codebase for recurring architectural patterns and generate project-specific scaffold pattern files. Eliminates repeated codebase exploration by the scaffold agent. Supports full scan mode and targeted update mode.
 disable-model-invocation: true
 ---
 

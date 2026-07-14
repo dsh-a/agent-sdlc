@@ -1,3 +1,8 @@
+---
+name: generate-tasks
+description: Decompose a PRD into an implementation task list. Assesses the codebase, identifies relevant files, and produces structured tasks with kind tags, agent assignments, and dependency ordering for the cycle pipeline.
+disable-model-invocation: true
+---
 # Generate Tasks
 
 You are generating a task list from a PRD.

@@ -1,4 +1,6 @@
 ---
+name: setup
+description: Interactive configuration wizard for the agent-sdlc pipeline. Detects the project stack, selects a language pack, generates .omp/agent-config.md (Project Commands, Architecture Rules, Context Sources, model preset), and populates the project-conventions skill from the chosen pack.
 disable-model-invocation: true
 ---
 

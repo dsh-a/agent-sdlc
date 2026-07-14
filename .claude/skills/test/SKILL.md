@@ -1,3 +1,8 @@
+---
+name: test
+description: Write rigorous, anti-faking tests for a class, method, or feature. Delegates to the test agent which covers behavior, invariants, edge cases, boundary values, and error handling. Rejects tests that assert plumbing or restate the code.
+disable-model-invocation: true
+---
 # Write Tests
 
 User-facing shim for the `test` agent. The agent owns the rigorous, anti-faking test-writing workflow; this skill is what `/test` invokes.

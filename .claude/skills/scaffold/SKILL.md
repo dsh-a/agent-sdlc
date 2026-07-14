@@ -1,3 +1,8 @@
+---
+name: scaffold
+description: Scaffold new components following established project patterns — entities/models, use cases, facades, services, or presentation (view-model + view) pairs. Routes to the right pattern file and includes DI wiring and codegen.
+disable-model-invocation: true
+---
 # Scaffold
 
 You are scaffolding a new component. This skill is an **index** — it routes you to the right pattern file. Per-type detail lives in `.claude/agents/scaffold/` (language-neutral pattern shapes + any project-specific patterns); language idioms come from the active pack's `scaffold-snippets.md`. Do not duplicate that detail here; load and follow it.

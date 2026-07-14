@@ -1,3 +1,8 @@
+---
+name: create-prd
+description: Write a Product Requirements Document from a feature description. Explores the codebase, checks the roadmap, scans existing PRDs, and returns a complete PRD with user stories, functional requirements, and acceptance criteria.
+disable-model-invocation: true
+---
 # Create PRD
 
 User-facing shim for the `create-prd` agent. The agent owns the PRD-authoring workflow; this skill is what `/create-prd` invokes.

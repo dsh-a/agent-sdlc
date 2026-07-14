@@ -1,3 +1,8 @@
+---
+name: feature-idea
+description: Capture a new feature idea interactively — loads existing feature list, scopes the idea, writes a story file to documentation/stories/, updates the index, and optionally hands off to /cycle.
+disable-model-invocation: true
+---
 You are capturing a new feature idea. Follow these steps in order.
 
 ## Step 1 — Load context

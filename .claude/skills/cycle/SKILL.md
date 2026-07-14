@@ -1,4 +1,6 @@
 ---
+name: cycle
+description: SDLC feature pipeline orchestrator. Run /cycle to go from a feature description to a tested, reviewed PR — creates PRD, generates tasks, spawns parallel implementation agents, verifies, reviews, and opens the PR. Supports --mode full|lean|hotfix, --exe, --manual, and resume from state file.
 disable-model-invocation: true
 ---
 

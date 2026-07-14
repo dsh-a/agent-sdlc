@@ -1,3 +1,8 @@
+---
+name: ui-story
+description: Implement a UI / presentation-layer feature. Delegates to the ui-story agent for building or modifying screens, components, and view-models following MVVM patterns, responsive design, and project conventions.
+disable-model-invocation: true
+---
 # UI Story
 
 User-facing shim for the `ui-story` agent. The agent owns the UI implementation workflow; this skill is what `/ui-story` invokes.
