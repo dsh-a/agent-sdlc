@@ -1,4 +1,4 @@
-# agent-sdlc — SDLC Framework Repo (`company-a` fork, omp target)
+# agent-sdlc — SDLC Framework Repo (workplace fork, omp target)
 
 This repo contains the agent pipeline that gets deployed into projects. It is **language-agnostic**: the core is stack-neutral and stack-specific rules live in a **pack** (`.claude/packs/<lang>/`). The default active pack is **Flutter**; **.NET** ships as an alternate template. You are editing the **framework itself**, not an app — no app build/test commands apply here.
 

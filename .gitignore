@@ -431,3 +431,8 @@ improvements-plan.md
 agent_states/
 .claude/worktrees/
 # <<< agent-sdlc <<<
+
+# Local model routing (may carry OPENROUTER_API_KEY). Commit models.yml.sample instead.
+.omp/models.yml
+# Env files, all variants
+.env*

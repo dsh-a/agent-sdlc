@@ -1,4 +1,4 @@
-# agent-sdlc — workplace fork (`company-a`)
+# agent-sdlc — workplace fork
 
 A Claude Code agent team for autonomous feature development. Drop these agents and skills
 into your project's `.claude/` directory and get a full SDLC pipeline — from feature idea to
