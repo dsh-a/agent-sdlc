@@ -34,9 +34,9 @@ This fork is **language-agnostic with explicit plug-in points**:
 ## The core-vs-pack model
 
 ```
+.omp/agent-config.md             # the one file you customize (Active Pack, Project Commands,
+                                 #   Architecture Rules, Context Sources, model preset) — lives in .omp/
 .claude/
-  config.md                      # the one file you customize (Active Pack, Project Commands,
-                                  #   Architecture Rules, Context Sources, model preset)
   skills/                        # discovered by omp via the `claude` provider (priority 80)
     project-conventions/         # ACTIVE conventions — loaded by agents deterministically
     context-sources/             # the MCP/RAG plug-in contract
@@ -294,16 +294,16 @@ Resume a paused cycle: `/cycle --exe agent_states/cycle-state-[feature-name].md`
 
 | What to customize | Where |
 |---|---|
-| Stack / language | `config.md` → **Active Pack** + the pack under `.claude/packs/` |
-| Build/test/lint commands | `config.md` → **Project Commands** |
-| Layer boundaries & patterns | `config.md` → **Architecture Review Rules** |
-| MCP / RAG plug-ins | `config.md` → **Context Sources** + `.omp/mcp.json` |
-| Model spending | `config.md` → **Model Allocation** + `.omp/config.yml` → `modelRoles` |
-| Auto verify/review | `config.md` → **Optional Agents** |
+| Stack / language | `.omp/agent-config.md` → **Active Pack** + the pack under `.claude/packs/` |
+| Build/test/lint commands | `.omp/agent-config.md` → **Project Commands** |
+| Layer boundaries & patterns | `.omp/agent-config.md` → **Architecture Review Rules** |
+| MCP / RAG plug-ins | `.omp/agent-config.md` → **Context Sources** + `.omp/mcp.json` |
+| Model spending | `.omp/agent-config.md` → **Model Allocation** + `.omp/config.yml` → `modelRoles` |
+| Auto verify/review | `.omp/agent-config.md` → **Optional Agents** |
 | Conventions (naming, layers) | `.claude/skills/project-conventions/SKILL.md` (from the pack) |
 | Permissions / approval | `.omp/config.yml` → `tools.approval` |
 | OpenRouter models | `.omp/models.yml.sample` → `~/.omp/agent/models.yml` |
 | Task isolation / concurrency | `.omp/config.yml` → `task.*` |
 | Advisor / memory / autolearn | `.omp/config.yml` → `advisor.*`, `memory.*`, `autolearn.*` |
 
-No agent or skill files need editing for routine customization — they read from `config.md`.
+No agent or skill files need editing for routine customization — they read from `.omp/agent-config.md`.

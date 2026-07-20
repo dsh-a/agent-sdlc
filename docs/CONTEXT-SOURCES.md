@@ -34,7 +34,7 @@ consultation is auditable in the run report.
 
 ---
 
-## The registry (`config.md` § Context Sources)
+## The registry (`.omp/agent-config.md` § Context Sources)
 
 | Column | Meaning |
 |---|---|

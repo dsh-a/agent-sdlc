@@ -1,0 +1,15 @@
+--- a/lib/data/repositories/order_repository.dart
++++ b/lib/data/repositories/order_repository.dart
+@@ class OrderRepository implements IOrderRepository {
+   final OrderApi _api;
+   OrderRepository(this._api);
+
+   @override
+   Future<Order> getById(String id) async {
+-    final Order? order = await _api.fetch(id);
+-    if (order == null) throw NotFoundException(id);
+-    return order;
++    final Order? order = await _api.fetch(id);
++    return order!;   // force-unwrap — throws a runtime null error when the order is missing
+   }
+ }

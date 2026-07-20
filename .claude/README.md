@@ -11,7 +11,7 @@ discovers agents from `.omp/agents/` (native, priority 100).
 
 ```
 .claude/
-  config.md            # central runtime config — the one file you customize
+  .omp/agent-config.md            # central runtime config — the one file you customize
   settings.json        # Bash/MCP permissions + telemetry hooks
   settings.json.sample # hooks template to merge into settings.json
   .mcp.json.sample     # template for connecting MCP servers (Context Sources)
@@ -31,7 +31,7 @@ discovers agents from `.omp/agents/` (native, priority 100).
 ## The two layers
 
 **Core (stack-neutral).** The orchestrator, agents, and most skills carry no language
-assumptions. They read commands, paths, and rules from `config.md` and load conventions from
+assumptions. They read commands, paths, and rules from `.omp/agent-config.md` and load conventions from
 the `project-conventions` skill.
 
 **Pack (stack-specific).** A pack supplies the conventions, test patterns, anti-patterns, and
@@ -42,7 +42,7 @@ swappable source you populate that skill from. Default active pack: **flutter**.
 
 ## What reads what
 
-| Component | Reads from `config.md` |
+| Component | Reads from `.omp/agent-config.md` |
 |---|---|
 | `cycle/SKILL.md` (orchestrator) | every section — at ~25 lookup points |
 | Implementation agents | Model Allocation, Project Commands (via the orchestrator) |

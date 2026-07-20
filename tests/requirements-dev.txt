@@ -1,0 +1,4 @@
+# agent-sdlc test/dev dependencies
+pyyaml>=6.0      # Layer 1: parse config.yml / models.yml.sample (duplicate-key detection)
+pytest>=8.0      # Layer 1: static validation suite
+requests>=2.31   # Layer 2: OpenRouter model-backed assessment

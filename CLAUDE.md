@@ -4,7 +4,7 @@ This repo contains the agent pipeline that gets deployed into projects. It is **
 
 ## Harness target
 
-This branch (`feature/omp-openrouter`) targets **Oh My Pi (omp)** with models routed through **OpenRouter**. The `.omp/` directory is the native omp adapter layer; `.claude/` remains the source of truth for skills, packs, and the agent-readable runtime config (`config.md`). See README § "omp + OpenRouter deployment" for the full setup.
+This branch (`feature/omp-openrouter`) targets **Oh My Pi (omp)** with models routed through **OpenRouter**. The `.omp/` directory is the native omp adapter layer; `.claude/` remains the source of truth for skills, packs, and the agent-readable runtime config (`.omp/agent-config.md`). See README § "omp + OpenRouter deployment" for the full setup.
 
 ## Structure
 
@@ -14,12 +14,12 @@ This branch (`feature/omp-openrouter`) targets **Oh My Pi (omp)** with models ro
   config.yml      # omp harness settings (modelRoles, isolation, advisor, memory, etc.)
   models.yml.sample  # OpenRouter provider config + per-tier model menu
   mcp.json.sample    # Context Sources MCP template (omp format)
+  agent-config.md # central runtime config — the one file users customize
   AGENTS.md       # project context (auto-loaded by omp, priority 100)
   RULES.md        # sticky hard rules (always-apply)
   hooks/
     log-event.ts  # supplementary telemetry hook
 .claude/
-  config.md       # central runtime config — the one file users customize
   skills/         # skills (discovered by omp via claude provider, priority 80)
     cycle/        # the orchestrator (/cycle)
     project-conventions/  # ACTIVE stack conventions

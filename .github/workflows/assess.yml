@@ -1,0 +1,33 @@
+name: assess (model-backed)
+
+# Layer 2 — model-backed assessment via OpenRouter. NOT on every push (protects
+# the funded OpenRouter account): manual dispatch + a weekly schedule. Needs the
+# OPENROUTER_API_KEY repo secret; defaults to a cheap model.
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: OpenRouter model id
+        default: anthropic/claude-haiku-4.5
+  schedule:
+    - cron: "0 9 * * 1"   # Mondays 09:00 UTC
+
+jobs:
+  assess:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r tests/requirements-dev.txt
+      - name: Run assessment
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          MODEL: ${{ github.event.inputs.model || 'anthropic/claude-haiku-4.5' }}
+        run: python tests/assess.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: assess-report
+          path: tests/assess-report.md

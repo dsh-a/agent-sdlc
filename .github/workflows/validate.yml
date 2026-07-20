@@ -1,0 +1,17 @@
+name: validate
+
+# Layer 1 — static validation. Free, fast, hard gate on every push/PR.
+on:
+  push:
+  pull_request:
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r tests/requirements-dev.txt
+      - run: pytest tests/test_structure.py -q

@@ -42,5 +42,5 @@ Switching packs repopulates these (see [`../packs/README.md`](../packs/README.md
 ## Authoring notes
 
 - Keep stack-specific content **in a pack**, not in a core skill. Core skills should read
-  commands/paths from `config.md` and defer conventions to `project-conventions`.
+  commands/paths from `.omp/agent-config.md` and defer conventions to `project-conventions`.
 - The `flutter` pack (`../packs/flutter/`) is a complete worked example of pack content.
