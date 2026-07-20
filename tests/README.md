@@ -37,3 +37,8 @@ Skips cleanly if `OPENROUTER_API_KEY` is unset. In CI (`.github/workflows/assess
 it runs on **manual dispatch + a weekly schedule** only — not every push — to protect
 the funded OpenRouter account, defaults to a cheap model, and uploads the report as an
 artifact. Add the key as the `OPENROUTER_API_KEY` repo secret to enable it.
+
+> **Recommended:** use a **dedicated** OpenRouter key with a **spend cap** set in
+> OpenRouter for CI (not your main key) — bounds the blast radius and lets you rotate
+> it independently. The key is never exposed to fork PRs, and the only workflow that
+> uses it (`assess.yml`) runs on manual dispatch + schedule, never on untrusted PR code.
