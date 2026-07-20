@@ -94,6 +94,19 @@ File location: `lib/ui/<feature>/views/<feature>_view.dart`. Route wiring (if ne
 
 ---
 
+## Formatting & comments
+
+- Line length: **100** characters max.
+- `///` for public API documentation; inline comments explain *why*, not *what*.
+
+---
+
+## Error handling
+
+- Async functions have proper error handling at **system boundaries** (Drift / Supabase / network / external services). Internal trusted-layer code does not need excessive defensive checks.
+
+---
+
 ## Imports
 
 - Domain layer (`lib/domain/`, `lib/data/repositories/.../*_repository.dart` interfaces): pure Dart only. No `package:flutter/...` imports.

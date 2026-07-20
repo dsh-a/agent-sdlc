@@ -210,7 +210,7 @@ When enabled, these agents run autonomously during Phase 4A and their reports ar
 
 ## Project Commands
 
-Agents run these commands to test, lint, and generate code. Update to match your project's toolchain. Defaults below target the active pack (`flutter`).
+Agents run these commands to test, lint, and generate code. This table is the **per-project override point** — the live values every implementation agent reads at runtime. The defaults below are seeded from the active pack (`flutter`; canonical list in `.claude/packs/flutter/commands.md`). Update them to match your project's toolchain.
 
 | Purpose | Command |
 |---|---|
@@ -229,41 +229,29 @@ Agents run these commands to test, lint, and generate code. Update to match your
 
 ## Architecture Review Rules
 
-These rules are used by the `review` agent (Step 2) and `verify` agent for convention checks. Customize them to match your project's architecture.
+These sections are **project-specific overrides** layered on top of the active pack's `project-conventions` — the canonical source for the stack's layer boundaries, patterns, naming, line-length, logging, comments, and error-handling (see `.claude/packs/<active-pack>/conventions.md`). The `review` (Step 2) and `verify` agents read the pack for the stack's rules and consult these sections for any per-project overrides. **Leave a section empty to use the pack's rules unchanged.**
 
 ### Layer Boundaries
 
-Define your project's architectural layers and import rules. The review agent checks that files in each layer only import from allowed sources.
+Fill this table only to **override or extend** the active pack's layer/import rules for this specific project. The review agent checks that files in each defined layer only import from allowed sources. Path patterns are project-specific — e.g. the `flutter` pack uses `lib/domain|data|ui/`, the `dotnet` template uses `src/**/Domain|Application|Infrastructure/`.
 
 | Layer | Path pattern | Allowed imports | Forbidden imports |
 |---|---|---|---|
-| Domain / Core | `lib/domain/` | Pure Dart, other domain modules | Flutter framework, data layer, `package:provider` |
-| Data / Infrastructure | `lib/data/` | Domain layer, external packages | UI layer |
-| UI / Presentation | `lib/ui/` | Domain layer via intermediaries (ViewModels, facades, use cases) | Direct data-layer imports |
-
-Adapt path patterns to your project structure. (Defaults shown for the `flutter` pack — MVVM over Clean Architecture; the `dotnet` template uses `src/**/Domain|Application|Infrastructure/`.)
+| _(project override — leave empty to use the pack)_ | | | |
 
 ### Pattern Compliance
 
-Describe your project's architectural patterns. The review agent checks that changed files follow these patterns.
+List only project-specific patterns that **override or extend** the pack's (state management, DI, view rules, interface usage at boundaries). Leave empty to use the pack unchanged. The review agent checks changed files against the pack's patterns plus anything added here.
 
-- **State management / presentation pattern**: MVVM with `ChangeNotifier` + Provider — ViewModels extend `ChangeNotifier`; Views observe via `context.watch`/`context.read`
-- **Views** never call repositories, services, or use cases directly — they go through a ViewModel or equivalent intermediary
-- **New dependencies** follow the project's DI pattern — Provider / `MultiProvider`, wired in `lib/dependencies/`
-- **Interfaces/abstractions** are used at layer boundaries (e.g., `IRepository<T>`, `IService`)
+- _(project override — e.g. "this app uses Riverpod instead of the pack's default DI")_
 
 ### Convention Checks
 
-| Convention | Rule |
+Add rows only to **override** the pack's conventions (naming, line-length, logging, comments, error-handling) for this project. Leave empty to use the pack's defaults.
+
+| Convention | Rule (project override) |
 |---|---|
-| Class naming | `PascalCase` |
-| Method / variable naming | `camelCase` |
-| File naming | `snake_case.dart` |
-| Private members | Leading underscore (`_field`, `_method`) |
-| Line length | 100 characters max |
-| Logging | Project `Logger` from package `logging` (never `print` in production code) |
-| Error handling | Async functions have proper error handling at system boundaries (Drift / Supabase / network / external services) |
-| Comments | `///` for public API documentation; inline comments explain _why_, not _what_ |
+| _(e.g. Line length)_ | _(e.g. `120` — overrides the pack's default)_ |
 
 ---
 
