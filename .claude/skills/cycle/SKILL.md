@@ -154,7 +154,7 @@ Write each piece of shared background to a `local://` file once. Subagents share
 A reusable step invoked at five stages (`prd`, `tasks`, `implement`, `review`, `verify`). The full contract is in the `context-sources` skill; the mechanics:
 
 1. Read `.omp/agent-config.md` § Context Sources. Select rows where `enabled` is `true` **and** `consult_at` contains the current stage. If none, skip silently.
-2. For each selected `mcp` source: load its tool via `ToolSearch` if deferred, then query it once with the row's `query_hint` plus concrete context (feature name, the task's Relevant Files, touched symbols). For `skill` sources, run the named skill.
+2. For each selected `mcp` source: query it once with the row's `query_hint` plus concrete context (feature name, the task's Relevant Files, touched symbols). For `skill` sources, run the named skill.
 3. Write the trimmed result to `local://ctx-sources.md` (append per source). Each agent's `assignment` references this file if it needs context-source data. Instruct the agent to echo `context-sources-consulted: <ids|none>` in its handoff.
 
 This is the same inject-downward pattern as Pre-digestion and Known pitfalls. `predigest` is intentionally **not** a consult stage by default (the pre-digest is a cheap summarizer).

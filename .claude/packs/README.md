@@ -15,7 +15,8 @@ packs/
 | File | Feeds | Purpose |
 |---|---|---|
 | `conventions.md` | the active `project-conventions` skill | layer boundaries, member order, naming, logging, entity construction |
-| `test-patterns.md` | the `test` agent / skill | framework, fixtures, naming, async rules |
+| `commands.md` | seeds `.omp/agent-config.md` § Project Commands | the stack's build/test/lint/codegen command defaults |
+| `test-patterns.md` / `ui-test-patterns.md` | the `test` agent / skill | framework, fixtures, naming, async rules (filename varies by pack) |
 | `test-antipatterns.md` | the cycle silent-skip gate | regexes that block a merge (gated/swallowed/skipped assertions) |
 | `scaffold-snippets.md` | the `scaffold` agent | language idiom for each pattern shape |
 
@@ -33,6 +34,6 @@ packs/
 
 ## Authoring a new pack
 
-Copy `packs/dotnet/` to `packs/<lang>/`, fill in the four files using `packs/flutter/` as a
+Copy `packs/dotnet/` to `packs/<lang>/`, fill in the files above using `packs/flutter/` as a
 complete worked example, then run the switch steps above. Keep `conventions.md` as the
 canonical source and re-run `/setup` after edits so the active skill stays in sync.

@@ -1,6 +1,6 @@
 # Sticky rules — agent-sdlc framework
 
-Never commit `agent_states/`, `.claude/worktrees/`, or `cycle_reports/` — runtime artifacts covered by the managed .gitignore block.
+Never commit `agent_states/`, `cycle_reports/`, or (Claude Code only) `.claude/worktrees/` — runtime artifacts covered by the managed .gitignore block. Under omp, Phase-3 isolation uses `omp/task/*` branches (auto-cleaned), not worktrees.
 
 Never edit generated files (`.g.dart`, `*.gen.dart`) — run the code generation command instead.
 

@@ -56,7 +56,7 @@ Follow all instructions in the loaded pattern file exactly.
 
 After completing all steps in the pattern file:
 
-1. Run the **Analyze / lint** command (§ Project Commands) for the final suite check. For per-edit inline checks during scaffolding, prefer `mcp__ide__getDiagnostics`. Fix all issues before reporting.
+1. Run the **Analyze / lint** command (§ Project Commands) for the final suite check. For per-edit inline checks during scaffolding, prefer `lsp(action:"diagnostics")`. Fix all issues before reporting.
 2. Run the **Code generation** command (§ Project Commands) if the project defines one and the change requires it (e.g. migrations, source generators). Skip if no codegen step is configured.
 3. Return a report covering:
    - Files created and modified

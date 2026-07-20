@@ -24,7 +24,7 @@ copying `.claude/packs/dotnet/` — see `.claude/packs/README.md`.
 
 Every artifact is one of three classes:
 - **local** — committed to the application repo; travels with the feature branch.
-- **runtime** — never committed; covered by the managed `.gitignore` block (cycle state, telemetry, worktrees).
+- **runtime** — never committed; covered by the managed `.gitignore` block (cycle state, telemetry; Claude-Code worktrees).
 - **vault** — written to the external docs vault when `vault_root` is set (see **Docs Vault** below); otherwise treated as local.
 
 | Artifact | Path | Class |
@@ -32,7 +32,7 @@ Every artifact is one of three classes:
 | PRDs and task files | `agent_tasks/` | local |
 | Cycle state | `agent_states/` | runtime |
 | Telemetry event logs | `agent_states/events/` | runtime |
-| Phase-3 worktrees | `.claude/worktrees/` | runtime |
+| Phase-3 worktrees (Claude Code only) | `.claude/worktrees/` | runtime |
 | Cycle reports | `cycle_reports/` | vault |
 | Run + verify + review reports | `agent_tasks/reports/` | vault |
 | Documentation | `documentation/` | local |
@@ -86,6 +86,8 @@ Active preset: **personal**
 | orchestrator (/cycle) | opus | opus | opus |
 
 To override a single agent regardless of preset, change the value in that agent's row under the active preset column. The cycle orchestrator reads this table for all agent spawns — implementation agents at Phase 3.3, pre-digest and monitor at Phase 3 start.
+
+> **Under omp:** named agents (`create-prd`, `generate-tasks`, `scaffold`, `ui-story`, `coding`, `test`, `verify`, `review`) resolve their model from their own `.omp/agents/*` frontmatter, so changing the active preset here governs the **generic** spawns (`task`, `pre-digest`, `monitor`, `supervisor`) but does not re-tier a named agent unless the orchestrator passes an explicit `model:` override. To run a named agent at a different tier under omp, set it in that agent's `.omp/agents/*` frontmatter.
 
 ### Model Versions
 
@@ -259,11 +261,11 @@ Add rows only to **override** the pack's conventions (naming, line-length, loggi
 
 External knowledge the pipeline consults at specific stages — a documentation MCP, a
 codebase-analysis / RAG service, an ADR store, etc. The orchestrator reads this table and,
-at each listed stage, queries the enabled sources **once** and injects the result into the
-spawned agent's prompt (the same inject-downward mechanism used for known-pitfalls and the
+at each listed stage, queries the enabled sources **once** and writes the result to a `local://` file the
+spawned agents read (the same downward-context mechanism used for known-pitfalls and the
 pre-digest). See `.claude/skills/context-sources/SKILL.md` for the full contract and
-`docs/CONTEXT-SOURCES.md` for setup. Connect the actual MCP servers in `.claude/.mcp.json`
-(template: `.claude/.mcp.json.sample`).
+`docs/CONTEXT-SOURCES.md` for setup. Connect the actual MCP servers in `.omp/mcp.json`
+(template: `.omp/mcp.json.sample`).
 
 | id | type | tool / skill | consult_at | required | enabled | query_hint |
 |---|---|---|---|---|---|---|
@@ -271,7 +273,7 @@ pre-digest). See `.claude/skills/context-sources/SKILL.md` for the full contract
 | codebase-rag | mcp | `mcp__codebase-rag__query` | tasks, implement, verify | optional | `false` | relevant file paths + public symbols; similar prior implementations & constraints |
 
 **Columns.**
-- **type** — `mcp` (a connected MCP server; the tool may be deferred — the consumer loads it via `ToolSearch` first) or `skill` (a local skill the orchestrator runs).
+- **type** — `mcp` (a connected MCP server; under omp the tool is auto-discovered from `.omp/mcp.json` — no `ToolSearch`) or `skill` (a local skill the orchestrator runs).
 - **consult_at** — pipeline stages where this source is queried. Vocabulary: `prd`, `tasks`, `predigest`, `implement`, `review`, `verify`. (`predigest` is excluded for cost by default — the pre-digest is a cheap summarizer.)
 - **required** — `optional`: unavailability degrades silently with a logged marker. `required`: unavailability surfaces a gate (and in autonomous mode logs `context-source <id>: DEGRADED` and proceeds). **Never mark an unreleased source `required`.**
 - **enabled** — `false` rows are skipped cleanly (e.g. `codebase-rag` until it is released and wired).

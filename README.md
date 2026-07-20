@@ -1,14 +1,14 @@
 # agent-sdlc — workplace fork
 
-A Claude Code agent team for autonomous feature development. Drop these agents and skills
-into your project's `.claude/` directory and get a full SDLC pipeline — from feature idea to
+An agent team for autonomous feature development on **Oh My Pi (omp)** + OpenRouter (Claude Code compatible, but that path is untested). Drop the `.claude/` **and** `.omp/` directories
+into your project and get a full SDLC pipeline — from feature idea to
 tested, reviewed PR — driven by `/cycle`.
 
 This fork is **language-agnostic with explicit plug-in points**:
 
 - The **core** (orchestrator, agents, pipeline) is stack-neutral. Stack-specific rules live
-  in a **pack** (`.claude/packs/<lang>/`). The default active pack is **.NET**; **Flutter**
-  ships as a worked reference example.
+  in a **pack** (`.claude/packs/<lang>/`). The default active pack is **Flutter**; **.NET**
+  ships as an alternate template.
 - External knowledge — a documentation MCP (`company-a-docs`), a RAG codebase-analysis
   service (`codebase-rag`), etc. — plugs in at named pipeline stages via the
   **Context Sources** registry. No code changes to add one: a config row + a connected MCP.
@@ -42,8 +42,8 @@ This fork is **language-agnostic with explicit plug-in points**:
     context-sources/             # the MCP/RAG plug-in contract
     cycle/                       # the orchestrator
   packs/
-    dotnet/                      # default active pack (placeholders — fill via /setup)
-    flutter/                     # worked reference example
+    flutter/                     # default active pack
+    dotnet/                      # alternate template (placeholders — fill via /setup)
   agents/                        # source-of-truth agent bodies (Claude Code path)
   .mcp.json.sample               # template for connecting your MCP servers
 .omp/
@@ -106,6 +106,7 @@ overflow recovery, `compaction.midTurnEnabled` for long Phase-3 runs.
 
 ```bash
 cp -r .claude/ /path/to/your-project/.claude/
+cp -r .omp/    /path/to/your-project/.omp/
 ```
 
 ### 2. Run `/setup`
@@ -119,23 +120,24 @@ You can also edit `.omp/agent-config.md` directly — it is the single source of
 
 ### 3. Connect your MCPs (optional but recommended)
 
-Copy `.claude/.mcp.json.sample` → `.claude/.mcp.json` and fill in your servers (e.g.
+Copy `.omp/mcp.json.sample` → `.omp/mcp.json` and fill in your servers (e.g.
 `company-a-docs`). Declare each in `.omp/agent-config.md` § Context Sources with the stages it
 should be consulted at. See [`docs/CONTEXT-SOURCES.md`](docs/CONTEXT-SOURCES.md). The
 `codebase-rag` source ships **disabled** until it is released.
 
 ### 4. Review permissions
 
-`.claude/settings.json` pre-allows the Bash patterns agents need (defaults target .NET:
-`dotnet test`/`build`/`format`) plus `mcp__<source>__*` for your context sources. Adjust to
-your toolchain and security preferences. **You must apply this yourself** — the agent cannot
-self-edit its own permission file.
+Under **omp**, bash approval is set in `.omp/config.yml` (`tools.approval.bash: allow`) — no
+per-command allowlist to maintain, and MCP tools are auto-discovered (no `mcp__<source>__*`
+grants). The `.claude/settings.json` allowlist is the legacy Claude Code path; its Bash
+defaults target Flutter (`flutter test`/`analyze`/`pub`).
 
 ### 5. Enable per-agent telemetry (recommended)
 
-`.claude/settings.json` ships a `hooks` block (`PostToolUse` + `SubagentStop`) that appends
-one JSONL line per tool call to `agent_states/events/<agent_id>.jsonl`. The run-report
-telemetry, the supervisor, and stall salvage all consume this log. Requires `python3` on PATH.
+Under **omp**, telemetry is native — the supervisor reads session transcripts directly and
+`.omp/hooks/log-event.ts` supplements them; no `python3` and no settings.json hook needed.
+(The `.claude/settings.json` `PostToolUse`/`SubagentStop` hooks are the legacy Claude Code
+path, appending JSONL to `agent_states/events/<agent_id>.jsonl`.)
 
 ### Conventions: tracked vs runtime
 

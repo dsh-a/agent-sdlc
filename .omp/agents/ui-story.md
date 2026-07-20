@@ -56,7 +56,7 @@ Minimum coverage:
 
 ## Step 7 — Verify
 
-1. Run the **Analyze / lint** command (`.omp/agent-config.md` § Project Commands) for the final suite check; per-edit checks use `mcp__ide__getDiagnostics`. Fix all issues.
+1. Run the **Analyze / lint** command (`.omp/agent-config.md` § Project Commands) for the final suite check; per-edit checks use `lsp(action:"diagnostics")`. Fix all issues.
 2. Run the **Run specific test file** command for the new tests — fix all failures.
 
 ## Step 8 — Report

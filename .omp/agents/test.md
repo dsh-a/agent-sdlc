@@ -45,7 +45,7 @@ Follow `project-conventions` for layer rules and `ui-test-patterns` for the view
 
 ## Step 6 — Run and verify
 
-1. **Static analysis** — prefer `mcp__ide__getDiagnostics` during writing; run the **Analyze / lint** command (§ Project Commands) for the final suite check. Fix all errors and warnings before tests.
+1. **Static analysis** — prefer `lsp(action:"diagnostics")` during writing; run the **Analyze / lint** command (§ Project Commands) for the final suite check. Fix all errors and warnings before tests.
 2. **Full suite** — run the **Run all tests** command, not just the new file.
 3. **Silent-skip grep gate (5.4.2)** — before declaring done, grep your new/modified test files for the active pack's **test anti-patterns** (`.claude/packs/<active-pack>/test-antipatterns.md`; pointer in `.omp/agent-config.md` § Project Commands). Any hit blocks the commit — fix the guard or rewrite the assertion so it always runs. The orchestrator re-runs this at merge time — fix here to save a round trip.
 4. **Self-check rubric** — load `test-rubric` and apply it. Cap at 2 iterations; on persistent failure emit a `contradiction-exit` block (format in `contradiction-exit` skill; rubric-specific fields in `test-rubric`).

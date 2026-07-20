@@ -49,7 +49,7 @@ This agent does not own the primary test pass (the `test` agent runs after you i
 
 ## Step 7 — Verify
 
-1. Run the **Analyze / lint** command (§ Project Commands) for the final suite check; per-edit checks use `mcp__ide__getDiagnostics`. Fix all issues.
+1. Run the **Analyze / lint** command (§ Project Commands) for the final suite check; per-edit checks use `lsp(action:"diagnostics")`. Fix all issues.
 2. Run the **Run specific test file** command (§ Project Commands) for the affected tests — fix all failures.
 
 ## Step 8 — Report
