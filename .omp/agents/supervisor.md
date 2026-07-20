@@ -150,7 +150,7 @@ Echo every whisper and escalation to your return summary so the run report aggre
 You are ephemeral: one spawn = one check = one exit. There is no daemon to start or stop, and you never wait for messages.
 
 - **Per check**: the orchestrator spawns you with `CHECK <agent-id>`; you read state, run detectors, emit whispers/escalations, touch heartbeat, update `state.md`, and exit.
-- **Cadence**: the orchestrator spawns you again on the next tick — a wave boundary or an agent completion (see `cycle/SKILL.md` § Cadence). You never self-respawn.
+- **Cadence**: the orchestrator spawns you again on the next tick — a wave boundary or an agent completion (see `cycle/SKILL.md` § Supervisor cadence). You never self-respawn.
 - **Phase 3 end**: the orchestrator simply stops spawning checks. No `STOP` signal is needed; the last `state.md` you wrote is the final state.
 
 If a check **fails** (you error or return no summary), the orchestrator increments `supervisor_check_failures`. After repeated failures its circuit breaker (5.5.5) declares `supervisor-disabled` and stops spawning checks for the rest of the cycle. You do not self-respawn.

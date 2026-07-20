@@ -9,7 +9,7 @@ Branch base: `develop` (`999ce44`). All changes are uncommitted-to-main; the bra
 ## Summary
 
 | Metric | Value |
-| Commits | 11 |
+| Commits | 10 |
 | Files changed | ~103 |
 | Lines added | ~2195 |
 | Lines removed | ~636 |
@@ -264,7 +264,7 @@ Cycle SKILL entry point: initialize `todo` with 7 pipeline phases. Mark `in_prog
 1. **Hook agent-id**: omp doesn't expose the subagent name to hooks via a stable env var. The hook falls back to "orchestrator". Non-fatal because the supervisor reads native transcripts (always correctly keyed by `id`).
 2. **`.claude/agents/` stale**: the `.claude/agents/` versions of monitor + supervisor still have file-based references. They're the Claude Code fallback; the `.omp/agents/` versions are omp-primary. Cycle SKILL path refs now point to `.omp/agents/`.
 3. **Claude Code compat**: untested and likely broken at the spawn layer. Accepted per the branch's purpose.
-4. **`.omp/agent-config.md` path**: stays at `.omp/agent-config.md` (agents read it by file path — works under omp). Renaming to `.omp/` is a follow-up.
+4. **`.omp/agent-config.md` path**: ✅ resolved — renamed from `.claude/config.md` to `.omp/agent-config.md` (Commit 10; agents read it by file path).
 
 ---
 

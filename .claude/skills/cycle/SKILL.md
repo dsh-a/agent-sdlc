@@ -518,7 +518,7 @@ The orchestrator collects supervisor escalations at three moments only (item 5.5
 2. **Sub-task boundary** — after each parent task's Commit protocol, before spawning the next.
 3. **After each supervisor check** — you've just collected a check's result (see 5.5.5: per-check spawn watchdog + circuit breaker), so drain any escalations it emitted.
 
-**Under omp (default):** drain your irc inbox at each moment — `irc(op: "inbox")` returns all pending escalation messages from the supervisor. No cursor tracking needed (messages are consumed on read). See the `escalations` skill § OMP IRC transport for the per-type handling (`pause-request` → recovery decision + `RESCUE`; `depth-recommendation` → log decision in cycle state; `bug-pattern` → log + surface in run report). For time-sensitive `pause-request` handling at watchdog ticks, `irc(op: "wait", from: "supervisor-<tick>", timeoutMs: 30000)`. Never block mid-tool-call.
+**Under omp (default):** drain your irc inbox at each moment — `irc(op: "inbox")` returns all pending escalation messages from the supervisor. No cursor tracking needed (messages are consumed on read). See the `escalations` skill § Transport for the per-type handling (`pause-request` → recovery decision + `RESCUE`; `depth-recommendation` → log decision in cycle state; `bug-pattern` → log + surface in run report). For time-sensitive `pause-request` handling at watchdog ticks, `irc(op: "wait", from: "supervisor-<tick>", timeoutMs: 30000)`. Never block mid-tool-call.
 
 **Claude Code fallback:** poll `agent_states/escalations.jsonl` with a per-cycle `escalation_cursor:` field tracking the last processed line.
 
@@ -584,7 +584,7 @@ Signals: explicit warnings, tool failures, truncation, very long session.
 
 1. Finish current in-flight agent only
 2. Pause signal to monitor (include worktree paths, current task)
-3. Schedule auto-resume: `CronCreate` (durable, one-shot, offset from round marks) with `/cycle --exe agent_states/cycle-state-[name].md`
+3. Schedule auto-resume — under **Claude Code** use `CronCreate` (durable, one-shot, offset from round marks); under **omp** there is no built-in scheduler, so resume manually with `/cycle --exe agent_states/cycle-state-[name].md`
 4. Report to user: what's done, resume point, manual fallback command
 
 ---

@@ -89,14 +89,15 @@ Switching stacks = pointing **Active Pack** at a different `packs/<lang>/` and p
 | Agent | `adversarial-tester` | Opt-in second-pass test hardening |
 | Agent | `self-improve` | Applies pipeline improvements |
 
-**omp-native features wired in:** native task isolation (replaces manual worktrees), irc for
-whispers + escalations + monitor streaming, batch task spawns with `id`/`role`/`isolated`,
-`local://` files for on-demand shared context, native session transcripts for supervisor
-observation, `explore` bundled agent for codebase scouting, LSP-first code intelligence,
-`ast_grep`/`ast_edit` for structural edits, `todo` for phase tracking, `autolearn` for
-cross-cycle learning, `advisor` (opt-in second-model review), `memory.backend: local` for
-persistent lessons, `retry.modelFallback` for OpenRouter resilience, `contextPromotion` for
-overflow recovery, `compaction.midTurnEnabled` for long Phase-3 runs.
+**omp-native features wired in:**
+
+- **Native task isolation** (replaces manual worktrees) with batch spawns (`id`/`role`/`isolated`)
+- **irc** for whispers, escalations, and monitor streaming
+- **`local://` files** for on-demand shared context; **native session transcripts** for supervisor observation
+- **`explore`** codebase-scouting agent · **LSP-first** intelligence · **`ast_grep`/`ast_edit`** structural edits
+- **`todo`** phase tracking · **`autolearn`** cross-cycle learning · **`advisor`** (opt-in second-model review)
+- **`memory.backend: local`** for persistent lessons
+- **OpenRouter resilience:** `retry.modelFallback`, `contextPromotion` (overflow recovery), `compaction.midTurnEnabled` (long Phase-3 runs)
 
 ---
 

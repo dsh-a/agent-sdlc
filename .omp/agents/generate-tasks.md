@@ -35,7 +35,7 @@ Use findings to calibrate task scope — don't create tasks for things that alre
 
 ## Step 3 — Generate parent tasks
 
-Create 4–6 parent tasks per `task-file-format` § Parent task structure. **Tag every parent task with a `[kind: ...]`** from the taxonomy in `task-file-format`. Pick the most specific kind; if a parent task spans kinds, split it. General code work that isn't a scaffold, UI story, or test task is `[kind: coding]` — reserve `[kind: task]` (generic) for the rare task no other kind fits.
+Create 4–6 parent tasks per `task-file-format` § Parent task structure. **Tag every parent task with a `[kind: ...]`** from the taxonomy in `task-file-format`. Pick the most specific kind; if a parent task spans kinds, split it. General code work that isn't a scaffold, UI story, or test task is `[kind: coding]` — reserve `[kind: general-purpose]` (generic) for the rare task no other kind fits.
 
 ## Step 4 — Generate sub-tasks
 

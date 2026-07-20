@@ -49,7 +49,7 @@ omp
 Then inside omp:
 
 ```
-/skill:setup
+/setup
 ```
 
 The wizard detects your stack (`pubspec.yaml` → flutter, `*.sln`/`*.csproj` → dotnet, `package.json` → node), selects a pack, and generates `.omp/agent-config.md` — Project Commands, Architecture Review Rules, Active Pack, Context Sources, and model preset. It also populates the active `project-conventions` skill from the chosen pack.
