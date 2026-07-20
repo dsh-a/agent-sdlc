@@ -87,7 +87,7 @@ Active preset: **personal**
 
 To override a single agent regardless of preset, change the value in that agent's row under the active preset column. The cycle orchestrator reads this table for all agent spawns — implementation agents at Phase 3.3, pre-digest and monitor at Phase 3 start.
 
-> **Under omp:** named agents (`create-prd`, `generate-tasks`, `scaffold`, `ui-story`, `coding`, `test`, `verify`, `review`) resolve their model from their own `.omp/agents/*` frontmatter, so changing the active preset here governs the **generic** spawns (`task`, `pre-digest`, `monitor`, `supervisor`) but does not re-tier a named agent unless the orchestrator passes an explicit `model:` override. To run a named agent at a different tier under omp, set it in that agent's `.omp/agents/*` frontmatter.
+> **Model resolution under omp:** each agent runs on the model the orchestrator passes at spawn; where it passes none (the Phase-4A `verify`/`review` spawns), the agent falls back to the tier in its `.omp/agents/*` frontmatter. So changing the preset re-tiers the table-driven spawns (generic `task` subagents, `monitor`, `pre-digest`, `supervisor`) but not the Phase-4A named agents — edit their `.omp/agents/*` frontmatter for those. Under Claude Code the orchestrator passes `model:` on every spawn, so the table governs all.
 
 ### Model Versions
 

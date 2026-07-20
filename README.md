@@ -54,7 +54,7 @@ This fork is **language-agnostic with explicit plug-in points**:
   AGENTS.md                      # project context (auto-loaded by omp, native priority 100)
   RULES.md                       # sticky hard rules (always-apply)
   hooks/
-    log-event.ts                 # telemetry hook (omp JS hook, replaces log-event.py)
+    log-event.ts                 # supplementary omp telemetry hook (JS)
 ```
 
 Switching stacks = pointing **Active Pack** at a different `packs/<lang>/` and populating the

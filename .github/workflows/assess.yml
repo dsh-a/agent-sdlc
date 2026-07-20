@@ -6,9 +6,9 @@ name: assess (model-backed)
 on:
   workflow_dispatch:
     inputs:
-      model:
-        description: OpenRouter model id
-        default: anthropic/claude-haiku-4.5
+      models:
+        description: OpenRouter model ids (comma-separated)
+        default: anthropic/claude-haiku-4.5,anthropic/claude-sonnet-4.5,google/gemini-2.5-flash,deepseek/deepseek-chat
   schedule:
     - cron: "0 9 * * 1"   # Mondays 09:00 UTC
 
@@ -24,7 +24,7 @@ jobs:
       - name: Run assessment
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          MODEL: ${{ github.event.inputs.model || 'anthropic/claude-haiku-4.5' }}
+          MODELS: ${{ github.event.inputs.models || 'anthropic/claude-haiku-4.5,anthropic/claude-sonnet-4.5,google/gemini-2.5-flash,deepseek/deepseek-chat' }}
         run: python tests/assess.py
       - uses: actions/upload-artifact@v4
         if: always()
