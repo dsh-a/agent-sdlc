@@ -45,10 +45,10 @@ Also read `.omp/agent-config.md` § Architecture Review Rules for layer boundari
 **Bootstrap.** If no project-specific pattern files exist at all, autonomously spawn a setup-scaffold pass before proceeding:
 
 ```
-Agent(subagent_type: "general-purpose", model: "sonnet",
-      prompt: "Run the /setup-scaffold skill in scan mode. Read
-               .claude/skills/setup-scaffold/SKILL.md and follow its steps.
-               Do not ask the user questions. Report what was created.")
+spawn agent: explore
+    Run the /setup-scaffold skill in scan mode. Read
+    .claude/skills/setup-scaffold/SKILL.md and follow its steps.
+    Do not ask the user questions. Report what was created.
 ```
 
 Wait for it to complete, then re-read `.claude/agents/scaffold/` and continue.

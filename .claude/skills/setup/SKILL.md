@@ -58,7 +58,7 @@ Ask about the project's architecture:
    Minimal APIs, MVVM, Blazor components, CQRS handlers.
 4. **"What DI pattern do you use?"** — e.g. built-in `IServiceCollection`, Autofac, manual factory.
 
-Fill in § Layer Boundaries, § Pattern Compliance, and § Convention Checks of `config.md`.
+Fill in § Layer Boundaries, § Pattern Compliance, and § Convention Checks of `.omp/agent-config.md`.
 
 ## Step 4 — Choose model preset
 
@@ -84,7 +84,7 @@ codebase-analysis / RAG service, an ADR store). For each:
 4. **enabled** — `false` until the MCP server is actually connected in `.omp/mcp.json`.
 5. a **query_hint**.
 
-Write these as rows in `config.md` § Context Sources, and remind the user to connect the
+Write these as rows in `.omp/agent-config.md` § Context Sources, and remind the user to connect the
 servers in `.omp/mcp.json` (template `.omp/mcp.json.sample`). Under omp, MCP tools are
 auto-discovered — no permission allowlist needed. See `.claude/skills/context-sources/SKILL.md`
 and `docs/CONTEXT-SOURCES.md`.

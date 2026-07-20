@@ -18,8 +18,8 @@ Optional scope filter: **$ARGUMENTS** (e.g., `economy`, `effectiveness`, a speci
 2. Spawn the `self-improve` agent with the scope (or empty for all):
 
 ```
-Agent(subagent_type: "self-improve", model: "sonnet",
-      prompt: "Scope: [argument or 'all'].")
+spawn agent: self-improve
+    Scope: [argument or 'all'].
 ```
 
 3. Surface the agent's report sections to the user:

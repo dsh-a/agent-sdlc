@@ -22,8 +22,8 @@ The feature description: **$ARGUMENTS**
 3. Spawn the `create-prd` agent:
 
 ```
-Agent(subagent_type: "create-prd", model: "sonnet",
-      prompt: "Feature: [description]. [Roadmap story number if any].")
+spawn agent: create-prd
+    Feature: [description]. [Roadmap story number if any].
 ```
 
 4. Read the produced PRD file (from the agent's return summary or its `produces:` path), present it to the user inline, and ask whether to revise. If yes → use the `/refine` skill on the PRD.

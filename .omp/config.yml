@@ -107,11 +107,6 @@ thinkingBudgets:
 # The 'full' preset shows model + cwd + git branch; add todo phase via custom segments.
 statusLine:
   preset: full
-thinkingBudgets:
-  low: 2048
-  medium: 8192
-  high: 16384
-  xhigh: 32768
 
 # Subagent service tier — inherit tracks the main agent's tier.
 tier:

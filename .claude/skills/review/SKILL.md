@@ -22,10 +22,10 @@ The branch or PR to review: **$ARGUMENTS**
 2. Spawn the `review` agent:
 
 ```
-Agent(subagent_type: "review", model: "sonnet",
-      prompt: "Branch: [name or PR ref]. PRD: [path or 'none'].
-               Report path: agent_tasks/reports/review-[feature]-[date].md.
-               Work autonomously — no user interaction.")
+spawn agent: review
+    Branch: [name or PR ref]. PRD: [path or 'none'].
+    Report path: agent_tasks/reports/review-[feature]-[date].md.
+    Work autonomously — no user interaction.
 ```
 
 3. After completion, read the report file and present:

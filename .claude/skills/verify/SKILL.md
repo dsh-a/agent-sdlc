@@ -23,10 +23,10 @@ The PRD or feature to verify: **$ARGUMENTS**
 3. Spawn the `verify` agent:
 
 ```
-Agent(subagent_type: "verify", model: "sonnet",
-      prompt: "PRD: [path]. Branch: [name]. Depth: [tier].
-               Report path: agent_tasks/reports/verify-[prd-stem]-[date].md.
-               Work autonomously — no user interaction.")
+spawn agent: verify
+    PRD: [path]. Branch: [name]. Depth: [tier].
+    Report path: agent_tasks/reports/verify-[prd-stem]-[date].md.
+    Work autonomously — no user interaction.
 ```
 
 4. After completion, read the report file and present its Coverage Matrix, Summary Statistics, and Recommendations to the user.

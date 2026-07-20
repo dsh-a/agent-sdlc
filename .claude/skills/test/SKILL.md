@@ -22,11 +22,11 @@ The class or feature to test: **$ARGUMENTS**
 3. Spawn the `test` agent with the gathered context:
 
 ```
-Agent(subagent_type: "test", model: "sonnet",
-      prompt: "Source files: [paths]
-               Test files: [paths or 'derive from source path']
-               AC: [pre-extracted from PRD or supplied inline]
-               Task: write tests for [target]")
+spawn agent: test
+    Source files: [paths]
+    Test files: [paths or 'derive from source path']
+    AC: [pre-extracted from PRD or supplied inline]
+    Task: write tests for [target]
 ```
 
 4. Surface the agent's report (test files written/modified, AC coverage, rubric outcome, items requiring user action) verbatim.

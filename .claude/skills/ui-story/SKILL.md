@@ -22,11 +22,11 @@ The screen, component, or feature: **$ARGUMENTS**
 3. Spawn the `ui-story` agent:
 
 ```
-Agent(subagent_type: "ui-story", model: "sonnet",
-      prompt: "PRD: [path or 'inline AC: ...'].
-               Source files: [paths or 'derive'].
-               AC: [pre-extracted].
-               Task: [description].")
+spawn agent: ui-story
+    PRD: [path or 'inline AC: ...'].
+    Source files: [paths or 'derive'].
+    AC: [pre-extracted].
+    Task: [description].
 ```
 
 4. Surface the agent's report: files created/modified, DI + route wiring added, AC coverage, test file path + count, golden update commands (if any), analyze/test status.
