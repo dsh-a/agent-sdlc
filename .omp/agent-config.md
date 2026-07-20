@@ -44,7 +44,7 @@ Every artifact is one of three classes:
 
 ## Docs Vault (external artifact store)
 
-When `vault_root` is set, the orchestrator redirects **vault**-class artifacts out of the application repo into a shared, git-backed Obsidian vault. This keeps retrospective process artifacts (cycle reports, run/verify/review reports) out of the product's git history while making them browsable and analyzable across every application that shares the vault. Leave `vault_root` empty to keep these artifacts local (committed to the app repo) — the framework is fully backward-compatible.
+When `vault_root` is set, the orchestrator redirects **vault**-class artifacts out of the application repo into a shared, git-backed **vault repo** (e.g. `ocelot-docs`) and commits + pushes it at cycle Finalize (§ cycle SKILL, Phase 4A step 7b). This keeps retrospective process artifacts (cycle reports, run/verify/review reports) out of the product's git history while versioning them in one place, browsable as plain Markdown across every application that shares the vault. Leave `vault_root` empty to keep these artifacts local (committed to the app repo) — the framework is fully backward-compatible.
 
 | Field | Value | Description |
 |---|---|---|
@@ -58,7 +58,7 @@ When `vault_root` is set, the orchestrator redirects **vault**-class artifacts o
 | `cycle_reports` | `{vault_root}/cycle_reports/{app_slug}/` |
 | `agent_tasks/reports` | `{vault_root}/reports/{app_slug}/` |
 
-The symlinks are added to the managed `.gitignore` block (no trailing slash — git treats a symlink as a file), so the application repo never commits vault artifacts. The vault is versioned by its own git remote (e.g. `ocelot-docs`), independent of any application repo.
+The symlinks are added to the managed `.gitignore` block (no trailing slash — git treats a symlink as a file), so the application repo never commits vault artifacts. The vault is a standalone git repo with its own remote (e.g. `ocelot-docs`), independent of any application repo; the orchestrator commits and pushes it at cycle Finalize so reports reach the remote without manual steps.
 
 ---
 

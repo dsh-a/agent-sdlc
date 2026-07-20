@@ -667,7 +667,17 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
 7. Run the **Finalize one-shot spawn** (§ State persistence) with `FINALIZE report:[path]` — it archives, then deletes the state file. **Do not skip.** The cycle may end here if the user handles the PR manually.
 
-**4A is not complete until steps 1–7 are done. Do not skip any step.**
+7b. **Vault sync** — if `vault_root` (§ Docs Vault in `.omp/agent-config.md`) is non-empty, commit and push the vault repo so this cycle's reports reach its remote (e.g. `ocelot-docs`). Orchestrator-run — the finalize monitor holds only `rm agent_states/*`, not git. **Best-effort: a vault push failure must not fail the cycle.**
+
+   ```
+   git -C "{vault_root}" add -A
+   git -C "{vault_root}" diff --cached --quiet || git -C "{vault_root}" commit -m "cycle {feature}: reports ({app_slug})"
+   git -C "{vault_root}" push || echo "vault push failed — reports are committed locally in the vault; push manually."
+   ```
+
+   If `vault_root` is empty, skip — reports are committed to the app repo as usual (backward-compatible default).
+
+**4A is not complete until steps 1–7 are done (plus 7b when a vault is configured). Do not skip any step.**
 
 ### 4B — Release (after gate passes; user confirmation required for PARTIAL)
 
