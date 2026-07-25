@@ -231,7 +231,7 @@ Cycle SKILL entry point: initialize `todo` with 7 pipeline phases. Mark `in_prog
 | File | What changed |
 |---|---|
 | `CLAUDE.md` | Rewritten — structure shows `.omp/` + `.claude/`, harness target documented |
-| `docs/WORKPLACE-SETUP.md` | Rewritten — 6-step omp + OpenRouter onboarding |
+| `docs/SETUP.md` | Rewritten — 6-step omp + OpenRouter onboarding |
 | `.claude/skills/context-sources/SKILL.md` | Rewritten — `local://` files, no `ToolSearch`, omp auto-discovers MCP tools |
 | `docs/CONTEXT-SOURCES.md` | Updated — `local://` files, `.omp/mcp.json`, no permission allowlist |
 | `.claude/packs/README.md` | Updated — switch steps reference `.omp/agents/` + `.omp/config.yml` |
@@ -303,7 +303,7 @@ Decision: keep `.claude/agents/` and other Claude Code files in place (omp ignor
 |---|---|---|
 | `debug` tool | `.omp/agents/test.md` | Step through failing tests with breakpoints, inspect variables, evaluate expressions — instead of reading code and guessing |
 | `checkpoint`/`rewind` | `.claude/skills/cycle/SKILL.md` | Orchestrator checkpoints before risky ops (L3 reverts, scope changes, complex merges); rewinds on failure instead of full cycle restart |
-| Profiles | `docs/WORKPLACE-SETUP.md` | `omp --profile <name>` for team workflows — isolated MCP + model roles per engineer, shared pipeline config |
+| Profiles | `docs/SETUP.md` | `omp --profile <name>` for team workflows — isolated MCP + model roles per engineer, shared pipeline config |
 | `statusLine` | `.omp/config.yml` | `preset: full` — show model + cwd + git branch in TUI |
 
 
@@ -313,7 +313,7 @@ Decision: keep `.claude/agents/` and other Claude Code files in place (omp ignor
 | Feature | Where | What it does |
 |---|---|---|
 | Plan mode mapping | cycle SKILL | Dry-run maps to `omp --plan`; restricts tools to read/search/find/lsp/web_search |
-| Session export | WORKPLACE-SETUP | `/session export/share/fork` for team review + post-mortem |
+| Session export | SETUP | `/session export/share/fork` for team review + post-mortem |
 | TTSR phase rules | .omp/RULES.md | Four phase-specific rules re-injected near current turn after context growth |
 | OpenRouter extraBody | models.yml.sample | Gateway hints, controller selectors for team-specific routing |
 | Protective hook | .omp/hooks/protect.ts | Blocks edits to generated files; prompts on dangerous bash |

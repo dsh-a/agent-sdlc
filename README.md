@@ -1,103 +1,119 @@
-# agent-sdlc — workplace fork
+# agent-sdlc
 
-An agent team for autonomous feature development on **Oh My Pi (omp)** + OpenRouter (Claude Code compatible, but that path is untested). Drop the `.claude/` **and** `.omp/` directories
-into your project and get a full SDLC pipeline — from feature idea to
-tested, reviewed PR — driven by `/cycle`.
+An agent team that takes a feature from idea to a tested, reviewed PR — autonomously,
+driven by a single `/cycle` command. It runs a full SDLC pipeline: PRD → task breakdown →
+parallel implementation → test → verify → review → PR.
 
-This fork is **language-agnostic with explicit plug-in points**:
+**Language-agnostic by design.** The core pipeline is stack-neutral; stack-specific rules
+live in a swappable **pack** (`.claude/packs/<lang>/`). Flutter ships active by default,
+with .NET as an alternate template.
 
-- The **core** (orchestrator, agents, pipeline) is stack-neutral. Stack-specific rules live
-  in a **pack** (`.claude/packs/<lang>/`). The default active pack is **Flutter**; **.NET**
-  ships as an alternate template.
-- External knowledge — a documentation MCP (`company-a-docs`), a RAG codebase-analysis
-  service (`codebase-rag`), etc. — plugs in at named pipeline stages via the
-  **Context Sources** registry. No code changes to add one: a config row + a connected MCP.
+**Pluggable knowledge sources.** Wire in external context — a documentation MCP, a RAG
+codebase-analysis service (e.g. `company-a-docs`, `codebase-rag`) — at named pipeline stages
+through the **Context Sources** registry. Adding one is a config row plus a connected MCP; no
+code changes.
 
-> **New here? Read [`docs/WORKPLACE-SETUP.md`](docs/WORKPLACE-SETUP.md) first.** It walks an
-> engineer from clone → connect MCPs → `/setup` → first `/cycle`.
+**Runs on Claude Code, Pi, and Oh My Pi (omp), and is OpenRouter ready** — route every
+agent through the models you choose.
+
+> **New here?** Start with [`docs/SETUP.md`](docs/SETUP.md) — clone → connect MCPs →
+> `/setup` → first `/cycle`.
 
 ---
 
-## Detailed documentation (read these)
+## Documentation
 
-| Doc | Covers |
+| Path | What it is |
 |---|---|
-| [`docs/WORKPLACE-SETUP.md`](docs/WORKPLACE-SETUP.md) | End-to-end onboarding for a new engineer |
-| [`docs/CONTEXT-SOURCES.md`](docs/CONTEXT-SOURCES.md) | Wiring MCP / RAG context sources into the cycle |
-| [`.claude/README.md`](.claude/README.md) | The `.claude/` layout and the core-vs-pack model |
-| [`.claude/packs/README.md`](.claude/packs/README.md) | Authoring a language pack (+ the Flutter example) |
-| [`.claude/skills/README.md`](.claude/skills/README.md) | Skill catalog — core vs pack-provided |
-| [`.claude/agents/README.md`](.claude/agents/README.md) | Agent catalog, the Phase-3 spawn model, context injection |
+| [`docs/SETUP.md`](docs/SETUP.md) | Onboarding guide — zero to a first `/cycle` run. |
+| [`docs/CONTEXT-SOURCES.md`](docs/CONTEXT-SOURCES.md) | Operator's guide to the MCP / RAG context-source registry. |
 
 ---
+
+## Layout
+
+```
+.claude/                       # the pipeline — copy into a project to install
+  skills/                      # /cycle orchestrator, entry-point commands, agent rubrics
+    cycle/                     #   the orchestrator
+    project-conventions/       #   ACTIVE stack conventions (loaded by agents)
+    context-sources/           #   the MCP / RAG plug-in contract
+  packs/                       # swappable language packs
+    flutter/                   #   default active pack
+    dotnet/                    #   alternate template (fill via /setup)
+  agents/                      # source-of-truth agent bodies
+  .mcp.json.sample             # MCP template (Claude Code path)
+.omp/                          # native Oh My Pi adapter layer
+  agent-config.md              # ★ the one file you customize (Active Pack, Project Commands,
+                               #   Architecture Rules, Context Sources, model preset)
+  agents/                      # omp-native agent definitions
+  config.yml                   # harness settings (modelRoles → OpenRouter, approval, task)
+  models.yml.sample            # OpenRouter provider config + per-tier model menu
+  mcp.json.sample              # Context Sources MCP template (omp format)
+  AGENTS.md                    # project context (auto-loaded by omp)
+  RULES.md                     # sticky hard rules (always-apply)
+  hooks/log-event.ts           # supplementary telemetry hook
+```
 
 ## The core-vs-pack model
 
-```
-.omp/agent-config.md             # the one file you customize (Active Pack, Project Commands,
-                                 #   Architecture Rules, Context Sources, model preset) — lives in .omp/
-.claude/
-  skills/                        # discovered by omp via the `claude` provider (priority 80)
-    project-conventions/         # ACTIVE conventions — loaded by agents deterministically
-    context-sources/             # the MCP/RAG plug-in contract
-    cycle/                       # the orchestrator
-  packs/
-    flutter/                     # default active pack
-    dotnet/                      # alternate template (placeholders — fill via /setup)
-  agents/                        # source-of-truth agent bodies (Claude Code path)
-  .mcp.json.sample               # template for connecting your MCP servers
-.omp/
-  agents/                        # 13 omp-native agent definitions (frontmatter + body)
-  config.yml                     # omp harness settings (modelRoles → OpenRouter, approval, task)
-  models.yml.sample              # OpenRouter provider config + per-tier model menu
-  mcp.json.sample                # Context Sources MCP template (omp format)
-  AGENTS.md                      # project context (auto-loaded by omp, native priority 100)
-  RULES.md                       # sticky hard rules (always-apply)
-  hooks/
-    log-event.ts                 # supplementary omp telemetry hook (JS)
-```
-
-Switching stacks = pointing **Active Pack** at a different `packs/<lang>/` and populating the
-`project-conventions` skill from it (which `/setup` automates). See
+The **core** — orchestrator, agents, skills — is stack-neutral. Everything a specific stack
+needs lives in a **pack** under `.claude/packs/<lang>/`: conventions, test patterns, idioms.
+Switching stacks means pointing **Active Pack** at a different `packs/<lang>/` and populating
+the `project-conventions` skill from it — which `/setup` automates. See
 [`.claude/packs/README.md`](.claude/packs/README.md).
 
 ---
 
 ## What's included
 
-| Type | Name | Purpose |
+**Commands** — slash-invocable skills:
+
+| Command | Purpose |
+|---|---|
+| `/cycle` | Run the full pipeline end-to-end (the main entry point) |
+| `/setup` | Configuration wizard — detects the stack, picks a pack |
+| `/create-prd` | Write a PRD from a feature description |
+| `/generate-tasks` | Decompose a PRD into an implementation task list |
+| `/process-tasks` | Step through a task list manually, one sub-task at a time |
+| `/scaffold` | Scaffold new components (entities, services, interfaces, UI) |
+| `/ui-story` | Build or modify a UI / presentation-layer component |
+| `/test` | Write rigorous, anti-faking tests |
+| `/verify` | Audit whether tests genuinely satisfy acceptance criteria |
+| `/review` | Independent code review before merging |
+| `/feature-idea` | Capture a feature idea, optionally hand off to `/cycle` |
+| `/refine` | Refine a story toward INVEST / Definition-of-Ready |
+| `/self-improve` | Analyze past cycle runs and tune agent/skill instructions |
+
+Agents also load internal skills that aren't invoked directly — `project-conventions` (active
+stack rules), `minimalism` (the reuse-first ladder), `context-sources` (the plug-in contract),
+plus the output-format rubrics.
+
+**Agents** — spawned by `/cycle`:
+
+| Agent | Phase | Role |
 |---|---|---|
-| Skill | `/cycle` | Main orchestrator — runs the full pipeline end-to-end |
-| Skill | `/create-prd` | Write a PRD from a feature description |
-| Skill | `/generate-tasks` | Decompose a PRD into an implementation task list |
-| Skill | `/process-tasks` | Step through a task list manually (one sub-task at a time) |
-| Skill | `/ui-story` | Build or modify a UI / presentation-layer component |
-| Skill | `/test` | Write rigorous, anti-faking tests |
-| Skill | `/verify` | Audit whether tests genuinely satisfy acceptance criteria |
-| Skill | `/review` | Independent code review before merging |
-| Skill | `/scaffold` | Scaffold new components (entities, services, interfaces, UI) |
-| Skill | `/feature-idea` | Capture a feature idea and optionally hand off to `/cycle` |
-| Skill | `/refine` | Refine a story toward INVEST / Definition-of-Ready |
-| Skill | `/self-improve` | Analyze past cycle runs and tune agent/skill instructions |
-| Skill | `/setup` | Interactive configuration wizard (detects stack, picks a pack) |
-| Skill | `project-conventions` | The active stack's conventions (loaded by agents) |
-| Skill | `minimalism` | The reuse-first / YAGNI ladder (loaded by implementers) |
-| Skill | `context-sources` | The MCP/RAG plug-in contract |
-| Agent | `create-prd`, `generate-tasks`, `scaffold`, `ui-story`, `coding`, `test`, `test-preflight` | Spawned by `/cycle` during Phases 1–3 |
-| Agent | `verify`, `review` | Spawned during Phase 4A — AC audit + code review |
-| Agent | `monitor`, `supervisor` | Cycle state persistence + Phase-3 observation |
-| Agent | `adversarial-tester` | Opt-in second-pass test hardening |
-| Agent | `self-improve` | Applies pipeline improvements |
+| `create-prd`, `generate-tasks`, `scaffold`, `ui-story`, `coding`, `test`, `test-preflight` | 1–3 | PRD, tasks, implementation |
+| `verify`, `review` | 4A | AC audit + code review |
+| `monitor`, `supervisor` | — | Cycle state persistence + Phase-3 observation |
+| `adversarial-tester` | opt-in | Second-pass test hardening |
+| `self-improve` | — | Applies pipeline improvements |
 
-**omp-native features wired in:**
+---
 
-- **Native task isolation** (replaces manual worktrees) with batch spawns (`id`/`role`/`isolated`)
-- **irc** for whispers, escalations, and monitor streaming
-- **`local://` files** for on-demand shared context; **native session transcripts** for supervisor observation
-- **`explore`** codebase-scouting agent · **LSP-first** intelligence · **`ast_grep`/`ast_edit`** structural edits
-- **`todo`** phase tracking · **`autolearn`** cross-cycle learning · **`advisor`** (opt-in second-model review)
-- **`memory.backend: local`** for persistent lessons
-- **OpenRouter resilience:** `retry.modelFallback`, `contextPromotion` (overflow recovery), `compaction.midTurnEnabled` (long Phase-3 runs)
+## omp-native integration
+
+Run on Oh My Pi, the pipeline uses the harness's native machinery instead of the file-based
+Claude Code fallbacks:
+
+| Capability | What it does |
+|---|---|
+| **Task isolation + batch spawns** | Each Phase-3 agent runs in an isolated workspace (`isolated: true`, no manual worktrees); independent tasks spawn together in one batch, each with its own `id`/`role`. |
+| **irc messaging** | The `irc` tool carries supervisor whispers, escalations, and monitor streaming — delivered immediately, no polling. |
+| **Shared context** | `local://` files hold on-demand shared context; native session transcripts feed supervisor observation. |
+| **Code intelligence** | The `explore` scouting agent, LSP-first navigation, and `ast_grep` / `ast_edit` structural edits. |
+| **Cross-cycle learning** | `todo` phase tracking, `autolearn` lessons, `advisor` (opt-in second-model review), and persistent lessons via `memory.backend: local`. |
+| **OpenRouter resilience** | `retry.modelFallback` (retry a failed call on another model), `contextPromotion` (context-overflow recovery), and `compaction.midTurnEnabled` (mid-turn compaction for long Phase-3 runs). |
 
 ---
 
@@ -110,58 +126,10 @@ cp -r .claude/ /path/to/your-project/.claude/
 cp -r .omp/    /path/to/your-project/.omp/
 ```
 
-### 2. Run `/setup`
+### 2. Pick your OpenRouter models
 
-`/setup` detects your stack (`*.sln`/`*.csproj` → dotnet, `pubspec.yaml` → flutter,
-`package.json` → node, …), selects a pack, and generates `.omp/agent-config.md` — Project
-Commands, Architecture Review Rules, Active Pack, Context Sources, and model preset. It also
-populates the active `project-conventions` skill from the chosen pack.
-
-You can also edit `.omp/agent-config.md` directly — it is the single source of customization.
-
-### 3. Connect your MCPs (optional but recommended)
-
-Copy `.omp/mcp.json.sample` → `.omp/mcp.json` and fill in your servers (e.g.
-`company-a-docs`). Declare each in `.omp/agent-config.md` § Context Sources with the stages it
-should be consulted at. See [`docs/CONTEXT-SOURCES.md`](docs/CONTEXT-SOURCES.md). The
-`codebase-rag` source ships **disabled** until it is released.
-
-### 4. Review permissions
-
-Under **omp**, bash approval is set in `.omp/config.yml` (`tools.approval.bash: allow`) — no
-per-command allowlist to maintain, and MCP tools are auto-discovered (no `mcp__<source>__*`
-grants). The `.claude/settings.json` allowlist is the legacy Claude Code path; its Bash
-defaults target Flutter (`flutter test`/`analyze`/`pub`).
-
-### 5. Enable per-agent telemetry (recommended)
-
-Under **omp**, telemetry is native — the supervisor reads session transcripts directly and
-`.omp/hooks/log-event.ts` supplements them; no `python3` and no settings.json hook needed.
-(The `.claude/settings.json` `PostToolUse`/`SubagentStop` hooks are the legacy Claude Code
-path, appending JSONL to `agent_states/events/<agent_id>.jsonl`.)
-
-### Conventions: tracked vs runtime
-
-| Directory | Tracked? |
-|---|---|
-| `agent_tasks/` (PRDs, task files) | committed |
-| `documentation/` (FEATURES, ROADMAP, CHANGELOG, …) | committed |
-| `agent_states/` (cycle state, telemetry, worktrees) | **never committed** |
-| `cycle_reports/`, `agent_tasks/reports/` | vault or local (see config § Docs Vault) |
-
-Gitignore protection is automatic — on every `/cycle` the orchestrator ensures a managed
-block keeps runtime artifacts out of git.
-
-
-## omp + OpenRouter deployment
-
-This branch (`feature/omp-openrouter`) targets the **Oh My Pi (omp)** harness with models
-routed through **OpenRouter**. The `.omp/` directory is the native omp adapter layer; `.claude/`
-remains the source of truth for skills, packs, and the agent-readable runtime config.
-
-### 1. Pick your OpenRouter models per tier
-
-Copy `.omp/models.yml.sample` → `~/.omp/agent/models.yml` and uncomment **one model per tier**:
+Copy `.omp/models.yml.sample` → `~/.omp/agent/models.yml` and uncomment **one model per tier**,
+then set `OPENROUTER_API_KEY` in your env or `<repo>/.env`.
 
 | Tier | omp role | Used by | Canonical id |
 |---|---|---|---|
@@ -169,30 +137,21 @@ Copy `.omp/models.yml.sample` → `~/.omp/agent/models.yml` and uncomment **one 
 | sonnet | `default` / `task` | implementation agents | `claude-sonnet-4-5` |
 | haiku | `smol` | monitor, preflight, supervisor | `claude-haiku-4-5` |
 
-Uncomment the matching `equivalence.overrides` lines so each OpenRouter model coalesces to its
-canonical tier id. Set `OPENROUTER_API_KEY` in your env or `<repo>/.env`.
+Uncomment the matching `equivalence.overrides` lines so each model coalesces to its canonical
+tier id.
 
-### 2. Connect MCPs (omp format)
+### 3. Run `/setup`
 
-Copy `.omp/mcp.json.sample` → `.omp/mcp.json` and fill in your context-source servers. Declare
-each in `.omp/agent-config.md` § Context Sources (the orchestrator reads that table at runtime).
+`/setup` detects your stack (`pubspec.yaml` → flutter, `*.sln`/`*.csproj` → dotnet,
+`package.json` → node, …), selects a pack, and generates `.omp/agent-config.md` — Project
+Commands, Architecture Review Rules, Active Pack, Context Sources, and model preset — then
+populates the active `project-conventions` skill from the pack. You can edit
+`.omp/agent-config.md` directly at any time; it's the single source of customization.
 
-### 3. Telemetry (native transcripts + supplementary hook)
-
-Under omp, the **primary** per-agent telemetry is the native session transcript: each subagent
-spawned with `id: "<role>-<task-number>"` gets `<id>.jsonl` (full tool-call history) and
-`history://<id>` (concise view). The supervisor reads these directly — no hook required for
-per-agent event logging.
-
-`.omp/hooks/log-event.ts` is a **supplementary** JS hook that writes a compatibility event log
-to `agent_states/events/<agent_id>.jsonl` (matching the Claude Code schema) and bumps the
-cadence counter. It's a fallback for the supervisor's file-path detectors, not the primary
-signal. omp auto-discovers hooks under `.omp/hooks/`.
-
-**Agent-id resolution:** the orchestrator passes `id: "<role>-<task-number>"` in every task
-spawn. This sets the child session's agentId, irc address, registry key, and artifact filename.
-The supervisor reads the native transcript (always correctly keyed by `id`) as the primary
-source; the hook's agent-id fallback (`OMP_AGENT_NAME` env → "orchestrator") is non-fatal.
+To wire in knowledge sources, copy `.omp/mcp.json.sample` → `.omp/mcp.json`, fill in your
+servers, and declare each in `.omp/agent-config.md` § Context Sources with the stages it should
+be consulted at (see [`docs/CONTEXT-SOURCES.md`](docs/CONTEXT-SOURCES.md)). The `codebase-rag`
+source ships **disabled** until it is released.
 
 ### 4. Run `/cycle`
 
@@ -201,42 +160,66 @@ omp          # launch from the repo root — omp discovers .omp/ + .claude/
 /cycle Add CSV export to the reports page
 ```
 
-omp discovers agents from `.omp/agents/` (native, priority 100), skills from `.claude/skills/`
-(claude provider, priority 80), and loads `.omp/AGENTS.md` + `.omp/RULES.md` as context. The
-`modelRoles` in `.omp/config.yml` resolve every spawn through your OpenRouter picks.
+> Full onboarding — prerequisites, permissions, and troubleshooting — lives in
+> [`docs/SETUP.md`](docs/SETUP.md).
 
-### 5. Inter-agent messaging (irc)
+### Tracked vs runtime files
 
-Under omp, the supervisor's whispers and escalations travel over the **irc** tool instead of
-the file-based polling channels. irc delivers immediately, wakes idle recipients, and persists
-as `irc:incoming` messages in each recipient's session — no polling, no cursor tracking.
+| Directory | Tracked? |
+|---|---|
+| `agent_tasks/` (PRDs, task files) | committed |
+| `documentation/` (FEATURES, ROADMAP, CHANGELOG, …) | committed |
+| `agent_states/` (cycle state, telemetry) | **never committed** |
+| `cycle_reports/`, `agent_tasks/reports/` | vault or local (see config § Docs Vault) |
 
-| Channel | File path (Claude Code) | omp irc path |
+Gitignore protection is automatic — on every `/cycle` the orchestrator ensures a managed block
+keeps runtime artifacts out of git.
+
+---
+
+## How it runs on omp
+
+The `.omp/` directory is the native omp adapter layer; `.claude/` remains the source of truth
+for skills, packs, and the agent-readable runtime config.
+
+### Harness discovery
+
+omp discovers agents from `.omp/agents/` (native, priority 100) and skills from
+`.claude/skills/` (claude provider, priority 80), and loads `.omp/AGENTS.md` + `.omp/RULES.md`
+as context. The `modelRoles` in `.omp/config.yml` resolve every spawn through your OpenRouter
+picks.
+
+### Telemetry
+
+Per-agent telemetry is the native session transcript: each subagent spawned with
+`id: "<role>-<task-number>"` gets a `<id>.jsonl` tool-call history (and a concise
+`history://<id>` view) that the supervisor reads directly. `.omp/hooks/log-event.ts` supplements
+it with a compatibility event log under `agent_states/events/` — no external hook runtime
+required. The file-based `.claude/settings.json` hooks are the Claude Code equivalent.
+
+### Inter-agent messaging (irc)
+
+Supervisor whispers and escalations travel over the `irc` tool — delivered immediately, waking
+idle recipients, no polling. The file-based paths are the Claude Code equivalent.
+
+| Channel | omp (irc) | Claude Code (files) |
 |---|---|---|
-| Whispers (supervisor → impl agent) | `agent_states/whispers/<id>.md` | `irc(op: "send", to: "<id>", …)` |
-| Escalations (supervisor → orchestrator) | `agent_states/escalations.jsonl` | `irc(op: "send", to: "Main", …)` |
-| Orchestrator collection | poll at 3 moments + cursor | `irc(op: "inbox")` at the same 3 moments |
+| Whispers (supervisor → impl agent) | `irc(op:"send", to:"<id>", …)` | `agent_states/whispers/<id>.md` |
+| Escalations (supervisor → orchestrator) | `irc(op:"send", to:"Main", …)` | `agent_states/escalations.jsonl` |
+| Orchestrator collection | `irc(op:"inbox")` | poll at 3 moments + cursor |
 
-The `whispers` and `escalations` skills carry an "OMP IRC transport" section documenting the
-protocol; the file-based path remains as the Claude Code fallback. The severity ladder
-(`note` → `strong` → `pause`) is unchanged — it moves into the irc message body as a
-`[severity]` prefix.
+The severity ladder (`note` → `strong` → `pause`) rides in the message body as a `[severity]`
+prefix.
 
-### 6. Native task isolation + batch spawns
+### Task isolation + batch spawns
 
-Phase-3 implementation agents spawn with `isolated: true` — omp captures a baseline from the
-feature-branch HEAD, creates an isolated workspace, runs the agent, commits to a task branch
-(`omp/task/<id>`), and cherry-picks into the feature branch. This replaces the manual
-`git worktree add` + worktree-startup preamble + manual merge/teardown entirely.
-
-Independent parent tasks spawn as a **batch** — one `task` call with a `tasks[]` array, each
-item getting its own `id`, `role`, `assignment`, and `isolated: true`. Shared background (PRD
-path, AC, context-source blocks, digest) is written to granular `local://` files once; each
-agent's `assignment` references only the files it needs, so the agent reads on demand rather
-than having all context injected as input tokens. The session semaphore bounds concurrency.
-
-Pre-digest agents run as parallel background **jobs** (`job poll` to collect), overlapping
-digestion across independent tasks while the orchestrator does other work.
+Phase-3 implementation agents spawn with `isolated: true`: omp captures a baseline from the
+feature-branch HEAD, runs the agent in an isolated workspace, commits to a task branch
+(`omp/task/<id>`), and cherry-picks back into the feature branch — no manual worktrees.
+Independent tasks spawn as one **batch**, each with its own `id`/`role`; shared background (PRD
+path, AC, context-source blocks) is written once to granular `local://` files that each agent
+reads on demand rather than receiving as injected tokens. Pre-digest agents run as parallel
+background jobs, overlapping digestion across tasks.
 
 ---
 
@@ -279,18 +262,9 @@ Resume a paused cycle: `/cycle --exe agent_states/cycle-state-[feature-name].md`
 
 ---
 
-## Other skills
-
-- **`/process-tasks <task-file>`** — step through a task list manually, one sub-task at a time.
-- **`/feature-idea`** — capture a new feature idea and optionally hand off to `/cycle`.
-- **`/refine <story-file>`** — refine a single story toward INVEST / Definition-of-Ready.
-- **`/self-improve`** — after a few cycles, analyze patterns and tune agent instructions.
-
----
-
 ## Customizing
 
-`.omp/agent-config.md` is the primary customization point (run `/setup`, or edit directly).
+Run `/setup`, or edit `.omp/agent-config.md` directly:
 
 | What to customize | Where |
 |---|---|
