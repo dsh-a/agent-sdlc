@@ -96,6 +96,7 @@ File location: `lib/ui/<feature>/views/<feature>_view.dart`. Route wiring (if ne
 
 ## Formatting & comments
 
+- **After editing any Dart file, run the Format command** (§ Project Commands) before you finish — CI enforces it with `dart format --set-exit-if-changed`, so an unformatted file fails the build. Don't hand-tune whitespace; let the formatter own it.
 - Line length: **100** characters max.
 - `///` for public API documentation; inline comments explain *why*, not *what*.
 

@@ -219,6 +219,7 @@ Agents run these commands to test, lint, and generate code. This table is the **
 | Run all tests | `flutter test` |
 | Run specific test file | `flutter test <path>` |
 | Analyze / lint | `flutter analyze` |
+| Format | `dart format .` |
 | Code generation | `flutter pub run build_runner build --delete-conflicting-outputs` |
 | Test path glob | `test/**` |
 | Test anti-patterns | `.claude/packs/flutter/test-antipatterns.md` |

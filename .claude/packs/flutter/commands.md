@@ -11,10 +11,12 @@ step or test glob).
 | Run all tests | `flutter test` |
 | Run specific test file | `flutter test <path>` |
 | Analyze / lint | `flutter analyze` |
+| Format | `dart format .` |
 | Code generation | `flutter pub run build_runner build --delete-conflicting-outputs` |
 | Test path glob | `test/**` |
 | Test anti-patterns | `.claude/packs/flutter/test-antipatterns.md` |
 
+- **Format** must be run after editing any Dart file — CI enforces it with `dart format --set-exit-if-changed`, so an unformatted file fails the build. This is a pack convention (see `conventions.md` § Formatting), loaded by agents via `project-conventions` — not hardcoded into agent instructions.
 - **Code generation** is optional — omit it if the project has no codegen step.
 - **Test path glob** scopes the silent-skip gate and preflight short-circuit (`test/**` for Flutter; .NET-style layouts use `tests/**`).
 - **Test anti-patterns** points at this pack's regex list, grepped by the cycle silent-skip gate.
