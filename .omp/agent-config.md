@@ -44,11 +44,11 @@ Every artifact is one of three classes:
 
 ## Docs Vault (external artifact store)
 
-When `vault_root` is set, the orchestrator redirects **vault**-class artifacts out of the application repo into a shared, git-backed **vault repo** (e.g. `ocelot-docs`) and commits + pushes it at cycle Finalize (§ cycle SKILL, Phase 4A step 7b). This keeps retrospective process artifacts (cycle reports, run/verify/review reports) out of the product's git history while versioning them in one place, browsable as plain Markdown across every application that shares the vault. Leave `vault_root` empty to keep these artifacts local (committed to the app repo) — the framework is fully backward-compatible.
+When `vault_root` is set, the orchestrator redirects **vault**-class artifacts out of the application repo into a shared, git-backed **vault repo** (e.g. `myapp-docs`) and commits + pushes it at cycle Finalize (§ cycle SKILL, Phase 4A step 7b). This keeps retrospective process artifacts (cycle reports, run/verify/review reports) out of the product's git history while versioning them in one place, browsable as plain Markdown across every application that shares the vault. Leave `vault_root` empty to keep these artifacts local (committed to the app repo) — the framework is fully backward-compatible.
 
 | Field | Value | Description |
 |---|---|---|
-| vault_root |  | Absolute path to the vault root. Empty = disabled. Example: `/Users/you/Documents/ocelot` |
+| vault_root |  | Absolute path to the vault root. Empty = disabled. Example: `/Users/you/Documents/myapp-docs` |
 | app_slug |  | Per-application subdirectory inside the vault. Empty = derived from the repo directory name. |
 
 **Resolution.** With `vault_root` set, the orchestrator ensures these symlinks exist at startup (creating the vault targets if missing, migrating any pre-existing local reports into them first) so every relative artifact path resolves into the vault with no per-reference changes:
@@ -58,7 +58,7 @@ When `vault_root` is set, the orchestrator redirects **vault**-class artifacts o
 | `cycle_reports` | `{vault_root}/cycle_reports/{app_slug}/` |
 | `agent_tasks/reports` | `{vault_root}/reports/{app_slug}/` |
 
-The symlinks are added to the managed `.gitignore` block (no trailing slash — git treats a symlink as a file), so the application repo never commits vault artifacts. The vault is a standalone git repo with its own remote (e.g. `ocelot-docs`), independent of any application repo; the orchestrator commits and pushes it at cycle Finalize so reports reach the remote without manual steps.
+The symlinks are added to the managed `.gitignore` block (no trailing slash — git treats a symlink as a file), so the application repo never commits vault artifacts. The vault is a standalone git repo with its own remote (e.g. `myapp-docs`), independent of any application repo; the orchestrator commits and pushes it at cycle Finalize so reports reach the remote without manual steps.
 
 ---
 
