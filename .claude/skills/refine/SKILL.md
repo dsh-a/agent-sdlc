@@ -335,7 +335,7 @@ Maintain `documentation/stories/README.md`. If it does not exist, create it with
 ```markdown
 # Stories Index
 
-Per-story files for the Ocelot roadmap. Each story is one Markdown file. This index is auto-maintained by the `/refine` skill.
+Per-story files for the project roadmap. Each story is one Markdown file. This index is auto-maintained by the `/refine` skill.
 
 | ID | Title | Status | Parent | Children | Depends on | Depended on by | File |
 |---|---|---|---|---|---|---|---|
