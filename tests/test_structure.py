@@ -146,8 +146,6 @@ _ASSET_RE = re.compile(
 def test_referenced_framework_files_exist():
     missing = set()
     for f in all_docs():
-        if f.name == "omp-and-openrouter-changes.md":
-            continue  # historical rename log intentionally cites old paths
         for m in _ASSET_RE.finditer(f.read_text()):
             path = m.group(1)
             if any(c in path for c in "<>{}*"):
