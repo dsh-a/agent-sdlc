@@ -8,7 +8,7 @@ language-agnostic: the core is stack-neutral and stack-specific rules live in a
 
 ```
 .omp/
-  agents/            # 13 omp-native subagent definitions (frontmatter + body)
+  agents/            # 15 omp-native subagent definitions (frontmatter + body)
   config.yml         # omp harness settings (modelRoles, isolation, advisor, memory, retry, task, compaction)
   models.yml.sample  # OpenRouter provider config + per-tier model menu → copy to ~/.omp/agent/models.yml
   mcp.json.sample    # Context Sources MCP template → copy to .omp/mcp.json

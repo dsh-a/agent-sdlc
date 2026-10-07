@@ -293,14 +293,27 @@ def main() -> int:
         out = report(repo)
         check("the report separates wakeups from human wait",
               "1 of 2 interval(s) ended on an agent-completion wakeup" in out, out)
-        # Tolerant to the second, deliberately. `backdate` sets raised_at to
-        # now-900s and the answer lands whenever the next subprocess gets to
-        # run, so under load the interval renders 15m01s or 15m02s. Asserting
-        # the exact second made this suite fail only when the whole runner ran,
-        # which is the worst kind of flake: green alone, red in CI, and blamed
-        # on load rather than on the assertion.
+        # Two things this assertion got wrong, both of which made it fail for
+        # reasons that have nothing to do with gate accounting.
+        #
+        # 1. It searched the WHOLE report for "9h" — the guard against the
+        #    wakeup's 900s being folded into a 9-hour human total. But the
+        #    report's first line is the log's path, and under `mkdtemp` that
+        #    path is random: CI drew `/tmp/tmp279hh055/`, which contains "9h",
+        #    so the guard matched the directory name and the check failed on a
+        #    green report. A 1-in-N flake, and it fired on the first push to
+        #    main after the public sync. Match the body only.
+        # 2. It enumerated `15m00s`..`15m05s`. `backdate` sets raised_at to
+        #    now-900s and the answer lands whenever the next subprocess runs, so
+        #    the rendered second is whatever the machine was doing; a six-value
+        #    window is a guess at how slow a runner gets. Any second will do —
+        #    what matters is 15 minutes rather than hours.
+        #
+        # The quantity itself is asserted exactly in the JSON check below
+        # (55..70s, not ~960), so this one is about the rendering.
+        body = "\n".join(out.splitlines()[1:])
         check("  ... and excludes them from the gate total",
-              any(f"15m{n:02d}s" in out for n in range(0, 6)) and "9h" not in out, out)
+              bool(re.search(r"15m\d{2}s", body)) and "9h" not in body, body)
 
         data = json.loads(subprocess.run(
             [sys.executable, str(REPORT), "--json"], cwd=repo,

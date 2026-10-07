@@ -1,16 +1,18 @@
-# agent-sdlc — SDLC Framework Repo (workplace fork, omp target)
+# agent-sdlc — SDLC Framework Repo (public core)
 
 This repo contains the agent pipeline that gets deployed into projects. It is **language-agnostic**: the core is stack-neutral and stack-specific rules live in a **pack** (`.claude/packs/<lang>/`). The default active pack is **Flutter**; **.NET** ships as an alternate template. You are editing the **framework itself**, not an app — no app build/test commands apply here.
 
 ## Harness target
 
-This branch (`feature/omp-openrouter`) targets **Oh My Pi (omp)** with models routed through **OpenRouter**. The `.omp/` directory is the native omp adapter layer; `.claude/` remains the source of truth for skills, packs, and the agent-readable runtime config (`.omp/agent-config.md`). See README § "omp + OpenRouter deployment" for the full setup.
+This repo targets **Oh My Pi (omp)** with models routed through **OpenRouter**. (That arrived on
+`feature/omp-openrouter` and has long since merged; it is the repo's state, not a branch's, and
+naming a branch here sent agents looking for one they were not on.) The `.omp/` directory is the native omp adapter layer; `.claude/` remains the source of truth for skills, packs, and the agent-readable runtime config (`.omp/agent-config.md`). See README § "omp-native integration" and § "How it runs on omp" for the full setup.
 
 ## Structure
 
 ```
 .omp/
-  agents/         # 13 omp-native subagent definitions (frontmatter + body)
+  agents/         # 15 omp-native subagent definitions (frontmatter + body)
   config.yml      # omp harness settings (modelRoles, isolation, advisor, memory, etc.)
   models.yml.sample  # OpenRouter provider config + per-tier model menu
   mcp.json.sample    # Context Sources MCP template (omp format)
@@ -30,11 +32,11 @@ This branch (`feature/omp-openrouter`) targets **Oh My Pi (omp)** with models ro
 
 ## Branching
 
-Work merges **feature → develop → main**. `develop` is the integration branch; open PRs against it,
-not against `main`. `main` is release, and reaching it is a separate, deliberate merge.
+This is the public core; `main` is the only long-lived branch. Open a PR against it.
 
-This was not followed before 2026-09-12 — PRs went straight to `main` and `develop` sat 150 commits
-behind — so treat an existing branch cut from `main` as the exception, not the pattern.
+Company-specific usage lives in a private downstream, and changes flow between the two by
+cherry-pick rather than merge — the histories are independent. `SYNCING.md` is authoritative.
+
 
 ## Editing guidelines
 
