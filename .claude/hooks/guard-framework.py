@@ -73,6 +73,22 @@ REDIRECT = re.compile(r">>?\s*(\S+)")
 INTERPRETERS = frozenset(("python3", "python", "perl", "ruby", "node", "sh",
                           "bash", "zsh", "osascript", "env"))
 PATHISH = re.compile(r"[\w.~@+-]*(?:/[\w.~@+-]+)+")
+if os.name == "nt":
+    # A drive prefix and backslash separators: `open('C:\\dev\\x','w')`.
+    PATHISH = re.compile(r"(?:[A-Za-z]:)?[\w.~@+-]*(?:[/\\]+[\w.~@+-]+)+")
+
+# Git Bash prints and accepts `/c/dev/x`; native Windows Python resolves that as
+# `C:\c\dev\x`. Unconverted, every MSYS-form write to the framework was allowed,
+# and a POSIX-form cwd made the hook inert — failing open, silently. Identity
+# off Windows, where `/c/...` is an ordinary path.
+_MSYS_DRIVE = re.compile(r"^/([A-Za-z])(?=/|$)")
+
+
+def native(p):
+    if os.name != "nt" or not isinstance(p, str):
+        return p
+    m = _MSYS_DRIVE.match(p)
+    return m.group(1).upper() + ":" + (p[2:] or "/") if m else p
 
 # Flags whose value is code or a module name rather than a file to run.
 CODE_FLAGS = frozenset(("-c", "-e", "-m", "--command", "-p", "-n", "--eval"))
@@ -141,7 +157,8 @@ def _real(path, base=None):
     absolute form does.
     """
     try:
-        p = os.path.expanduser(path)
+        p = os.path.expanduser(native(path))
+        base = native(base)
         if base and not os.path.isabs(p):
             p = os.path.join(base, p)
         return os.path.realpath(p)
@@ -153,6 +170,8 @@ def under(path, root, base=None):
     real = _real(path, base)
     if not isinstance(real, str):
         return False
+    # Windows paths are case-insensitive; normcase is the identity elsewhere.
+    real, root = os.path.normcase(real), os.path.normcase(root)
     return real == root or real.startswith(root + os.sep)
 
 
@@ -336,7 +355,7 @@ def main():
     except Exception:
         return 0
 
-    cwd = payload.get("cwd") or os.getcwd()
+    cwd = native(payload.get("cwd") or os.getcwd())
     root = framework_root(cwd)
     if not root:
         return 0
@@ -358,7 +377,8 @@ def main():
         for cand in bash_targets(inp.get("command") or "", cwd):
             if cand.startswith("-"):
                 continue
-            if ("/" in cand or cand.startswith("~")) and under(cand, root, cwd):
+            if ("/" in cand or os.sep in cand or cand.startswith("~")) \
+                    and under(cand, root, cwd):
                 hits.append(cand)
 
     if not hits:

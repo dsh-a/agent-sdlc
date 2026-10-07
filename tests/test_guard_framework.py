@@ -63,7 +63,11 @@ os.symlink(FW / ".claude/skills/cycle", PROJ / ".claude/skills/cycle")
 os.symlink(FW / ".claude/packs", PROJ / ".claude/packs")
 (PROJ / "lib/app.dart").write_text("void main() {}\n")
 
-AGENT = str(FW / ".claude/agents/coding.md")
+# Forward slashes: these strings go into Bash commands, and bash reads an
+# unquoted `C:\Users\x` as `C:Usersx`. `as_posix()` is the identity off Windows
+# and `C:/Users/...` on it — the form a Windows agent actually types. The
+# backslash and `/c/...` forms get their own section below.
+AGENT = (FW / ".claude/agents/coding.md").as_posix()
 
 # ---------------------------------------------------------------- it blocks
 #
@@ -117,7 +121,7 @@ check("reading an agent definition is allowed",
 check("  ... with cat", not blocked(PROJ, "Bash", command=f"cat {AGENT}"))
 check("  ... with the Read tool", not blocked(PROJ, "Read", file_path=AGENT))
 check("  ... and listing the directory",
-      not blocked(PROJ, "Bash", command=f"ls -la {FW}/.claude/agents/"))
+      not blocked(PROJ, "Bash", command=f"ls -la {FW.as_posix()}/.claude/agents/"))
 check("  ... and diffing against it",
       not blocked(PROJ, "Bash", command=f"diff -q {AGENT} {AGENT}"))
 
@@ -132,7 +136,7 @@ check("running a framework script is allowed",
 check("  ... with arguments",
       not blocked(PROJ, "Bash", command="python3 .claude/skills/cycle/clear-agent-states.py --all"))
 check("  ... by absolute path",
-      not blocked(PROJ, "Bash", command=f"python3 {FW}/.claude/skills/cycle/gate-report.py"))
+      not blocked(PROJ, "Bash", command=f"python3 {FW.as_posix()}/.claude/skills/cycle/gate-report.py"))
 check("  ... with bash, which only escaped by accident",
       not blocked(PROJ, "Bash", command="bash .claude/skills/cycle/run-suite.sh log x"))
 check("  ... piped, as the orchestrator actually invokes it",
@@ -145,13 +149,13 @@ check("a python one-liner writing the framework is still blocked",
 check("  ... via a relative path through the clone's symlink",
       blocked(PROJ, "Bash", command="python3 -c \"open('.claude/skills/cycle/SKILL.md','w')\""))
 check("  ... and -m with a framework target is not a script argument",
-      blocked(PROJ, "Bash", command=f"python3 -m pip install --target {FW}/.claude"))
+      blocked(PROJ, "Bash", command=f"python3 -m pip install --target {FW.as_posix()}/.claude"))
 check("  ... nor is a redirect past an exempt script",
       blocked(PROJ, "Bash", command=f"python3 .claude/skills/cycle/gate-report.py > {AGENT}"))
 check("  ... and sh -c carrying a sed still blocks",
       blocked(PROJ, "Bash", command=f"sh -c \"sed -i '' s/a/b/ {AGENT}\""))
 check("  ... copying over a framework script is not 'running' it",
-      blocked(PROJ, "Bash", command=f"cp /tmp/evil.py {FW}/.claude/skills/cycle/gate-report.py"))
+      blocked(PROJ, "Bash", command=f"cp /tmp/evil.py {FW.as_posix()}/.claude/skills/cycle/gate-report.py"))
 
 # A stream editor only writes with -i. Round 10 blocked
 # `sed -n '1,200p' <framework>/skills/harness-findings/SKILL.md` — a read, and the
@@ -212,7 +216,7 @@ check("writing project source is allowed",
 check("  ... editing it", not blocked(PROJ, "Edit", file_path=str(PROJ / "lib/app.dart"),
                                       old_string="a", new_string="b"))
 check("  ... sed against it",
-      not blocked(PROJ, "Bash", command=f"sed -i '' 's/a/b/' {PROJ}/lib/app.dart"))
+      not blocked(PROJ, "Bash", command=f"sed -i '' 's/a/b/' {PROJ.as_posix()}/lib/app.dart"))
 check("  ... committing", not blocked(PROJ, "Bash", command="git add -A && git commit -m x"))
 check("  ... running the suite",
       not blocked(PROJ, "Bash", command="flutter test test/widget/foo_test.dart"))
@@ -253,6 +257,40 @@ PLAIN = R / "plain"
 (PLAIN / "lib").mkdir(parents=True)
 check("a non-deployment is left alone",
       not blocked(PLAIN, "Write", file_path=str(PLAIN / "lib/x.dart"), content="x"))
+
+# ---------------------------------------------------------------- Windows
+#
+# Native Windows Python reads Git Bash's `/c/dev/x` as `C:\c\dev\x`, so before
+# these were normalised every MSYS-form write to the framework was allowed, and
+# a POSIX-form cwd allowed everything — the guard failed open, silently. Only
+# meaningful on Windows: off it, `/c/...` is an ordinary path.
+if os.name == "nt":
+    def msys(p: pathlib.Path) -> str:
+        s = p.as_posix()
+        return "/" + s[0].lower() + s[2:]
+
+    AGENT_MSYS = msys(FW / ".claude/agents/coding.md")
+    AGENT_BS = str(FW / ".claude/agents/coding.md")
+    check("windows: an MSYS-form path is blocked",
+          blocked(PROJ, "Bash", command=f"sed -i 's/a/b/' {AGENT_MSYS}"))
+    check("  ... through a redirect",
+          blocked(PROJ, "Bash", command=f"echo x > {AGENT_MSYS}"))
+    check("  ... and inside a python one-liner",
+          blocked(PROJ, "Bash",
+                  command=f"python3 -c \"open('{AGENT_MSYS}','w').write('x')\""))
+    check("windows: a quoted backslash path is blocked",
+          blocked(PROJ, "Bash", command=f"sed -i 's/a/b/' '{AGENT_BS}'"))
+    check("  ... and through a redirect",
+          blocked(PROJ, "Bash", command=f"echo x > '{AGENT_BS}'"))
+    check("windows: a lower-case drive letter is still the same file",
+          blocked(PROJ, "Bash", command=f"cp /tmp/x {AGENT[0].lower() + AGENT[1:]}"))
+    check("windows: a POSIX-form cwd still resolves the deployment",
+          blocked(pathlib.PurePosixPath(msys(PROJ)), "Bash",
+                  command="echo x > .claude/skills/cycle/SKILL.md"))
+    check("windows: reading through an MSYS-form path is still allowed",
+          not blocked(PROJ, "Bash", command=f"cat {AGENT_MSYS}"))
+    check("  ... and writing project source through one",
+          not blocked(PROJ, "Bash", command=f"echo x > {msys(PROJ / 'lib/app.dart')}"))
 
 # ---------------------------------------------------------------- failure
 #

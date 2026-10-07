@@ -11,6 +11,7 @@ below matter at least as much as the true positives.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -110,6 +111,27 @@ def main() -> int:
     check("malformed payload exits 0, never blocks", p.returncode == 0, p.stderr)
     code, _ = fire("Bash")
     check("missing command exits 0", code == 0)
+
+    # --- Windows path forms ---------------------------------------------------
+    # A credential *file name* is caught whatever the path looks like; a file
+    # that is secret only by its *directory* (`.ssh/config`, `.aws/config`) has
+    # to resolve. Before normalisation a quoted backslash path did not even
+    # tokenise, and was read unguarded.
+    if os.name == "nt":
+        home_bs = str(HOME)
+        home_msys = "/" + HOME.as_posix()[0].lower() + HOME.as_posix()[2:]
+        check("windows: a quoted backslash path into ~/.ssh is blocked",
+              blocked("Bash", command=f"cat '{home_bs}\\.ssh\\config'"))
+        check("  ... and into ~/.aws",
+              blocked("Bash", command=f"head '{home_bs}\\.aws\\config'"))
+        check("windows: an MSYS-form path into ~/.ssh is blocked",
+              blocked("Bash", command=f"cat {home_msys}/.ssh/config"))
+        check("windows: a drive-form path is blocked",
+              blocked("Bash", command=f"cat {HOME.as_posix()}/.docker/config.json"))
+        check("windows: the Read tool with a backslash path is blocked",
+              blocked("Read", file_path=f"{home_bs}\\.ssh\\config"))
+        check("windows: a quoted backslash path to project source is allowed",
+              not blocked("Bash", command=f"cat '{ROOT / 'README.md'}'"))
 
     code, err = fire("Bash", command="cat ~/.ssh/id_rsa")
     check("the refusal says what and why", "credential material" in err, err)

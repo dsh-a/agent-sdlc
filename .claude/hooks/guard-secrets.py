@@ -52,10 +52,23 @@ SECRET_NAMES = re.compile(
 HOME = os.path.expanduser("~")
 
 
+# Git Bash's `/c/Users/x` is `C:\Users\x`; native Windows Python would resolve
+# it as `C:\c\Users\x`. Identity off Windows, where `/c/...` is an ordinary path.
+_MSYS_DRIVE = re.compile(r"^/([A-Za-z])(?=/|$)")
+
+
+def native(p):
+    if os.name != "nt":
+        return p
+    m = _MSYS_DRIVE.match(p)
+    return m.group(1).upper() + ":" + (p[2:] or "/") if m else p
+
+
 def resolve(p, cwd):
     """Absolute, symlink-free, with ~ and $HOME expanded. Never raises."""
     try:
-        p = os.path.expandvars(os.path.expanduser(p.strip().strip("'\"")))
+        p = native(os.path.expandvars(os.path.expanduser(p.strip().strip("'\""))))
+        cwd = native(cwd) if cwd else cwd
         if not os.path.isabs(p):
             p = os.path.join(cwd or os.getcwd(), p)
         return os.path.realpath(p)
@@ -87,6 +100,9 @@ def is_secret(path):
 # decide what to resolve, not a shell parser. Anything it misses is a read the
 # permission layer already allowed — this hook narrows, it is not the boundary.
 TOKEN = re.compile(r"[~$/\w][\w./~$-]*")
+if os.name == "nt":
+    # A drive prefix and backslash separators: `cat 'C:\Users\x\.ssh\config'`.
+    TOKEN = re.compile(r"(?:[A-Za-z]:)?[~$/\\\w][\w./\\~$-]*")
 
 # Commands that can actually read a file or send its contents somewhere, plus
 # the interpreters that can do either. A path only matters if something in the
@@ -111,6 +127,8 @@ READERS = frozenset((
 # the second one is what gets scanned.
 SEGMENT = re.compile(r"[;&|]{1,2}|\n")
 REDIRECT = re.compile(r"[<>]{1,2}\s*([~$/\w][\w./~$-]*)")
+if os.name == "nt":
+    REDIRECT = re.compile(r"[<>]{1,2}\s*['\"]?(" + TOKEN.pattern + r")")
 
 
 def bash_paths(cmd):
