@@ -1,149 +1,280 @@
 ---
 name: refine
-description: Refine a user story toward INVEST compliance and Definition-of-Ready. Interactive dialogue — explores the codebase, builds a question queue, maintains a refinement log, and emits a DoR verdict. Can split stories that are too large.
+description: Refine a story issue toward INVEST compliance and Definition-of-Ready. Interactive dialogue — grounds the story against the codebase, probes every acceptance criterion, keeps a refinement log in the issue comments, and emits a DoR verdict. Can split stories into sub-issues.
 disable-model-invocation: true
 ---
 
 # Refine — Story Refinement Dialogue
 
-You are refining a single user story toward INVEST compliance and a Definition of Ready (DoR) verdict. The product is a **better story**, not a report. The refinement log is supporting evidence.
+You are refining a single user story toward INVEST compliance and a Definition of Ready (DoR)
+verdict. The product is a **better story**, not a report. The refinement log is supporting evidence.
 
-The story file to refine: **$ARGUMENTS**
+The story issue to refine: **$ARGUMENTS** (an issue number, `#412`, or a URL).
 
-If `$ARGUMENTS` is empty, ask the user for a path to a story file (e.g. `documentation/stories/1.51.md`). Do not proceed without one.
+If `$ARGUMENTS` is empty, list candidates (`gh issue list --label story`) and ask which one.
+Do not proceed without one.
+
+Stories live in GitHub — see `.omp/agent-config.md` § Artifact Paths. Every read is a live `gh`
+call. **If a `gh` call fails, stop and report it.** Never write the story to a local file instead.
+
+`rationale.md`, beside this file, holds the measurements behind the rules below. Read it when a
+rule looks arbitrary; do not load it to follow one.
 
 ---
 
 ## Operating principles
 
-- **Story file is destructively rewritten** as discovery happens. The `## Refinement log` appendix and `## Open questions` queue are append-only across passes.
-- **Splits are non-destructive.** New child files; parent retains original prose and gains a visible split notice. Never delete content from a parent.
-- **Codebase grounds every concrete claim.** A path, type/component name, schema column, or "currently X" assertion must be verified before it survives refinement.
-- **DoR is advisory.** Emit the verdict; do not block any other workflow on it.
-- **Dialogue, not monologue.** Surface ambiguities as questions to the user. Do not invent answers.
-- **Persist the question queue** to the story file after every batch so the dialogue is resumable across sessions.
+- **The issue body is destructively rewritten** as discovery happens. It holds the live spec,
+  the `## Open questions` queue, and `## Open spikes`.
+- **The refinement log is issue comments** — one per pass, append-only. Never edit a prior pass.
+- **Splits are non-destructive.** Children are new sub-issues; the parent keeps its prose and
+  gains a split notice.
+- **One home per fact.** Status, parentage and ordering are GitHub primitives, never prose:
+
+  | Fact | Home |
+  |---|---|
+  | Refinement maturity (DRAFT / REFINING / REFINED / BLOCKED) | board field `Refinement` |
+  | Pipeline status | board field `Status` — `cycle` owns it |
+  | Parent / children | sub-issues |
+  | Depends on | issue dependencies (`blocked_by`) |
+  | Depended on by | **derived** — read the `blocking` direction; never stored |
+
+  Write one direction; read the other.
+- **DoR is advisory.** Emit the verdict; block no other workflow on it.
+- **Dialogue, not monologue.** Surface ambiguities as questions. Do not invent answers.
+- **The user reads the story twice** — Step 1 for orientation, Step 8 for sign-off. `REFINED` is
+  what lets `/cycle` build from this body unattended, so it needs an explicit yes.
+- **Persist the queue** to the issue body after every batch, so the dialogue resumes across
+  sessions.
 
 ---
 
 ## Model & effort allocation
 
-To keep the main thread cheap, delegate read-heavy and mechanical work to subagents with the smallest viable model. The main thread (running this skill) handles reasoning, dialogue, and final writes.
+Delegate read-heavy mechanical work to the smallest viable model. The main thread handles
+reasoning, dialogue and final writes.
 
-| Step | Work | Where | Model | Effort |
-|---|---|---|---|---|
-| 2 | Codebase grounding (greps, file reads, schema lookups) | `Explore` subagent | **haiku** | medium |
-| 3 | Question queue construction | main thread | inherit | high |
-| 4 | Dialogue with user | main thread | inherit | high |
-| 5 | Refinement-log writes | main thread | inherit | low |
-| 7 | Prose-allocation proposal for split children | main thread | inherit | high |
-| 7 | Writing child files (mechanical carve-up after user confirms allocation) | main thread | inherit | low |
-| 8 | Index table maintenance | main thread | inherit | low |
+| Step | Work | Where | Model |
+|---|---|---|---|
+| 2 | Greps, file reads, schema lookups | `Explore` subagent | **haiku** |
+| 2 | Citation + absence checks on what came back | main thread (`evidence.py`) | inherit |
+| 3 | Probe verdicts | main thread | inherit |
+| 4 | Dialogue | main thread | inherit |
+| 7–8 | Split allocation, sign-off, verdict | main thread | inherit |
 
-**Forbidden reads:** generated/codegen files (can be 10k+ lines — e.g. `*.g.dart`, `*.freezed.dart`, or your codegen's output such as `*.g.cs`). Read the hand-authored source/schema definition instead. Pass this rule to any spawned subagent.
+**Forbidden reads:** generated/codegen files (`*.g.dart`, `*.freezed.dart`, `*.g.cs`). Read the
+hand-authored source instead, and pass this rule to every subagent.
 
-When spawning the Explore subagent, pass `model: "haiku"` and a self-contained prompt that lists every claim to verify and the expected output format (a structured grounding table). Do not let the subagent read generated files.
+---
+
+## The scripts
+
+Two scripts own everything mechanical. They print facts; you interpret them.
+
+**`probes.py`** — pure text, no network:
+
+| Verb | Gives you |
+|---|---|
+| `artifacts --body -` | every probeable artifact, with flags and each probe's workload |
+| `probes` | the probe table below, which it is the source of |
+| `coverage --body - --verdicts f.tsv [--prior g.tsv]` | the gaps, and the log's `**Probes:**` line |
+| `queue read / next-id / add / resolve` | the `## Open questions` section |
+| `profiles --path <file>` | the customer profiles, or `unavailable` |
+
+**`story.py`** — the `gh` half:
+
+| Verb | Gives you |
+|---|---|
+| `load <n>` | issue, labels, board fields, both dependency directions, and a gate verdict |
+| `dor <n> --coverage <file>` | the DoR table as a gate; exit 1 names what is unmet |
+| `set-depth <n> <full\|lean\|hotfix>` | the board write, after resolving four ids |
+| `split <n> --plan <json>` | children, links, chain, notice, close |
+
+Exit codes for both: `0` ok · `1` refused or unmet · `2` bad usage · `3` **could not determine**.
+Writes are **dry by default**; `--apply` writes. A `3` is never a default — stop and report it.
 
 ---
 
 ## Step 1 — Load and validate the target
 
-1. Read `$ARGUMENTS`. If the file does not exist, stop and report.
-2. Parse YAML frontmatter. Required fields:
-   ```yaml
-   ---
-   id: <string>
-   title: <string>
-   status: <DRAFT | REFINING | REFINED | SPLIT | BLOCKED>
-   parent: <id or null>
-   children: [<id>, ...]
-   depends_on: [<id>, ...]
-   depended_on_by: [<id>, ...]
-   refined_at: <ISO date or null>
-   ---
-   ```
-3. If frontmatter is missing or partial, generate it from the file's contents (story heading, dependency hints in prose) and ask the user to confirm before continuing.
-4. If `status: SPLIT`, stop. A SPLIT story is closed to further refinement — refine its children instead.
-5. If `status: REFINED` and `refined_at` is recent, ask: "Re-open refinement on a previously-refined story?" before continuing.
-6. Set `status: REFINING` and write back the frontmatter.
+```sh
+python3 .claude/skills/refine/story.py load <n>
+```
+
+One invocation replaces five `gh` calls and prints `gate=`:
+
+| `gate=` | Do |
+|---|---|
+| `ok` | continue |
+| `closed-superseded` | stop — it stopped existing. Refine what replaced it |
+| `has-children` | stop — a split parent is closed to refinement. Refine the children |
+| `already-refined` | ask the user before re-opening a previously-refined story |
+
+**Restate the issue before touching anything.** The user typed a number; the number says nothing.
+A wrong target caught here costs nothing, and caught after a body rewrite costs the body. The
+script gives the facts and deliberately will not summarise the prose — that reading is yours, and
+a wrong one is what this catches:
+
+```
+### #<n> <issue title> — as it stands
+
+**Board:** Refinement <value> · Status <value> · Phase <value> · Depth <value or "unset">
+**Links:** parent <#n or none> · children <#n… or none> · blocked by <#n…> · blocks <#n…>
+**Labels:** <labels>
+
+**What it asks for:** <2-4 sentences, from the body — not the title>
+
+**Acceptance criteria as written:** <count, or "none stated">
+
+**What this pass will attack:** <the 2-3 weakest points you can already see>
+
+Refining this one? (y / different issue)
+```
+
+Then set `Refinement` to `REFINING`. If a fact you need has no field, set the field — do not
+write it into the body as prose.
 
 ---
 
 ## Step 2 — Codebase grounding (delegated)
 
-Extract every concrete claim from the story into a list, then delegate verification to an `Explore` subagent on **haiku**. Do not perform greps or large file reads on the main thread.
-
-Claim types to extract:
+Extract every concrete claim, then delegate verification to an `Explore` subagent on **haiku**.
+Do not grep or read large files on the main thread.
 
 | Claim type | How the subagent verifies |
 |---|---|
-| File path (`lib/.../foo.dart`) | `Glob` / `Read` |
+| File path | `Glob` / `Read` |
 | Class / component / function name | `grep -r "class Foo\|Foo("` |
-| Schema column / table | Read the hand-authored schema/model definition (NEVER generated files) |
-| "Currently X is at Y" / "X is a Z" | grep + structural comparison |
-| Cross-story reference (e.g. "used by 1.6") | Read the referenced story file if present |
+| Schema column / table | the hand-authored schema (NEVER generated files) |
+| "Currently X is at Y" | grep + structural comparison |
+| Cross-story reference | `gh issue view <n>` |
 
-Spawn the subagent with a prompt like:
-
-```
-Verify the following claims about the codebase. For each, return one of:
-  VERIFIED — claim matches reality (cite file:line)
-  CONTRADICTED — claim is wrong (cite actual state)
-  NOT-FOUND — referenced thing does not exist
-
-Forbidden reads: any generated/codegen file.
-Output a markdown table only — no prose.
-
-Claims:
-1. <claim>
-2. <claim>
-...
+```sh
+cat .claude/skills/refine/grounding-prompt.md
 ```
 
-Set `model: "haiku"`. Receive the table back, store it in memory.
+`grounding-prompt.md` holds the spawn prompt. **Paste it, and paste the fenced block from
+`evidence/SKILL.md` § Method rules for a search subagent — do not retype or paraphrase either.**
+`Explore` is a built-in harness agent whose body and tools the framework does not own, so the
+prompt is the only channel those rules have. If `evidence` is unreachable at all three
+`autonomous-agent` § Skill resolution paths, tell the user that delegated grounding would be
+unverified and **ground on the main thread instead** rather than spawning blind.
 
-Contradicted and not-found rows become questions in Step 3. Do NOT silently fix contradictions — they are user-facing decisions ("the story says X but the code says Y — which is right?").
+### Check the citations before using any row
+
+A conclusion and its citation fail independently — a grounding subagent once attributed a
+sentence to an issue body when it had read it from a source comment one row earlier in its own
+report, and the conclusion was sound.
+
+Per `evidence` § Checking a subagent's citations: re-check **every citation bound for the issue
+body, a child issue, a bug report or the Step 8 restatement**, and spot-check two others.
+
+```sh
+gh issue view <n> --json body -q .body |
+  python3 .claude/skills/evidence/evidence.py cite --phrase '<quoted phrase>' --source -
+```
+
+`hits=0` strikes the **citation**, not the claim: the row reverts to ungrounded. Re-verify it
+from a source you read directly, or make it a question. Never keep a claim with a bad citation;
+never drop a claim because its citation was bad.
+
+A row whose `Corpus searched` cell names fewer files than the claim's scope is also ungrounded:
+
+```sh
+python3 .claude/skills/evidence/evidence.py absence --pattern '<symbol>' <the real corpus>
+```
+
+Contradicted and not-found rows become questions in Step 3. Do **not** silently fix a
+contradiction — "the story says X but the code says Y, which is right?" is the user's call.
 
 ---
 
-## Step 3 — Build the question queue
+## Step 2b — Prove the mechanism
 
-Walk the story and enumerate every ambiguity. The categories below are the minimum coverage:
+**Trigger:** the story asserts that a tool, config file, framework or CI feature *behaves a
+certain way*. Not every story has one.
 
-### A. AC verifiability
-For each acceptance criterion: is it testable as written? Could two engineers disagree on whether it passed? If yes, queue a clarifying question.
+Run it — in a throwaway project if the real repo would be disturbed — and record the command and
+its **exact output** in the log. **Reading the documentation is not proving. A missing `--help`
+flag is not proving.** Both are specific mistakes on record.
 
-### B. Behavioral gaps
-- Empty / boundary states ("what does empty look like?")
-- Error states ("what happens when X fails?")
-- Concurrent / sync states (offline-first apps especially — what does the user see during a conflict?)
-- Cross-platform divergence (web keyboard, mobile gestures, large vs small screen)
+Three things make a proof worth having:
 
-### C. Scope boundaries
-For every "out of scope" or "decoupled" mention: what does the user see *concretely*? (Hidden? Disabled? Visible-but-no-op?)
+1. **The exact command and its exact output**, pasted, not summarised.
+2. **The version it was proven against** — a mechanism is true of a toolchain, not forever.
+3. **What it rules out.** The useful half is often negative.
 
-### D. Data / structural
-- Migrations or schema impact
-- Ordering, uniqueness, cardinality constraints not explicit in prose
-- What happens to data when an entity is removed / changed
+**The proof is the pasted output, not the file.** Run it outside the repo where you can, and
+delete it in the same step that records its output — "later" is the pass that leaked one
+(`rationale.md` § Throwaways). **A probe inside the project's test glob is not a throwaway**: a
+bare test run sweeps it and one `git add -A` commits it. Log where it ran and that it is gone, so
+a reader can tell a deleted probe from one nobody looked for.
 
-### E. Dependencies
-- Upstream stories this depends on (must already be REFINED or shipped)
-- Downstream stories that depend on this one (do they constrain its design?)
-- Shared widgets / extracted components — does the extraction itself deserve to be a separate story?
+A story carrying an unproven mechanism claim is **not READY** (Step 8). `rationale.md` § Mechanism
+has the case that pays for this step: a tag taxonomy that was rejected outright by the tool, in
+seven open issues, found by running it.
 
-### F. Risks
-- a11y (screen readers, keyboard nav, drag-drop alternatives)
-- Performance ceilings (worst-case data size?)
-- Telemetry / analytics expectations
+---
 
-### G. Sizing & split signals
-- Can this be delivered as one PR / one cycle? If not, where are the natural seams?
-- Are there sub-deliverables that have independent value?
-- Is there scope that could be deferred without breaking the story's core promise?
+## Step 3 — Probe every artifact
 
-Each question must be self-contained, answerable in 1–2 sentences. Group related questions for the same batch where possible.
+Refinement at its best is five people in a room: a **developer**, the **codebase** itself, a
+**product manager**, an **agile coach** and a **quality engineer** — and, because none of those
+five is the customer, the **customer profiles** the product serves. That is a good argument that
+the probe set below is complete. It is a bad way to apply it: a persona tells you a motive, not
+what to point at. So the unit of work here is a **probe over an enumerated artifact**.
 
-**Persist the queue.** After the queue is built (and after each batch in Step 4), write it to the story file under a `## Open questions` section. Format:
+```sh
+gh issue view <n> --json body -q .body > /tmp/body.md
+python3 .claude/skills/refine/probes.py artifacts --body /tmp/body.md
+```
+
+That prints every artifact with an id, and each probe's workload. Work one probe at a time and
+record a verdict per artifact in a TSV — `probe<TAB>artifact-id<TAB>verdict<TAB>artifact-text`:
+
+| Probe | Input | Asks |
+|---|---|---|
+| `inherited-claim` | each citation `ungrounded` | Is it true *today*? A claim inherited from the epic or a sibling is suspect by default — agreeing with the parent is a shared source, not corroboration |
+| `measured-number` | each number `ungrounded` | Was it measured, or inherited? Name the measurement or demote it to a question |
+| `mechanism-exists` | each mechanism `unproven` | Does it behave as claimed? Prove it (Step 2b). And is a sibling already building it? One mechanism across siblings, not two |
+| `ac-strict` | each AC `open` | Could this be marked satisfied while the thing it protects is still broken, or could two engineers disagree that it passed? |
+| `deferred-number` | each AC `threshold` | A deferred number is not an agreed one. Name it, or make it a question — an unnamed threshold is satisfiable by one that never fires |
+| `concrete-deferral` | each prose deferral | What does the user see concretely — hidden, disabled, or visible-and-inert? |
+| `named-edge` | each dependency xref | Is the edge filed, or invented? Two stories touching one subject are not dependent — record that you checked and found none |
+| `independently-demonstrable` | each proposed child | Can it be demonstrated without running its sibling? A seam needs evidence, not a count |
+| `profile-impact` | each customer profile | Does this serve or degrade this customer? "All of them equally" is the answer to distrust |
+
+`probes.py probes` is the source of that table; if the two disagree, the script is right.
+
+**`profile-impact` needs the project's profile file.**
+
+```sh
+PROF=$(python3 .claude/skills/cycle/config-get.py customer_profiles_path \
+         --default product/customer-profiles.md)
+python3 .claude/skills/refine/probes.py profiles --path "$PROF"
+```
+
+Exit 3 means `unavailable`. Say *unavailable* in the log — **never `clean`** — and tell the user
+the file is missing. `customer-profiles.template.md` beside this file is the contract. The sharp
+questions, once profiles exist: which profile is this **designed for** (all of them equally is
+suspect); which one does it **degrade**; which one would never **discover** it. Worst-case data
+volume belongs to a named profile, not to nobody.
+
+Each question you raise must be self-contained and answerable in 1–2 sentences. Keep the
+`(AC) (Behavior) (Scope) (Data) (Deps) (Risk) (Size)` tags — they are in flight in open issues.
+
+**The queue is epic-wide, not per story.** `Q-19` raised on one story is answered on another and
+cited by a third, and a story inherits the parent's deferred questions on arrival:
+
+```sh
+python3 .claude/skills/refine/probes.py queue next-id <every sibling body>
+```
+
+Never number from 1. When an answer changes a sibling, say so there too (Step 6b).
+
+**Persist the queue** to the issue body under `## Open questions` after the queue is built and
+after each batch. `probes.py queue add` and `resolve` print the whole modified body for
+`gh issue edit --body-file -`, changing exactly one line:
 
 ```markdown
 ## Open questions
@@ -151,11 +282,11 @@ Each question must be self-contained, answerable in 1–2 sentences. Group relat
 <!-- Auto-maintained by /refine. Edit answers here only if you want them treated as resolved. -->
 
 - [ ] (Behavior) Cross-phase drag — can a set move between phases?
-- [ ] (Scope) AI `[⚡]` button when out of scope — hidden / disabled / no-op?
 - [x] ~~(Data) `_routineExerciseSets` actual type?~~ → `Map<String, List<ExerciseSet>>` (resolved 2026-04-28)
 ```
 
-On every re-invocation: read this section before doing anything else. Treat unchecked items as the active queue. If the user has manually checked items or written answers between sessions, fold those answers into the next pass without re-asking.
+On every re-invocation, read this section first. Unchecked items are the active queue. If the
+user checked items or wrote answers between sessions, fold those in without re-asking.
 
 ---
 
@@ -163,81 +294,83 @@ On every re-invocation: read this section before doing anything else. Treat unch
 
 State at the start of each batch: `Q-batch mode: N (default 1)`.
 
-Default batch size is **1**. The user may say "switch to 2", "switch to 3", or "switch to 1" at any time. On a switch:
+Default batch size is **1**. The user may say "switch to 2/3/1" at any time:
 
-- **Increase (e.g. 1 → 3):** Re-ask the current pending question, *plus* the next (N − current) from the queue, as a single batch. The user re-answers the original question alongside the new ones.
-- **Decrease (e.g. 3 → 1):** Re-ask only the first of the current batch. Push the rest back onto the queue's front in original order.
+- **Increase (1 → 3):** re-ask the pending question plus the next (N − current), as one batch.
+- **Decrease (3 → 1):** re-ask only the first; push the rest back onto the queue's front in order.
 
-Use `AskUserQuestion` for batches. For each question:
-- Title: short noun phrase
-- Header: 1–2 word category from Step 3 (AC / Behavior / Scope / Data / Deps / Risk / Size)
-- Question: full text, self-contained
-- Options: provide 2–4 plausible answers + one "Other (specify)" option when reasonable
+Use `AskUserQuestion`. Title: short noun phrase. Header: the 1–2 word category tag. Question:
+full text, self-contained. Options: 2–4 plausible answers plus "Other (specify)" when reasonable.
 
 After each batch:
-1. Apply each answer to the story (rewrite the relevant section, update ACs, add scope notes, add open spike, adjust frontmatter dependencies, etc.)
-2. Append the Q+A pair to `## Refinement log` (see Step 5).
-3. Update `## Open questions`: strike-through and resolve answered items, append any new follow-ups raised by the answer.
-4. Save the file before asking the next batch (so an interrupted session is resumable).
 
-Continue until the queue is empty AND no answer in the last round produced new questions.
+1. Apply each answer — rewrite the body section, update ACs, add scope notes or a spike. A
+   dependency answer becomes an **issue dependency**, not prose:
+   ```sh
+   # the endpoint takes the integer database id, not the issue number
+   BLOCKER_ID=$(gh api "repos/$REPO/issues/<blocker-n>" --jq .id)
+   gh api -X POST "repos/$REPO/issues/<n>/dependencies/blocked_by" -f issue_id=$BLOCKER_ID
+   ```
+2. Hold the Q+A pair for this pass's log comment.
+3. Update `## Open questions`: resolve answered items, append follow-ups.
+4. Push the body edit **before** asking the next batch, so an interrupted session resumes.
+
+Continue until the queue is empty and the last round produced no new questions. Then re-run
+`probes.py artifacts` — a rewritten body has new artifacts — and `coverage`.
 
 ---
 
 ## Step 5 — Maintain the refinement log
 
-The `## Refinement log` section lives at the bottom of the story file. Each refinement pass appends a new dated subsection:
+One issue comment per pass, posted at the end of the pass, never edited afterwards.
 
-```markdown
-## Refinement log
-
-### 2026-04-28 — Pass 1
-
-**Grounding:**
-- VERIFIED: `OrderSearchPanel` exists at `lib/ui/orders/views/order_search_panel.dart`
-- CONTRADICTED: story claimed `_orderLines` is a `Map<String, OrderLine>` — actual type is `Map<String, List<OrderLine>>`. User confirmed story prose was outdated; rewrote.
-
-**Questions answered:**
-- Q (Scope): What does the AI `[⚡]` button look like when out of scope? → Hidden entirely on this screen until 1.8 ships. Story updated.
-- Q (Behavior): Cross-phase drag allowed? → Yes, sets can move between phases and from UNPHASED into a phase. Added AC.
-- ...
-
-**Destructive changes to story:**
-- Replaced "Map<String, ExerciseSet>" with "Map<String, List<ExerciseSet>>" in Special Considerations.
-- Added 4 new ACs (cross-phase drag, empty phase prune, save toast, version-badge persistence).
-- Removed obsolete bullet about ExerciseSearchModal location (now grounded as already-extracted).
-
-**Open spikes raised:** see `## Open spikes` (1 added).
-
-**DoR verdict at end of pass:** NEEDS-SPIKE
+```sh
+python3 .claude/skills/refine/probes.py coverage --body /tmp/body.md \
+  --verdicts /tmp/verdicts.tsv --prior /tmp/last-pass.tsv
+cat .claude/skills/refine/templates.md          # § The refinement-log comment
+gh issue comment <n> --body-file -
 ```
 
-Append-only. Never delete a prior pass's log entry.
-
----
+Paste the `**Probes:**` line `coverage` printed. A coverage line you wrote by hand is a claim;
+one the script printed is a count — and gaps mean the pass is not done. `rationale.md` § Probes
+have been the culprit explains why the log separates instrument failure from content failure.
 
 ## Step 6 — Open spikes
 
-When a question cannot be answered without investigation (a design decision needs prototyping, an external constraint needs research, etc.), add an entry under `## Open spikes` in the story file:
+When a question needs investigation rather than a decision, add an entry under `## Open spikes`
+in the **issue body**:
 
 ```markdown
 ## Open spikes
 
 - **[SPIKE-1] Schema impact of version-badge field**
-  Question: should `Order.Version` be a stored int column or derived from a save_count tracked elsewhere? Impacts migration scope.
+  Question: stored int column, or derived from a save_count tracked elsewhere?
   Blocks: AC "version badge persists across sessions"
   Time-box: 2 hours
 ```
 
-The skill does NOT auto-create separate spike story files. If a spike is large enough to warrant its own story, note it in the log and let the user create it manually.
+This skill does not auto-file spike issues. A story with one or more open spikes ends
+`Refinement = BLOCKED`.
 
-A story with one or more open spikes ends Step 7 with `status: BLOCKED`.
+## Step 6b — Propagate a correction
+
+A correction that stays in one story fixes one story. When this pass contradicts something
+**inherited** — from the epic, a sibling, or a cited document — it has to reach the source.
+
+1. Find who else carries the claim: `gh issue list` over the epic's sub-issues, plus anything
+   the story cites.
+2. Correct each, with a one-line provenance footnote — what changed, which pass found it, and on
+   which issue.
+3. **A closed issue is left alone** and noted as archival. Reopening it to correct prose nobody
+   will read again is churn.
+4. Record the fan-out in this pass's log — *"corrected in #415, #416, #543"* — so the next reader
+   can tell a propagated fix from an isolated one.
 
 ---
 
 ## Step 7 — Decide whether to split
 
-After all questions are answered, evaluate against INVEST:
+After the queue is empty, evaluate against INVEST:
 
 | Letter | Check |
 |---|---|
@@ -245,156 +378,195 @@ After all questions are answered, evaluate against INVEST:
 | **N**egotiable | Is scope intentional and explicit? |
 | **V**aluable | Is the user-visible outcome clear? |
 | **E**stimable | Can the team size it? |
-| **S**mall | Can it be delivered as one cycle / one PR? |
+| **S**mall | One cycle, one PR? |
 | **T**estable | Is every AC verifiable? |
 
-If **S** fails (story is too large), propose a split. Present the split plan to the user before writing any files:
+**A seam needs evidence, not a count.** Say what makes the cut real: which child is
+independently demonstrable, and what forces them apart. Both directions need the same kind of
+reason — `rationale.md` § Seams records a split justified by two open defects, and a three-way
+split rejected in the same pass because a fixture child had no demonstrable value alone.
+
+If **S** fails, propose the split shape, then the prose allocation, then write. Three
+confirmations, because each is cheaper to reject than the next:
 
 ```
-Proposed split of 1.51:
-  1.51.1 — Shared component extraction (OrderSearchPanel, SimilarOrderSheet, AdjustAllSheet, DropZone)
-  1.51.2 — View-model data-model migration (Map→List, new methods)
-  1.51.3 — Two-pane layout + structural panel (dual-mode, search integration)
-  1.51.4 — Right canvas + chip nav + phase sections
+Proposed split of #412:
+  A — Shared component extraction (OrderSearchPanel, SimilarOrderSheet, DropZone)
+  B — View-model data-model migration (Map→List, new methods)
+  C — Two-pane layout + structural panel
 Confirm split, adjust, or cancel?
 ```
 
-If the user confirms the split shape, **do not write child files yet**. First propose the prose allocation:
+On confirmation, propose the **prose allocation** the same way — which sections and which ACs go
+to each child, and what stays in the parent as archival — and take a second confirmation before
+writing anything.
 
-```
-Proposed prose allocation for split:
+**Check the allocation mechanically before writing anything.** Every parent AC must land in
+exactly one child: in two is duplicated work, in none is a silently dropped requirement.
 
-  → 1.51.1 (Shared component extraction):
-     - Component inventory rows: OrderSearchPanel, SimilarOrderSheet, AdjustAllSheet, DropZone
-     - Special Considerations bullets 3, 4, 5, 6
-     - ACs: (none directly — extraction is pre-work)
-
-  → 1.51.2 (ViewModel data-model migration):
-     - ViewModel additions table (entire)
-     - Special Considerations bullet 1 (Map→List)
-     - ACs: (none directly — internal refactor)
-
-  → 1.51.3 (Two-pane layout + structural panel):
-     - Screen Layout section
-     - Left panel description
-     - ACs: 1, 6, 7, 10, 11, 12, 13, 15, 16, 18 (numbered from current order)
-
-  → 1.51.4 (Right canvas + chip nav + phase sections):
-     - Right canvas section, Canvas Components section
-     - ACs: 2, 3, 4, 5, 8, 9, 14, 17, 19, 20
-
-  → Stays in parent only (archival):
-     - Original "Why here" rationale, data/schema callout, the original unsplit AC list
-
-Confirm allocation, edit, or cancel?
+```sh
+python3 .claude/skills/evidence/evidence.py enumerate --unit checkbox \
+  --before parent.md --after child-a.md --after child-b.md --after child-c.md
 ```
 
-Only after the user confirms allocation, write the children:
+`verdict=anomalous` names each `unplaced` and `duplicated` AC. Resolve both with the user — a
+dropped AC is far cheaper to find here than in `verify`.
 
-1. **Children:** create one new file per child at `documentation/stories/<parent_id>.<n>.md`. Each child gets:
-   - Frontmatter with `parent: <parent_id>`, fresh `depends_on` (often `[<parent_id>.<n-1>]` for sequential children + parent's original deps for the first child), and empty `depended_on_by`.
-   - The allocated prose, ACs, and components from the confirmed allocation.
-   - Initial `status: DRAFT`.
+Then write the children. Title them plainly; **do not invent `<parent>.<n>` ids** — the issue
+number is the identity, and `epic:` labels are generated from the sub-issue tree, never
+hand-written.
 
-2. **Parent:** prepend a visible split block immediately after the frontmatter:
-   ```markdown
-   > **Split on 2026-04-28** into:
-   > - [1.51.1 — Shared component extraction](./1.51.1.md)
-   > - [1.51.2 — View-model data-model migration](./1.51.2.md)
-   > - [1.51.3 — Two-pane layout + structural panel](./1.51.3.md)
-   > - [1.51.4 — Right canvas + chip nav + phase sections](./1.51.4.md)
-   >
-   > This story is closed to further refinement. Original prose retained below for archival; refer to the children for the live specification.
-   ```
-3. Update parent frontmatter: `status: SPLIT`, `children: [1.51.1, 1.51.2, 1.51.3, 1.51.4]`.
-4. Append a "Split rationale" entry to the parent's `## Refinement log`.
+```sh
+python3 .claude/skills/refine/story.py split <n> --plan plan.json          # dry run
+python3 .claude/skills/refine/story.py split <n> --plan plan.json --apply
+```
 
-The parent's original prose, ACs, and refinement log all remain in place. Nothing is deleted.
+```json
+{"notice": "> **Split on 2026-04-28** into …\n>\n> Closed to further refinement. Original prose retained below for archival; the children carry the live specification.",
+ "children": [{"title": "Shared component extraction", "body_file": "child-a.md"},
+              {"title": "View-model data-model migration", "body_file": "child-b.md",
+               "after_previous": true}]}
+```
+
+The script creates children, links them as sub-issues, chains `after_previous` as dependencies,
+inherits the parent's `blocked_by` onto the first child, prepends the notice and closes the
+parent `not planned` + `superseded:split` — **in that order**, because an edge needs both numbers
+and a parent closed early leaves a half-split story unrefinable. Set each child's `Refinement`
+to `DRAFT`. Then post the pass's log comment on the parent with the split rationale.
+
+The parent's prose, ACs and log comments all remain. Nothing is deleted.
 
 ### Offer to refine children in the same session
 
-After children are written, ask the user:
-
 ```
-Children created. Refine them now in this session, or stop here?
-  [1] Refine 1.51.1 next (recommended — keeps context warm)
-  [2] Refine all children sequentially (1.51.1 → 1.51.2 → …)
-  [3] Stop. User will re-invoke /refine per child later.
+Children created. Refine them now, or stop here?
+  [1] Refine the first child next (recommended — keeps context warm)
+  [2] Refine all children sequentially
+  [3] Stop. I will re-invoke /refine per child later.
 ```
 
-If the user picks (1) or (2), recurse: invoke this skill's flow on the chosen child file, starting from Step 1. Skip Step 2's grounding for repeated claims that were already verified for the parent in this session — pass the existing grounding table to the child as a known-good baseline (still re-ground anything new the child introduces).
-
-If the user picks (3), proceed to Step 9 with the parent's verdict.
+On (1) or (2), recurse from Step 1 on the chosen child. Pass the existing grounding table in as
+a known-good baseline for claims already verified this session; still ground anything new.
 
 ---
 
-## Step 8 — Update the index
+## Step 8 — Restate, take sign-off, set final status
 
-Maintain `documentation/stories/README.md`. If it does not exist, create it with this skeleton:
+**Nothing here is written until the user has signed off.** Decide the verdict and the depth,
+show the user the whole story, then edit the board.
 
-```markdown
-# Stories Index
-
-Per-story files for the project roadmap. Each story is one Markdown file. This index is auto-maintained by the `/refine` skill.
-
-| ID | Title | Status | Parent | Children | Depends on | Depended on by | File |
-|---|---|---|---|---|---|---|---|
+```sh
+python3 .claude/skills/refine/story.py dor <n> --coverage /tmp/coverage.txt
 ```
 
-For each refined story (parent and children if split), insert or update its row:
+Exit 1 names what is unmet. Two conditions the script cannot check are yours to assert: INVEST,
+and that every CONTRADICTED grounding row was resolved rather than dropped.
 
-- `Status` reflects current frontmatter status.
-- Cross-references are clickable relative links (e.g. `[1.51](./1.51.md)`).
-- Sort rows by ID using natural numeric sort (1.5, 1.51, 1.51.1, 1.51.2, 1.52, 1.6 — not lexicographic).
-- Preserve any narrative content above or below the table that the user has added by hand.
-
----
-
-## Step 9 — Set final status and emit DoR verdict
-
-Final status, written to frontmatter:
-
-| Verdict | Condition | Frontmatter status |
+| Verdict | Condition | `Refinement` |
 |---|---|---|
-| **READY** | All INVEST checks pass; no open spikes; no contradicted-and-unresolved grounding | `REFINED` |
-| **NEEDS-SPLIT** | INVEST-S fails; user did not confirm split (or deferred) | `REFINING` |
-| **BLOCKED** | One or more open spikes present | `BLOCKED` |
-| **SPLIT** | Story was split this pass | `SPLIT` |
+| **READY** | INVEST passes; no open spikes; no unresolved contradiction; every mechanism claim proven (Step 2b); `probes.py coverage` reports zero gaps; `Depth` set | `REFINED` |
+| **NEEDS-SPLIT** | INVEST-S fails; user did not confirm the split | `REFINING` |
+| **BLOCKED** | One or more open spikes | `BLOCKED` |
+| **SPLIT** | Split this pass | — closed `not planned` + `superseded:split` |
 
-Set `refined_at` to today's date in ISO format.
+Do not touch `Status` — `cycle` owns it. Do not stamp a `refined_at`: the last log comment's
+timestamp is that date.
 
-Then output a single user-facing block:
+### Set `Depth` — required for READY
+
+A `REFINED` story must say how deep a cycle it warrants, in the board's **`Depth`** field
+(`full` / `lean` / `hotfix`). `/cycle` reads it instead of asking, which is what lets a fan-out
+run several stories at the right depth without one flag for all of them.
+
+**This is the right place for the decision and nowhere else is.** `/cycle`'s own heuristics read
+the *argument string*, and `/cycle BUG-088` matched every `hotfix` condition while the work
+changed a ViewModel's lifetime across every entry path into a screen. You have just read the body
+and grounded it. Nothing downstream will know more than you do now.
+
+| `Depth` | Choose when |
+|---|---|
+| `hotfix` | One defect, one cause, one file or nearly. No new AC beyond "it stops doing that." **Never for a story** |
+| `lean` | Small and behaviourally obvious. The ACs you wrote this pass *are* the spec. No schema or migration, one layer, no new cross-story contract |
+| `full` | Anything touching schema, a migration, more than one layer, a shared component other stories consume, or where grounding changed the design. **Also whenever you hesitate** — `full` costs one extra human gate, and `lean`'s cost is measured (`rationale.md` § Depth) |
+
+```sh
+python3 .claude/skills/refine/story.py set-depth <n> full          # dry run
+python3 .claude/skills/refine/story.py set-depth <n> full --apply
+```
+
+Exit 3 with `reason=no-depth-field` means the board has no such field. Say so in the verdict
+block rather than inventing a home — a `Depth:` line in the body is exactly the second copy this
+skill exists to prevent. `/cycle` degrades to asking.
+
+### The sign-off restatement — required before `REFINED`
+
+`REFINED` is a claim made to everything downstream: `/cycle` will build from this body without
+re-reading the original, and a fan-out will run it unattended. The person who lives with that has
+seen the story only one `AskUserQuestion` batch at a time. They answered about the parts; they
+have never been shown the result.
+
+So print the **complete** final story and ask for an explicit sign-off. Complete means the issue
+body verbatim — not a summary, not a diff. It is the artifact they are approving.
 
 ```
-=== Refinement complete: <story-id> ===
+### #<n> <issue title> — refined, pending your sign-off
 
-Verdict: <READY | NEEDS-SPLIT | BLOCKED | SPLIT>
+**Proposed:** Refinement REFINED · Depth <full|lean|hotfix>
+**Links:** blocked by <#n… or none> · blocks <#n… or none> · parent <#n or none>
 
-Story: documentation/stories/<id>.md
-Index: documentation/stories/README.md
-<if split: list child files>
-<if blocked: list open spikes by name>
+--- issue body as it now reads ---
+<the full body, verbatim, including every AC and any `## Open spikes`>
+--- end ---
 
-Destructive changes this pass: <count>
-Append-only log entries: 1
-Open questions remaining: <count, if not READY>
+**Changed this pass:** <n destructive edits, n ACs added, n removed, n questions resolved>
+  <!-- Do not count by hand. Predicted AC totals were wrong three times in one
+       session while the edits were correct, and only an enumeration told the
+       arithmetic error apart from an edit defect. Save the pre-edit body and run:
+       evidence.py enumerate --before <saved> --after <current> --unit checkbox -->
+**Probes:** <the line `coverage` printed>
+**Depth rationale:** <one line — the specific finding that chose it>
+**Grounding still unresolved:** <any CONTRADICTED/NOT-FOUND row you did not close, or "none">
 
-Next action:
-  - READY: ready to enter the implementation pipeline (e.g. /cycle).
-  - NEEDS-SPLIT: re-run /refine and confirm the split, or restructure manually.
-  - BLOCKED: resolve open spikes; re-run /refine when answers exist.
-  - SPLIT: re-run /refine on each child to take it to READY.
+Sign off and mark REFINED? (yes / changes needed)
 ```
 
-Stop after this output. Do not auto-loop on children, do not auto-invoke other skills, do not commit. The user drives the next move.
+Use `AskUserQuestion` for the sign-off itself, so the answer is unambiguous.
+
+**On "changes needed":** do not argue and do not set `REFINED`. Leave `Refinement` at `REFINING`,
+push what they said onto the front of the queue, and return to Step 4. A restatement the user
+cannot reject is a notification, not a gate.
+
+Skip this gate only when the verdict is not `READY` — `NEEDS-SPLIT`, `BLOCKED` and `SPLIT` all
+mean "not done yet", and nothing downstream will act on them.
+
+Only after sign-off, write `Refinement` and `Depth`. Then print the closing block —
+`templates.md` § The closing verdict block, which reports `Signed off by user:` among the rest —
+and stop. Do not auto-loop on children, do not auto-invoke other skills, do not commit.
 
 ---
 
 ## Notes for the agent
 
-- Treat the story file as canonical. After every Step 4 batch, the file is the source of truth for in-progress refinement state.
-- Resumability: on re-invocation with `status: REFINING`, read `## Open questions` (active queue) and the latest `## Refinement log` entry. Do not re-ask checked items unless the user requests a fresh pass.
-- Never modify ROADMAP.md. The user migrates stories out of ROADMAP.md by hand.
+- The issue is canonical. Push the body edit after every batch.
+- On re-invocation with `Refinement = REFINING`, read `## Open questions` and the latest log
+  comment. Do not re-ask resolved items. Pass last pass's verdict TSV as `--prior` so unchanged
+  artifacts carry forward.
+- Never build a local index, mirror or export of the board. Reads are live `gh` calls.
 - Never read or modify generated/codegen files.
-- When in doubt about destructive vs. clarifying: if the original prose is no longer recoverable from the result, it is destructive and must be logged.
-- Token efficiency: all greps and code reads go through the haiku Explore subagent in Step 2. The main thread should not run grep/Read against the source tree directly.
+- If the original prose is no longer recoverable from the result, the change is destructive and
+  must be logged.
+- All greps and code reads go through the haiku `Explore` subagent in Step 2. **`evidence.py` is
+  not a grep for this purpose** — it returns one verdict line, and running it on the main thread
+  to check a subagent's claim is the point of it.
+- Evidence discipline (`evidence` owns these — reference, don't duplicate):
+  - **An absence claim carries its corpus.** A NOT-FOUND over one file is a fact about that file.
+  - **Could-not-determine is never absent.** A missing path, an unreadable file, a failed `gh`
+    call, `profiles` exit 3 — each is a third outcome.
+  - **Grep for the fact, never the phrasing you remember.** Enumerating your own phrasings finds
+    a subset by construction.
+  - **Read anchors; never retype them.** `evidence.py anchor` before any guarded edit to the
+    body, `guarded-edit` to apply, so a batch cannot half-apply.
+  - **A returned URL is acceptance, not content.** After a body edit:
+    `evidence.py round-trip --local <file> --remote-cmd 'gh issue view <n> --json body -q .body'`.
+  - **A gate failing is evidence.** That your probes have usually been the culprit is not grounds
+    for assuming it this time — disprove a gate with a fresh read, never with recollection.

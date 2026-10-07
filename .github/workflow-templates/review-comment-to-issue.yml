@@ -1,0 +1,183 @@
+# File an issue from a PR comment.
+#
+# A reviewer reading a PR finds something real that does not belong on this
+# branch. Today that observation is inert: acting on it means leaving the review,
+# opening a terminal, and writing the issue by hand. Under a parallel run the
+# operator is the only reviewer and is looking at five branches at once, so the
+# cost of that round trip is exactly when it is highest.
+#
+# Write one of these at the start of a line in any PR comment or review comment:
+#
+#     /bug     <title>
+#     /story   <title>
+#     /feature <title>
+#
+# Everything after the first line becomes the issue body, with the PR and the
+# comment linked back. The label comes from the command you used — it is not
+# inferred from the text, because a two-word title is not enough to infer from
+# and the tracker contract is explicit that queried facts must not be derived
+# unreliably (docs/architecture/github-tracker-migration-plan.md, D-rules).
+#
+# Deliberately absent: anything that changes the branch. That is a second,
+# comment-triggered write path into the repository and it needs its own review.
+#
+# Trigger safety: this runs on `issue_comment`/`pull_request_review_comment`,
+# NOT `pull_request_target`, and it never checks out the PR head. It reads a
+# comment and calls the API; it never executes repository code. Its own reply is
+# posted with GITHUB_TOKEN, which by design does not re-trigger workflows, so it
+# cannot loop.
+#
+# Known limits, both cheap to live with:
+#   - A command inside a code fence still fires. Documenting the syntax in a PR
+#     comment files an issue. Close it; the alternative is a markdown parser.
+#   - Only the first command in a comment is taken. Two findings are two
+#     comments, which is also how they read back.
+
+name: Review comment → issue
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  pull-requests: write
+  contents: read
+
+jobs:
+  file:
+    # Only on pull requests, and only from someone who can already write here.
+    # A private repo makes this unlikely to matter; leaving it out would still
+    # be wrong, because the check is what makes the trigger safe to widen later.
+    if: >-
+      (github.event_name == 'pull_request_review_comment' ||
+       github.event.issue.pull_request != null) &&
+      (github.event.comment.author_association == 'OWNER' ||
+       github.event.comment.author_association == 'MEMBER' ||
+       github.event.comment.author_association == 'COLLABORATOR')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Parse the command
+        id: parse
+        env:
+          BODY: ${{ github.event.comment.body }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import os, re, json
+
+          body = os.environ.get("BODY", "")
+          # The command must start a line. Prose that merely mentions "/bug"
+          # mid-sentence is not a command.
+          m = re.search(r"^/(bug|story|feature)[ \t]+(\S.*)$", body, re.M)
+          if not m:
+              print("found=false")
+              raise SystemExit(0)
+
+          label, title = m.group(1), m.group(2).strip()
+          # Body is whatever follows the command line.
+          rest = body[m.end():].strip()
+
+          # A delimiter the comment cannot contain, or a comment body ending a
+          # heredoc early would inject arbitrary step outputs.
+          import secrets
+          d = "EOT_" + secrets.token_hex(8)
+
+          print("found=true")
+          print(f"label={label}")
+          print(f"title<<{d}"); print(title[:250]); print(d)
+          print(f"rest<<{d}"); print(rest); print(d)
+          PY
+
+      - name: Create the issue
+        if: steps.parse.outputs.found == 'true'
+        id: create
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TITLE: ${{ steps.parse.outputs.title }}
+          LABEL: ${{ steps.parse.outputs.label }}
+          REST: ${{ steps.parse.outputs.rest }}
+          PR: ${{ github.event.issue.number || github.event.pull_request.number }}
+          COMMENT_URL: ${{ github.event.comment.html_url }}
+          AUTHOR: ${{ github.event.comment.user.login }}
+          FILE: ${{ github.event.comment.path }}
+        run: |
+          set -euo pipefail
+          {
+            printf '## Why this exists\n\n'
+            printf 'Raised by @%s while reviewing #%s.\n\n' "$AUTHOR" "$PR"
+            if [ -n "${FILE:-}" ]; then
+              printf 'On `%s`.\n\n' "$FILE"
+            fi
+            if [ -n "$REST" ]; then printf '%s\n\n' "$REST"; fi
+            printf -- '---\n\nFiled from [this review comment](%s).\n' "$COMMENT_URL"
+          } > /tmp/body.md
+
+          # Rule 2 of the tracker contract: a gh failure is loud and stops. There
+          # is no file fallback and no partial success that reads as a success.
+          url=$(gh issue create --title "$TITLE" --label "$LABEL" --body-file /tmp/body.md)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "number=${url##*/}" >> "$GITHUB_OUTPUT"
+
+      # >>> board >>>
+      # No continue-on-error. It sets the step *conclusion* to success while only
+      # `outcome` records a failure, so a step that did nothing showed green on
+      # the run page (#505). This step now reports honestly through an output and
+      # always exits 0 for the states it expects, so green means "handled" and a
+      # genuine API failure surfaces as a warning annotation rather than a lie.
+      - name: Put it on the board
+        if: steps.parse.outputs.found == 'true'
+        id: board
+        env:
+          # Projects v2 is user/org scoped, so GITHUB_TOKEN cannot write to it.
+          # Absent secret means the issue is still filed and labelled; the reply
+          # below says board placement was skipped rather than implying it ran.
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          URL: ${{ steps.create.outputs.url }}
+        run: |
+          set -uo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "placed=no-token" >> "$GITHUB_OUTPUT"
+            echo "No PROJECT_TOKEN secret — board placement skipped (the issue is still filed)."
+            exit 0
+          fi
+          if ! item=$(gh project item-add @@BOARD_NUMBER@@ --owner @@BOARD_OWNER@@ --url "$URL" --format json \
+                      | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])'); then
+            echo "placed=failed" >> "$GITHUB_OUTPUT"
+            echo "::warning::could not add the issue to the board"
+            exit 0
+          fi
+          if ! gh project item-edit \
+                 --id "$item" \
+                 --project-id @@PROJECT_ID@@ \
+                 --field-id @@STATUS_FIELD_ID@@ \
+                 --single-select-option-id @@BACKLOG_OPTION_ID@@; then
+            echo "placed=added-no-status" >> "$GITHUB_OUTPUT"
+            echo "::warning::added to the board but could not set Status=Backlog"
+            exit 0
+          fi
+          echo "placed=true" >> "$GITHUB_OUTPUT"
+          echo "placed on the board as Backlog"
+      # <<< board <<<
+
+      - name: Reply on the PR
+        if: steps.parse.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.issue.number || github.event.pull_request.number }}
+          URL: ${{ steps.create.outputs.url }}
+          LABEL: ${{ steps.parse.outputs.label }}
+          BOARD: ${{ steps.board.outputs.placed }}
+        run: |
+          set -euo pipefail
+          case "${BOARD:-no-board}" in
+            true)            note="on the board as **Backlog**" ;;
+            no-board)        note="no board configured for this project" ;;
+            no-token)        note="**not** added to the board — set the \`PROJECT_TOKEN\` secret (a classic token with \`repo\` and \`project\` scopes) to enable that" ;;
+            added-no-status) note="added to the board, but its **Status could not be set** — see the run's warnings" ;;
+            *)               note="**not** added to the board — see the run's warnings" ;;
+          esac
+          gh pr comment "$PR" --body "Filed $URL as \`$LABEL\`, $note."

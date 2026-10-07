@@ -61,6 +61,21 @@ The self-improve agent reads run reports + verify audits and identifies recurrin
 
 ---
 
+### Harness finding patterns
+
+Per-cycle process faults recorded under `## Harness findings` (taxonomy owned by the
+`harness-findings` skill). Read them across reports, not within one.
+
+- **Same finding in ≥3 of the last 5 cycles** — a pipeline defect, not an incident.
+  Recommend at **high** confidence regardless of individual severity.
+- **Any P0, even once** — recommend immediately. "Agents built against the wrong base"
+  does not need a second occurrence to be worth fixing.
+- **A probe that never reports anything across many cycles** — either genuinely clean or
+  never actually checked. Cross-check against reports that wrote `None`; a run report with
+  a `RESCUE` line and no findings is a signal the checklist was skipped.
+- **Repeated "what worked" entries** — a behaviour being re-requested per prompt each
+  cycle belongs in an agent or skill definition. Recommend promoting it.
+
 ## Recommendation format
 
 ```markdown

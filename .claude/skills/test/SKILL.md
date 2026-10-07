@@ -16,7 +16,7 @@ The class or feature to test: **$ARGUMENTS**
 1. If `$ARGUMENTS` is empty, ask the user what class, method, or feature to test.
 
 2. Determine context:
-   - **PRD-driven** — if a PRD or story exists in `agent_tasks/`, find the matching file and extract its AC. If you can't find one, ask the user for the AC inline before proceeding.
+   - **PRD-driven** — if a PRD or story exists in `agent_tasks/prds/`, find the matching file and extract its AC. If you can't find one, ask the user for the AC inline before proceeding.
    - **Code-driven** — if no PRD exists and the user can't supply AC, derive from the source's public API and existing behavior, and flag in the report that no PRD was used.
 
 3. Spawn the `test` agent with the gathered context:

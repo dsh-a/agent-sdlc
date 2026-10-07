@@ -10,9 +10,44 @@ For each acceptance criterion, audit whether the existing tests genuinely verify
 
 ---
 
+## Check 0 — does a test exist at all?
+
+**Before any other check, name the test.** Cite a test file and a test name for this
+criterion. If you cannot, the verdict is **NO TEST** — regardless of how complete the
+implementation looks, and regardless of how many of the six checks below you could
+answer in the abstract.
+
+**The test must assert *this* criterion, not merely live in the right file.** If no assertion would fail when the criterion is violated, the verdict is NO TEST — not INCOMPLETE or WEAK, which describe a test that exists.
+
+This gate exists because the six checks all presuppose a test, and without it stated the
+audit drifts. Measured 2026-09-20 across twelve models on a fixture where one criterion
+was implemented with no test asserting it: answers scattered across PASS, WEAK and
+INCOMPLETE, and almost none said NO TEST. Every one of those verdicts reports a criterion
+as audited when nothing verifies it — an AC audit signing off untested code while
+reporting coverage, which is the precise failure this rubric exists to prevent.
+
+An empty **Test File** or **Test Name** cell in the coverage matrix is therefore not a
+formatting lapse. It is the verdict: a row with no citation is NO TEST or NO IMPL, never
+PASS, WEAK or INCOMPLETE.
+
+**Precedence when more than one applies:**
+
+| Situation | Verdict |
+|---|---|
+| Not implemented (whether or not a test exists) | **NO IMPL** |
+| Implemented, no test found | **NO TEST** |
+| Implemented, test found | run the six checks below |
+
+NO IMPL outranks NO TEST. A criterion the code does not satisfy is a gap in the feature;
+whether someone wrote a test for the thing that does not exist is a detail beneath it.
+The same measurement found models splitting on exactly this case, because the rubric had
+never said which wins.
+
+---
+
 ## Per-AC checks
 
-For each AC, look for a test and apply these six checks:
+Once Check 0 has named a test, apply these six checks:
 
 1. **Naive-shortcut test.** If the implementation were replaced with a hardcoded return or no-op, would the test still pass? Yes → **WEAK TEST**.
 2. **Boundary test.** If the AC specifies a threshold, does the test check both sides? Only one side → **INCOMPLETE BOUNDARY**.
@@ -27,6 +62,12 @@ Then check the implementation: does the code actually do what the AC requires, o
 
 ## Verdicts
 
+**One row per AC, always — never a count.** Enumerate every criterion's verdict rather than
+reporting how many passed. Predicted AC totals were wrong three times in one session while
+the content was right, and only a per-item enumeration told an arithmetic slip apart from a
+real coverage gap. `evidence.py enumerate --unit checkbox` is the mechanical half when the
+AC list itself changed between two versions of a spec.
+
 For each AC row in the coverage matrix:
 
 | Verdict | Meaning |
@@ -34,10 +75,17 @@ For each AC row in the coverage matrix:
 | **PASS** | Criterion is tested and the test is robust |
 | **WEAK** | Test exists but would pass with a naive implementation |
 | **INCOMPLETE** | Test exists but missing boundary / negative / side-effect checks |
-| **NO TEST** | No test found for this criterion |
-| **NO IMPL** | Criterion is not implemented in the code |
+| **NO TEST** | Implemented, but no test found for this criterion |
+| **NO IMPL** | Criterion is not implemented in the code — outranks NO TEST |
 
-`PASS` requires both: test is robust (all six checks pass for this AC) AND the implementation actually satisfies the criterion.
+`PASS` requires three things: Check 0 named a real test, that test is robust (all six checks
+pass for this AC), AND the implementation actually satisfies the criterion.
+
+**WEAK is not a lesser PASS, and the naive-shortcut check is stricter than it looks.** If a
+hardcoded return would satisfy the assertion, the verdict is WEAK even when the
+implementation is correct and the criterion is genuinely met — the verdict describes the
+*test*, not the code. A test asserting `expect(await repo.getById('x'), isNull)` is WEAK
+against "returns null for a missing order", because `return null;` passes it.
 
 ---
 

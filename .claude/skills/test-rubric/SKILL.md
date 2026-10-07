@@ -75,9 +75,14 @@ loop:
   if all pass: done — proceed to final report
   if iteration >= 2: emit contradiction-exit, stop
   fix the failures (edit tests; or fix impl if genuinely broken)
-  re-run the full test suite to confirm green
+  re-run the tests you touched, scoped and bounded, to confirm green
   iteration += 1
 ```
+
+**Scoped, not the full suite.** This loop runs inside the `test` agent, which is
+forbidden to run the bare suite — it is what the 600s watchdog kills
+(`test` agent § Running tests without being killed). The whole-tree confirmation is
+the orchestrator's, at the Commit protocol and Phase 4A.
 
 **Cap at 2 iterations.** A third pass means the rubric is fighting the impl or the AC — that's a signal, not a bug to grind through.
 

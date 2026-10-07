@@ -1,11 +1,92 @@
 {
-  "_comment": "Sample hooks block — merge into your .claude/settings.json. Enables the per-agent event log at agent_states/events/<agent_id>.jsonl (consumed by run-report telemetry and stall salvage). Requires python3 on PATH.",
+  "_comment_permissions": [
+    "Permission patterns do NOT resolve most-specific-wins: a broad `ask` or `deny` entry",
+    "shadows a narrower `allow`, and an `ask` in a non-interactive subagent resolves to a",
+    "denial. So `Bash(rm *)` in either list silently revokes `Bash(rm agent_states/*)`, and",
+    "the finalize monitor cannot honour its cleanup contract. Do NOT widen the rm rules to",
+    "fix that \u2014 a glob permission is a string match on a command, satisfied by a `cd ..`",
+    "first, a symlinked directory, or a shell-expanded variable. Allow the script instead:",
+    "it resolves <git-root>/agent_states itself, refuses any other path, and takes no",
+    "argument that can widen its scope. Keep the blanket rm deny.",
+    "Both paths are allowed because a deployment may symlink the framework skills into",
+    "~/.claude/skills rather than into the project. See .claude/skills/cycle/monitor.md.",
+    "Both are also RELATIVE, and agents must call them that way. In fan-out 6 a monitor",
+    "expanded the first into an absolute clone path, matched neither entry, fell through",
+    "to the auto-mode classifier and was refused at Finalize."
+  ],
+  "permissions": {
+    "allow": [
+      "Bash(bash .claude/skills/cycle/open-terminal.sh*)",
+      "Bash(bash ~/.claude/skills/cycle/open-terminal.sh*)",
+      "Bash(bash .claude/skills/cycle/preflight-deploy.sh*)",
+      "Bash(bash ~/.claude/skills/cycle/preflight-deploy.sh*)",
+      "Bash(bash .claude/skills/cycle/publish-branch.sh*)",
+      "Bash(bash ~/.claude/skills/cycle/publish-branch.sh*)",
+      "Bash(bash .claude/skills/cycle/reap-clones.sh*)",
+      "Bash(bash ~/.claude/skills/cycle/reap-clones.sh*)",
+      "Bash(bash .claude/skills/cycle/run-suite.sh*)",
+      "Bash(bash ~/.claude/skills/cycle/run-suite.sh*)",
+      "Bash(bash .claude/skills/cycle/start-parallel-cycles.sh*)",
+      "Bash(bash ~/.claude/skills/cycle/start-parallel-cycles.sh*)",
+      "Bash(bash .claude/skills/cycle/sync-gitignore.sh*)",
+      "Bash(bash ~/.claude/skills/cycle/sync-gitignore.sh*)",
+      "Bash(python3 .claude/skills/cycle/aggregate-telemetry.py*)",
+      "Bash(python3 ~/.claude/skills/cycle/aggregate-telemetry.py*)",
+      "Bash(python3 .claude/skills/cycle/clear-agent-states.py*)",
+      "Bash(python3 ~/.claude/skills/cycle/clear-agent-states.py*)",
+      "Bash(python3 .claude/skills/cycle/config-get.py*)",
+      "Bash(python3 ~/.claude/skills/cycle/config-get.py*)",
+      "Bash(python3 .claude/skills/cycle/gate-report.py*)",
+      "Bash(python3 ~/.claude/skills/cycle/gate-report.py*)",
+      "Bash(python3 .claude/skills/cycle/prune-analyzer-baselines.py*)",
+      "Bash(python3 ~/.claude/skills/cycle/prune-analyzer-baselines.py*)",
+      "Bash(python3 .claude/skills/cycle/suite-result.py*)",
+      "Bash(python3 ~/.claude/skills/cycle/suite-result.py*)",
+      "Bash(python3 .claude/skills/evidence/evidence.py*)",
+      "Bash(python3 ~/.claude/skills/evidence/evidence.py*)",
+      "Bash(python3 .claude/skills/harness-intake/findings-extract.py*)",
+      "Bash(python3 ~/.claude/skills/harness-intake/findings-extract.py*)",
+      "Bash(python3 .claude/skills/refine/probes.py*)",
+      "Bash(python3 ~/.claude/skills/refine/probes.py*)",
+      "Bash(python3 .claude/skills/refine/story.py*)",
+      "Bash(python3 ~/.claude/skills/refine/story.py*)",
+      "Edit(/agent_tasks/**)",
+      "Read(/agent_tasks/**)",
+      "Edit(/agent_states/**)",
+      "Read(/agent_states/**)",
+      "Edit(/cycle_reports/**)",
+      "Read(/cycle_reports/**)"
+    ],
+    "deny": [
+      "Bash(rm *)",
+      "Bash(rm -rf *)"
+    ]
+  },
+  "_comment": "Sample hooks block \u2014 merge into your .claude/settings.json. Enables the per-agent event log at agent_states/events/<agent_id>.jsonl (consumed by run-report telemetry and stall salvage). gate-log.py on SubagentStop is what captures refused tool calls: PostToolUse never fires on a refusal, so a subagent denied a command leaves no trace anywhere else \u2014 fan-out 7 reported zero permission wait while three calls had been refused. Requires python3 on PATH.",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-framework.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-secrets.py"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "*",
         "hooks": [
-          {"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"}
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"
+          }
         ]
       }
     ],
@@ -13,9 +94,31 @@
       {
         "matcher": "*",
         "hooks": [
-          {"type": "command", "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"}
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-log.py"
+          }
         ]
       }
     ]
-  }
+  },
+  "_comment_allow": "The allow list below is generated \u2014 regenerate with: deploy.sh grants. It covers framework scripts and the three artifact directories a cycle writes; add your project's own grants after it.",
+  "_comment_file_rules": [
+    "The artifact rules are spelled `Edit`, nested with `**`, and anchored with a single `/`.",
+    "All three parts are load-bearing. Claude Code consults path rules for `Edit` and `Read`",
+    "only: a `Write(...)`, `Glob(...)`, `NotebookEdit(...)` or `MultiEdit(...)` path rule is",
+    "accepted, never matched, and warned about at startup. `*` does not cross `/`, so an",
+    "`Edit(*)` covers the repo root and nothing below it \u2014 and every artifact a cycle writes is",
+    "nested, which is a prompt per PRD, task file, state file and report. The single leading `/`",
+    "anchors at the primary working directory, so one rule is correct in the main checkout and in",
+    "every fan-out clone; a `//` prefix would mean the filesystem root instead.",
+    "A docs vault needs more: its paths are outside the repo, so `deploy.sh grants <project>`",
+    "emits `//`-anchored absolute rules for them plus a `permissions.additionalDirectories`",
+    "entry. The allow rules alone do nothing \u2014 a path outside the working set is refused before",
+    "any allow rule is consulted."
+  ]
 }

@@ -1,0 +1,54 @@
+{
+  "name": "supersede-decomposed",
+  "kind": "chain",
+  "why": "Second arm of the co-adaptation experiment, on the other wide gap. `test-preflight` scored 47% open-weight against 100% premium on the monolithic probe, and its failures split by size: small models never emitted the labels, large ones emitted them wrong.\n\nDecomposed the same way as `ac-coverage-decomposed`: two binary questions per existing test, and the keep/update/delete label computed in code. The two questions are the ones the duty actually turns on \u2014 does this test exercise the changed behaviour at all, and does the new AC contradict what it asserts. Neither requires the model to know the label vocabulary.\n\nPrediction worth recording before the run, so it can be wrong: this should help small models more than `ac-coverage` did, because half of test-preflight's failures were format rather than judgement and a one-word contract removes that class outright.",
+  "context": "## Acceptance criteria for this task\n\nAC-1: `OrderRepository.getById` MUST return `null` for a missing order instead of throwing `NotFoundException`. Callers are being updated to handle null.\nAC-2: `OrderRepository.getById` must still return the order unchanged when one exists.\n\n## Changed symbols\n\n`OrderRepository.getById`\n\n## Existing tests that reference those symbols\n\n### T1 \u2014 test/data/order_repository_test.dart:12\n```dart\ntest('getById throws NotFoundException when the order is missing', () async {\n  when(api.fetch('x')).thenAnswer((_) async => null);\n  expect(() => repo.getById('x'), throwsA(isA<NotFoundException>()));\n});\n```\n\n### T2 \u2014 test/data/order_repository_test.dart:20\n```dart\ntest('getById returns the order when it exists', () async {\n  when(api.fetch('x')).thenAnswer((_) async => anOrder);\n  expect(await repo.getById('x'), anOrder);\n});\n```\n\n### T3 \u2014 test/data/order_api_test.dart:8\n```dart\ntest('OrderApi.fetch hits the right endpoint', () async {\n  await api.fetch('x');\n  verify(http.get(Uri.parse('/orders/x'))).called(1);\n});\n```\n",
+  "criteria": {
+    "T1": "T1 \u2014 `getById throws NotFoundException when the order is missing`",
+    "T2": "T2 \u2014 `getById returns the order when it exists`",
+    "T3": "T3 \u2014 `OrderApi.fetch hits the right endpoint`"
+  },
+  "steps": [
+    {
+      "id": "exercises",
+      "system": "You answer one question about a test. Reply with exactly one word: YES or NO.",
+      "ask": "Does this test exercise the behaviour of the changed symbol listed above \u2014 that is, would changing that symbol's behaviour affect whether this test passes?\n\nTest: {criterion}"
+    },
+    {
+      "id": "contradicts",
+      "skip_if": {
+        "exercises": "NO"
+      },
+      "system": "You answer one question about a test. Reply with exactly one word: YES or NO.",
+      "ask": "Does any acceptance criterion listed above CONTRADICT what this test asserts \u2014 so that satisfying the criterion would make this test's current assertion wrong?\n\nTest: {criterion}"
+    }
+  ],
+  "decide": [
+    {
+      "when": {
+        "exercises": "NO"
+      },
+      "verdict": "KEEP"
+    },
+    {
+      "when": {
+        "exercises": "YES",
+        "contradicts": "YES"
+      },
+      "verdict": "DELETE"
+    },
+    {
+      "when": {
+        "exercises": "YES",
+        "contradicts": "NO"
+      },
+      "verdict": "KEEP"
+    }
+  ],
+  "grader": "chain_verdicts",
+  "expect": {
+    "T1": "DELETE",
+    "T2": "KEEP",
+    "T3": "KEEP"
+  }
+}

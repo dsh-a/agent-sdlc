@@ -8,7 +8,7 @@ Never add packages without checking `pubspec.yaml` first.
 
 Stack-specific content belongs in a pack (`.claude/packs/<lang>/`), never in a core agent or skill.
 
-When passing `model:` to a task spawn, resolve the tier label (opus/sonnet/haiku) through the Model Versions table in `.omp/agent-config.md` and pass the specific model ID, not the alias label.
+When passing `model:` to a task spawn, resolve the tier label (opus/sonnet/haiku) through the Model Versions table in `.omp/agent-config.md` and pass the specific model ID, not the alias label. This rule is omp-specific — Claude Code's `Agent` tool takes the bare tier label and rejects a concrete id.
 
 # Phase-specific rules (injected by omp's time-traveling stream rules)
 # TTSR re-attaches these near the current turn so they stay visible after

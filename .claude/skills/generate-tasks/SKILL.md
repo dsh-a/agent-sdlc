@@ -9,7 +9,7 @@ You are generating a task list from a PRD.
 
 PRD file: **$ARGUMENTS**
 
-If $ARGUMENTS is empty, ask the user to provide the path to a PRD file (e.g. `agent_tasks/prd-feature-name.md`).
+If $ARGUMENTS is empty, ask the user to provide the path to a PRD file (e.g. `agent_tasks/prds/prd-feature-name.md`).
 
 ## Output
 

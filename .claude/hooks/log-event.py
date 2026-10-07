@@ -1,12 +1,24 @@
 #!/usr/bin/env python3
 """log-event — Claude Code PostToolUse + SubagentStop hook.
 
-Appends one JSONL line per event to ``<main-root>/agent_states/events/<agent_id>.jsonl``,
-where ``<main-root>`` is resolved from the git common dir so this works identically
-from the main checkout or from any Phase-3 worktree. Pure logging — never fails
-the calling tool.
+Appends one JSONL line per event to ``<cycle-root>/agent_states/events/<agent_id>.jsonl``.
 
-Wired from ``.claude/settings.json`` as a ``PostToolUse`` and ``SubagentStop`` hook.
+Resolving ``<cycle-root>`` is the whole subtlety, because two different kinds of
+linked worktree want opposite answers:
+
+* A **Phase-3 agent worktree** is a workspace *inside* one cycle. Its events belong
+  to that cycle, so they must land in the main checkout — hence ``--git-common-dir``.
+* A **fan-out clone** (``start-parallel-cycles.sh``) is a whole cycle of its own that
+  happens to be implemented as a linked worktree of the origin. ``--git-common-dir``
+  points at the origin, so under a parallel run every clone appended into one
+  directory in the origin repo while each clone had no ``agent_states/events/`` at
+  all — measured in fan-out 1, see docs/internal/parallel-cycles-evidence-run1.md E1.
+
+Git topology cannot tell the two apart: both are linked worktrees. So the launcher
+marks a fan-out clone with ``agent_states/.fanout-clone`` and that marker wins.
+
+Pure logging — never fails the calling tool. Wired from ``.claude/settings.json``
+as a ``PostToolUse`` and ``SubagentStop`` hook.
 """
 
 import json
@@ -16,24 +28,47 @@ import sys
 from datetime import datetime, timezone
 
 
+# Marker written by start-parallel-cycles.sh into each clone. Its presence means
+# "this checkout is a cycle in its own right" — see the module docstring.
+FANOUT_MARKER = os.path.join("agent_states", ".fanout-clone")
+
+
+def _git(args, cwd):
+    return subprocess.check_output(
+        ["git"] + args, cwd=cwd, stderr=subprocess.DEVNULL, text=True
+    ).strip()
+
+
+def cycle_root(cwd):
+    """The checkout whose agent_states/ this event belongs to, or None."""
+    try:
+        top = _git(["rev-parse", "--show-toplevel"], cwd)
+    except Exception:
+        return None
+    # A fan-out clone owns its own telemetry even though it is a linked worktree.
+    if top and os.path.exists(os.path.join(top, FANOUT_MARKER)):
+        return top
+    try:
+        common = _git(["rev-parse", "--git-common-dir"], cwd)
+    except Exception:
+        return top or None
+    if not os.path.isabs(common):
+        common = os.path.join(cwd, common)
+    return os.path.dirname(os.path.abspath(common))
+
+
 def main():
     try:
         payload = json.loads(sys.stdin.read())
     except Exception:
         return
 
-    # Resolve main project root via git common dir (works from any worktree).
-    try:
-        common = subprocess.check_output(
-            ["git", "rev-parse", "--git-common-dir"],
-            stderr=subprocess.DEVNULL,
-            text=True,
-        ).strip()
-        main_root = os.path.dirname(os.path.abspath(common))
-    except Exception:
+    cwd = payload.get("cwd") or os.getcwd()
+    cycle_dir = cycle_root(cwd)
+    if cycle_dir is None:
         return
 
-    events_dir = os.path.join(main_root, "agent_states", "events")
+    events_dir = os.path.join(cycle_dir, "agent_states", "events")
     try:
         os.makedirs(events_dir, exist_ok=True)
     except Exception:
@@ -70,6 +105,19 @@ def main():
             "event": "subagent_stop",
             "stop_reason": payload.get("stop_reason"),
         }
+        # A stop with no agent_type is not one of this pipeline's agents. Measured
+        # across six fan-out sessions: 257 stops, of which 36 carried a type and
+        # matched a subagent transcript, and 221 carried none and matched nothing
+        # anywhere. The untyped ones arrive at a steady ~1/min in every clone,
+        # independent of spawns or tool volume — the harness's own background.
+        #
+        # They are still recorded, because a count that arrives on a clock is
+        # evidence about the harness and dropping it would be stripping on
+        # uncertainty. But they go in one pooled file rather than one file each:
+        # 154 of c3's 184 event files were a single 172-byte untyped stop, which is
+        # how a deployment reached 966 files and made the raw directory unreadable.
+        if not payload.get("agent_type"):
+            agent_id = "_untyped-stops"
 
     if line is None:
         return
@@ -87,7 +135,7 @@ def main():
     # spawn a supervisor check. Pure best-effort — never fails the caller.
     if event == "PostToolUse" and agent_id != "orchestrator":
         try:
-            counters_dir = os.path.join(main_root, "agent_states", "counters")
+            counters_dir = os.path.join(cycle_dir, "agent_states", "counters")
             os.makedirs(counters_dir, exist_ok=True)
             counter_path = os.path.join(counters_dir, agent_id)
             current = 0

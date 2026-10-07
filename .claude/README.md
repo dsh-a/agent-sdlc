@@ -18,7 +18,8 @@ discovers agents from `.omp/agents/` (native, priority 100).
   hooks/
     log-event.py       # per-agent event log (PostToolUse + SubagentStop)
   agents/              # the agent team (stack-neutral) — see agents/README.md
-    scaffold/          # language-neutral pattern shapes (interface, service, command, …)
+    scaffold/          # 26 language-neutral pattern shapes (23 GoF + interface/service/use-case)
+      INDEX.md         # routing table — triggers + disambiguation; read this to pick a pattern
   skills/              # skills — see skills/README.md
     project-conventions/  # ACTIVE stack conventions (loaded by agents)
     ui-test-patterns/     # ACTIVE UI test patterns (loaded by agents)

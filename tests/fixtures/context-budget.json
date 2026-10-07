@@ -1,0 +1,132 @@
+{
+  "agents": {
+    "adversarial-tester": {
+      "body": 666,
+      "skills": 0,
+      "total": 666
+    },
+    "coding": {
+      "body": 2290,
+      "skills": 5848,
+      "total": 8138
+    },
+    "create-prd": {
+      "body": 998,
+      "skills": 2431,
+      "total": 3429
+    },
+    "generate-tasks": {
+      "body": 2675,
+      "skills": 5380,
+      "total": 8055
+    },
+    "monitor": {
+      "body": 1922,
+      "skills": 0,
+      "total": 1922
+    },
+    "plan-reviewer": {
+      "body": 371,
+      "skills": 0,
+      "total": 371
+    },
+    "pre-digest": {
+      "body": 922,
+      "skills": 0,
+      "total": 922
+    },
+    "review": {
+      "body": 3050,
+      "skills": 4755,
+      "total": 7805
+    },
+    "scaffold": {
+      "body": 2666,
+      "skills": 5848,
+      "total": 8514
+    },
+    "self-improve": {
+      "body": 995,
+      "skills": 3227,
+      "total": 4222
+    },
+    "supervisor": {
+      "body": 2364,
+      "skills": 2140,
+      "total": 4504
+    },
+    "test": {
+      "body": 3596,
+      "skills": 8831,
+      "total": 12427
+    },
+    "test-preflight": {
+      "body": 2005,
+      "skills": 0,
+      "total": 2005
+    },
+    "ui-story": {
+      "body": 2067,
+      "skills": 7839,
+      "total": 9906
+    },
+    "verify": {
+      "body": 4611,
+      "skills": 4431,
+      "total": 9042
+    }
+  },
+  "baseline": {
+    "AGENTS.md": 745,
+    "RULES.md": 337,
+    "TOTAL": 38649,
+    "agent-config.md": 7787,
+    "cycle/SKILL.md": 29780
+  },
+  "interactive": {
+    "refine/SKILL.md": 6762
+  },
+  "note": "Re-record deliberately. The diff on this file is the review artifact.",
+  "recorded": "2026-10-04",
+  "skills": {
+    "ac-audit-rubric": 1530,
+    "ac-authoring": 617,
+    "autonomous-agent": 1814,
+    "context-sources": 1119,
+    "contradiction-exit": 1004,
+    "create-prd": 390,
+    "cycle": 29780,
+    "escalations": 1067,
+    "evidence": 3393,
+    "feature-idea": 686,
+    "generate-tasks": 983,
+    "harness-findings": 2652,
+    "harness-intake": 2400,
+    "minimalism": 1554,
+    "minimalism-review": 889,
+    "pattern-divergence": 1087,
+    "pipeline-metrics-rubric": 1413,
+    "pr-body-format": 1531,
+    "process-tasks": 889,
+    "project-conventions": 1407,
+    "refine": 6762,
+    "review": 430,
+    "review-report-format": 645,
+    "scaffold": 1058,
+    "sd-wire": 2797,
+    "self-improve": 426,
+    "setup": 1961,
+    "setup-scaffold": 1596,
+    "task-file-format": 954,
+    "test": 505,
+    "test-rubric": 1513,
+    "ui-story": 394,
+    "ui-test-patterns": 933,
+    "verify": 450,
+    "whispers": 1073
+  },
+  "tolerance": {
+    "frac": 0.02,
+    "min": 200
+  }
+}

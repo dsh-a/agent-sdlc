@@ -1,24 +1,49 @@
 # OpenRouter provider config for agent-sdlc (omp target).
 #
-# Copy to ~/.omp/agent/models.yml, uncomment ONE model per tier, set
-# OPENROUTER_API_KEY in your env or <repo>/.env, then uncomment the matching
-# equivalence.override line so the canonical tier id resolves.
+# Copy to ~/.omp/agent/models.yml. You may copy ONLY the `providers:` block —
+# everything below it is optional, and the model list is the part that rots.
 #
-# Verify current model ids at https://openrouter.ai/models before use.
-# Prices below are illustrative — confirm on OpenRouter.
+# ── THE SHORT VERSION ────────────────────────────────────────────────────────
 #
-# OpenRouter routing + caching:
-#   - openRouterRouting.only: pin to specific upstream providers (quality control)
-#   - openRouterRouting.order: prefer providers in order (fallback preference)
-#   - cacheControlFormat: anthropic enables prompt caching on anthropic/* models
-#     (reduces cost on repeated system prompts — significant for the cycle orchestrator)
+# Name the provider id directly in .omp/config.yml's modelRoles. No tier labels,
+# no equivalence mapping, nothing to keep in sync:
 #
-# OpenRouter variant (set in .omp/config.yml → providers.openrouterVariant):
-#   - default: standard routing
-#   - nitro: fastest inference (higher cost, lower latency — good for haiku tier)
-#   - floor: cheapest available (cost optimization — good for haiku tier)
-#   - online: highest availability (avoid rate limits during parallel Phase-3 waves)
-#   - exacto: exact model match (no provider fallback — strictest quality)
+#   modelRoles:
+#     slow:    openrouter/qwen/qwen3.8-2.4t-a95b     # orchestrator, verify, review
+#     default: openrouter/deepseek/deepseek-v4-pro   # implementation agents
+#     task:    openrouter/deepseek/deepseek-v4-pro
+#     smol:    openrouter/openai/gpt-oss-20b         # monitor, pre-digest, supervisor
+#
+# Verified 2026-09-21: `openrouter/qwen/qwen3.8-flash` resolves and answers with
+# no entry anywhere in models.yml. omp reads the live OpenRouter catalogue, so
+# declaring models here duplicates something it already knows.
+#
+# ── WHY THIS FILE SHRANK ─────────────────────────────────────────────────────
+#
+# A deployed models.yml carried three defects at once, none of which errored:
+# `deepseek/deepseek-v4-pro` declared twice with contextWindows of 1,048,576 and
+# 200,000; equivalence mapping it to `claude-sonnet-4-5` while config.yml asked
+# for `claude-sonnet-4-6`, so the mapping silently did not apply; and no opus
+# override at all, leaving the orchestrator's own `slow:` role unresolved.
+#
+# All three are drift between a hand-written copy and a live catalogue. The fix
+# is to stop keeping the copy. `tests/models_config.py` guards what remains and
+# can be run against a live file:
+#
+#   python3 tests/models_config.py ~/.omp/agent/models.yml
+#
+# ── PICKING A MODEL ──────────────────────────────────────────────────────────
+#
+#   omp models openrouter          # what is actually available right now
+#   omp models find <pattern>      # search the live catalogue
+#
+# Size the role against the measured peaks in
+# docs/internal/agent-requirement-profiles.md, not against price: `slow` carries
+# the orchestrator at 375k p90, so it needs a genuinely large window.
+#
+# The blocks below are kept as a reference for the rarer case where a canonical
+# tier id must resolve to a specific provider model. They are commented out, and
+# a file containing only `providers:` is a working file.
 
 providers:
   openrouter:

@@ -32,6 +32,19 @@ Status: [active | paused | finished]
 - ts: [YYYY-MM-DDTHH:MM:SSZ] | type: [enum] | agent: [task-id or agent-id] | description: [short] | resolution: [text] | artifact: [path or none]
 - (or "None")
 
+## Gate answers
+
+Every gate raised and how it was answered, verbatim. Required — a gate answered and not recorded
+here is lost the moment the orchestrator's context is (a park, a resume, a crash), and downstream
+contracts read this section: `pr-body-format` requires an accepted gap to be reported *as accepted*
+in the PR body, and it can only know that from here.
+
+- gate: [gate-1 | gate-2 | admission | 4b-verify | pr-body] | raised: [ts] | answered: [ts] | by: [who]
+  decision: [approve | approve-with-changes | reject | defer | fix-first]
+  resume_at: [phase to resume at — may be earlier than where the gate was raised]
+  note: [the answer verbatim, including any rationale the answer gave]
+- (or "None")
+
 ## Deviations
 - task: [task-id] | ac: [AC id or short ref] | implemented: [what] | reason: [why]
 - (or "None")
@@ -65,6 +78,8 @@ Resume cron: [job ID or none]
 1. Read this file + all digests in `agent_states/digests/`
 2. Skip completed phases
 3. Resume from: [specific instruction]
-4. Verify: run the **Run all tests** + **Analyze / lint** commands (`.omp/agent-config.md` § Project Commands), `git status`
+4. Verify: **Analyze / lint** (`.omp/agent-config.md` § Project Commands) and `git status`; run the
+   test suite through `run-suite.sh start`/`check` rather than inline, so a resume cannot be killed
+   by the watchdog the way a fresh run can
 
 5. Resume state persistence (write inline by default; spawn a new monitor only if `agent_messaging: true`), reuse existing digests

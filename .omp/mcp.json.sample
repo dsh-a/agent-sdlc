@@ -3,12 +3,12 @@
   "_comment": "Template for .omp/mcp.json — connect MCP servers referenced by .omp/agent-config.md § Context Sources. Copy to .omp/mcp.json and fill in real commands/URLs/credentials. Do NOT commit secrets; .omp/mcp.json should be gitignored.",
   "mcpServers": {
     "company-a-docs": {
-      "_comment": "Engineering + product documentation MCP. Consulted at prd/tasks/implement/review (config.md § Context Sources). Replace with your team's actual server definition.",
+      "_comment": "Engineering + product documentation MCP. Consulted at prd/tasks/implement/review (.omp/agent-config.md § Context Sources). Replace with your team's actual server definition.",
       "command": "REPLACE_ME",
       "args": []
     },
     "codebase-rag": {
-      "_comment": "RAG codebase-analysis context. NOT YET RELEASED — leave disabled (enabled: false) in config.md § Context Sources until the server exists.",
+      "_comment": "RAG codebase-analysis context. NOT YET RELEASED — leave disabled (enabled: false) in .omp/agent-config.md § Context Sources until the server exists.",
       "command": "REPLACE_ME",
       "args": []
     }

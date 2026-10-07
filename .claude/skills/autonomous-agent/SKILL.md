@@ -21,6 +21,30 @@ You are an autonomous agent spawned by the `/cycle` orchestrator. The rules belo
 - **Never** use `python`, shell scripts, `cat <<EOF` heredocs, or `echo >` redirection for file I/O. These bypass the tool layer and break telemetry, hooks, and audit trails.
 - Never hand-edit generated files (anything produced by a codegen/build step — e.g. `*.g.dart`, `*.freezed.dart`, or another stack's output such as `*.g.cs`). Re-run the project's **Code generation** command (`.omp/agent-config.md` § Project Commands) instead when codegen output needs updating.
 
+## Skill resolution
+
+Your agent prompt names skills to load (`test-rubric`, `project-conventions`, and so on). How
+they reach you differs by harness: omp autoloads them from `autoloadSkills:`, while a Claude
+Code subagent gets no autoload and must read the file itself. Assume nothing is preloaded.
+
+To load a named skill, read the first path that exists, in this order:
+
+1. `.claude/skills/<name>/SKILL.md` — relative to your working directory (a Phase-3 worktree
+   usually does **not** have this; try it anyway, a deployment may symlink it in)
+2. `<repo-root>/.claude/skills/<name>/SKILL.md` — the main checkout, when you are in a worktree
+3. `~/.claude/skills/<name>/SKILL.md` — user-scope skills; in a framework deployment this is
+   commonly a symlink to the framework checkout and is the path that actually resolves
+
+**A skill you cannot read is a missing gate, not a missing convenience.** Never apply a named
+skill "from memory" and continue as though it ran — the rubric you half-remember is not the
+rubric, and the run report will record a check that never happened. If a skill your prompt
+names as a gate is unreachable at all three paths, stop and emit a `contradiction-exit` block
+(schema in `contradiction-exit`) with `trigger: skill-unreachable` and the paths you tried.
+For a skill that is advisory rather than a gate, proceed and state plainly in your return that
+it was unreachable and which one.
+
+---
+
 ## Code intelligence (LSP-first)
 
 When you need to find definitions, references, or rename symbols, prefer the **`lsp`** tool over `grep`:
@@ -53,6 +77,25 @@ If you proceed but diverge from the literal PRD AC or task description (e.g., a 
 ```
 deviation: task: [task-id] | ac: [AC ref or "n/a"] | implemented: [what] | reason: [why]
 ```
+
+**Design choices are deviations too.** Matching the AC text is not the test — a task can satisfy
+every word of its AC and still resolve a decision the AC never addressed. Before writing
+`Deviations: None`, check whether you made a call about:
+
+- **Placement** — which layer, class, or module the logic landed in; inside vs. outside an
+  existing transaction, lock, or error boundary.
+- **Ordering** — where in a sequence the new step runs, and what that implies if a later step
+  fails.
+- **Boundary** — what the change treats as its own responsibility versus the caller's;
+  validation moved to or from an edge.
+- **Shape** — a new abstraction, parameter, or field the AC did not ask for.
+
+If you described the choice anywhere in your own prose, it is a deviation — write it as one.
+The AC is silent on these by construction, so nothing downstream will catch them: an agent that
+put a guard outside a transaction described exactly that placement in its summary and still
+reported `Deviations: None`, and only the orchestrator reading the diff caught it. Use
+`ac: n/a` when no criterion governs the choice; that is the normal case here, not a reason to
+omit the line.
 
 ---
 

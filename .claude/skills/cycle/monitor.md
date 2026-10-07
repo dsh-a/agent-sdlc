@@ -28,7 +28,7 @@ The orchestrator sends brief updates via irc. Expect 1–2 sentences per update:
 - `BLOCKER [task-id]: [description]` — add to blockers section
 - `BLOCKER RESOLVED [task-id]` — remove from blockers
 - `PAUSE reason:[reason] resume:[time or unknown]` — set status to paused, write resume instructions
-- `FINALIZE report:[path]` — archive, then delete all `agent_states/` files for this cycle (`rm agent_states/*`)
+- `FINALIZE report:[path]` — archive, then clear this cycle's state with `python3 .claude/skills/cycle/clear-agent-states.py --all`
 
 ## Critical responsibility
 
@@ -44,5 +44,22 @@ Update state to `paused`, record:
 ## On finalize
 
 1. Confirm the run report file exists at the path the orchestrator provided
-2. Delete all files in `agent_states/` for this cycle (state file + all digests)
-3. State files are ephemeral. The cycle report and run report are the permanent records.
+2. Clear this cycle's ephemeral state with `clear-agent-states.py --all`. Use exactly
+   `python3 .claude/skills/cycle/clear-agent-states.py --all`, or
+   `python3 ~/.claude/skills/cycle/clear-agent-states.py --all` where the deployment symlinks the
+   framework skills into the home directory instead. **Never expand either into an absolute path.**
+   Your grant is a string match on those two forms; in fan-out 6 a monitor rewrote the first as
+   `python3 /Users/…/dev/cycles/myapp-c5/.claude/skills/cycle/clear-agent-states.py --all`, which
+   matched neither, fell through to the auto-mode classifier, and was refused as
+   `[Irreversible Local Destruction]`. You always run from the project root, so the relative form
+   always resolves. Do not use `rm` — broad `rm` patterns
+   are denied by design and a narrow allow cannot override them, which is the bug this script
+   exists to route around. The script resolves `<git-root>/agent_states` itself, refuses any
+   other path, and prints exactly what it deleted and kept.
+3. **Report what it printed.** You exist as a separate spawn solely to hold this permission, so
+   a refusal or a partial failure is your failure to report, not a detail to omit. The script
+   exits `0` cleaned, `1` refused, `2` partial failure. On a non-zero exit return
+   `FINALIZE INCOMPLETE — agent_states/ not cleaned: [the script's stderr]` rather than a clean
+   summary. If the script itself is missing or unrunnable, say so by name — the likely cause is
+   a deployment that has not been re-wired, and the directory will otherwise grow every cycle.
+4. State files are ephemeral. The cycle report and run report are the permanent records.

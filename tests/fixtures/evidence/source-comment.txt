@@ -1,0 +1,1 @@
+This source-code comment reads: the guard rejects a write whose owner is unset.

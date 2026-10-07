@@ -18,7 +18,8 @@ packs/
 | `commands.md` | seeds `.omp/agent-config.md` § Project Commands | the stack's build/test/lint/codegen command defaults |
 | `test-patterns.md` / `ui-test-patterns.md` | the `test` agent / skill | framework, fixtures, naming, async rules (filename varies by pack) |
 | `test-antipatterns.md` | the cycle silent-skip gate | regexes that block a merge (gated/swallowed/skipped assertions) |
-| `scaffold-snippets.md` | the `scaffold` agent | language idiom for each pattern shape |
+| `scaffold-snippets.md` | the `scaffold` agent | **index** of language idioms — a § Coverage table routing each pattern shape to one file in `snippets/`, plus the fallback for uncovered shapes |
+| `snippets/<pattern>.md` | the `scaffold` agent | one Dart/C# idiom per pattern shape, named to match `.claude/agents/scaffold/<pattern>.md`. Each declares **extracted** (project house convention) or **illustrative** (reference only) |
 
 ## How a pack becomes active
 
