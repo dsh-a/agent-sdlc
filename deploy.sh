@@ -34,6 +34,20 @@ set -u
 PROG=deploy
 FW="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 
+# Git Bash's `ln -s` silently *copies* unless MSYS asks for native links, and a
+# copy is the failure this script exists to catch — so it cannot depend on how
+# the calling shell was configured. `nativestrict` fails instead of copying when
+# Windows refuses a symlink (Developer Mode off), which `link` then reports.
+case "$(uname -s 2>/dev/null)" in
+  MINGW*|MSYS*|CYGWIN*)
+    WINDOWS=1
+    case "${MSYS:-}" in
+      *winsymlinks:native*) ;;
+      *) export MSYS="${MSYS:+$MSYS }winsymlinks:nativestrict" ;;
+    esac ;;
+  *) WINDOWS= ;;
+esac
+
 say()  { printf '  %s\n' "$*"; }
 die()  { printf '%s: %s\n' "$PROG" "$*" >&2; exit 2; }
 
@@ -83,6 +97,9 @@ grants_in() {
   [ -f "$1" ] || return 0
   python3 - "$1" <<'PY'
 import json, re, sys
+# LF on every platform: Windows Python writes CRLF, and MSYS bash strips the CR
+# from $(...) but not from <(...), so `comm` saw `x` and `x<CR>` as two grants.
+sys.stdout.reconfigure(newline="\n")
 try:
     allow = json.load(open(sys.argv[1]))["permissions"]["allow"]
 except Exception:
@@ -98,6 +115,7 @@ hooks_wired_in() {
   [ -f "$1" ] || return 0
   python3 - "$1" <<'PY'
 import json, re, sys
+sys.stdout.reconfigure(newline="\n")   # see grants_in
 try:
     cfg = json.load(open(sys.argv[1])).get("hooks", {})
 except Exception:
@@ -494,7 +512,7 @@ while IFS=$'\t' read -r kind rel; do
       LINKED=$((LINKED+1))
     else
       say "FAILED    could not link $rel"
-      PROBLEMS=$((PROBLEMS+1))
+      PROBLEMS=$((PROBLEMS+1)); LINK_FAILED=1
     fi
   fi
 done < <(manifest)
@@ -532,21 +550,59 @@ for _us in skills agents; do
       say "USER      $USER_LINK → $(readlink "$USER_LINK") (a different framework)"
       say "          leaving it alone; re-point it by hand if that is wrong"
     fi
+  elif [ -d "$USER_LINK" ]; then
+    # A real directory is a machine that keeps other skills or agents here too —
+    # a team toolkit, a plugin's links. One symlink over it would hide them, so
+    # the framework goes in item by item, and only framework items are judged.
+    while IFS= read -r item; do
+      [ -n "$item" ] || continue
+      dst="$USER_LINK/$item"; src="$FW/.claude/$_us/$item"
+      if [ -L "$dst" ]; then
+        t="$(readlink "$dst")"; t="${t%/}"
+        td="$(cd "$(dirname "$t")" 2>/dev/null && pwd -P)"
+        if [ ! -e "$dst" ]; then
+          if [ "$CMD" = "link" ]; then
+            rm -f "$dst"; ln -s "$src" "$dst" 2>/dev/null \
+              && say "relinked  $dst (was dangling)" \
+              || { say "FAILED    could not link $dst"; PROBLEMS=$((PROBLEMS+1)); LINK_FAILED=1; }
+          else
+            say "USER      $dst dangles → $t"; PROBLEMS=$((PROBLEMS+1))
+          fi
+        elif [ "$td" != "$FW/.claude/$_us" ] || [ "$(basename "$t")" != "$item" ]; then
+          say "USER      $dst → $t (a different framework)"
+          say "          leaving it alone; re-point it by hand if that is wrong"
+        fi
+      elif [ -e "$dst" ]; then
+        say "USER      $dst is a copy, not a link — it goes stale invisibly; remove it, then link"
+        PROBLEMS=$((PROBLEMS+1))
+      elif [ "$CMD" = "link" ]; then
+        ln -s "$src" "$dst" 2>/dev/null \
+          || { say "FAILED    could not link $dst"; PROBLEMS=$((PROBLEMS+1)); LINK_FAILED=1; }
+      else
+        say "USER      $dst missing — $_why"
+        PROBLEMS=$((PROBLEMS+1))
+      fi
+    done < <(git -C "$FW" ls-files -- ".claude/$_us" | cut -d/ -f3 | sort -u | grep -v '^README\.md$')
   elif [ -e "$USER_LINK" ]; then
-    say "USER      $USER_LINK is a real directory, not a link — $_us may resolve stale"
+    say "USER      $USER_LINK is a file, not a directory or a link"
     PROBLEMS=$((PROBLEMS+1))
   else
     if [ "$CMD" = "link" ]; then
       mkdir -p "$HOME/.claude" 2>/dev/null
       ln -s "$FW/.claude/$_us" "$USER_LINK" 2>/dev/null \
         && say "linked    $USER_LINK → $FW/.claude/$_us (machine scope)" \
-        || { say "FAILED    could not create $USER_LINK"; PROBLEMS=$((PROBLEMS+1)); }
+        || { say "FAILED    could not create $USER_LINK"; PROBLEMS=$((PROBLEMS+1)); LINK_FAILED=1; }
     else
       say "USER      $USER_LINK missing — $_why"
       PROBLEMS=$((PROBLEMS+1))
     fi
   fi
 done
+
+if [ -n "${LINK_FAILED:-}" ] && [ -n "$WINDOWS" ]; then
+  say "          Windows refused a symlink. Turn on Developer Mode (Settings → System →"
+  say "          For developers), or run from an elevated shell; this script never copies."
+fi
 
 # ------------------------------------------------- links git can still see
 #

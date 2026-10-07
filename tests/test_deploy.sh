@@ -39,6 +39,16 @@ cp "$S" "$FW/deploy.sh"; chmod +x "$FW/deploy.sh"
 git -C "$FW" add -A; git -C "$FW" commit -qm fw
 D="$FW/deploy.sh"
 
+# A sandbox HOME for every case, already wired the way `link` leaves a machine.
+# Without it each `link` below reached the real ~/.claude: on a machine with no
+# ~/.claude/skills it created one pointing into this temp fixture, dangling the
+# moment the fixture was deleted, and on a machine whose ~/.claude/skills holds
+# other skills every `check` failed for a reason no case was testing. The
+# user-scope section overrides HOME again, per case.
+export HOME="$R/home"; mkdir -p "$HOME/.claude"
+ln -s "$FW/.claude/skills" "$HOME/.claude/skills"
+ln -s "$FW/.claude/agents" "$HOME/.claude/agents"
+
 # A settings.json wiring every hook this framework ships, as `link` expects.
 wire_hooks() {
   {
@@ -206,12 +216,63 @@ chk "a user link to another framework is left alone" \
     "$(readlink "$H2/.claude/skills")" "$FW2/.claude/skills"
 chk "  ... and reported" "$(echo "$out" | grep -c 'USER.*different framework')" 1
 
-# A real directory there means skills resolve from a copy — the stale-copy shape.
-H3="$R/home7"; mkdir -p "$H3/.claude/skills"
+# A real ~/.claude/skills is a machine that keeps other skills there too — a
+# team toolkit, a plugin's links. Replacing it with one symlink would hide them,
+# so the framework is linked into it item by item. What still fails is a
+# framework item that is absent, a copy, or another checkout's.
+H3="$R/home7"; mkdir -p "$H3/.claude/skills/team-skill"
+ln -s "$FW/.claude/agents" "$H3/.claude/agents"
 out="$(HOME="$H3" bash "$D" check "$P" 2>&1)"; rc=$?
-chk "a real ~/.claude/skills directory is reported" \
-    "$(echo "$out" | grep -c 'USER.*real directory')" 1
-chk "  ... and fails the check" "$rc" 1
+chk "a real ~/.claude/skills is checked item by item" \
+    "$(echo "$out" | grep -c 'USER .*skills/\(cycle\|verify\) missing')" 2
+chk "  ... failing while any framework skill is absent" "$rc" 1
+chk "  ... and not calling the directory itself a problem" \
+    "$(echo "$out" | grep -c 'real directory')" 0
+HOME="$H3" bash "$D" link "$P" >/dev/null 2>&1
+chk "  ... link adds each framework skill alongside the others" \
+    "$(readlink "$H3/.claude/skills/cycle")|$(readlink "$H3/.claude/skills/verify")" \
+    "$FW/.claude/skills/cycle|$FW/.claude/skills/verify"
+chk "  ... leaving the machine's own skills alone" \
+    "$([ -d "$H3/.claude/skills/team-skill" ] && [ ! -L "$H3/.claude/skills/team-skill" ] && echo yes)" yes
+HOME="$H3" bash "$D" check "$P" >/dev/null 2>&1
+chk "  ... after which check passes" "$?" 0
+
+# A real directory with a framework skill's name is the stale-copy shape: the
+# machine resolves an old copy and nothing says so.
+H4="$R/home8"; mkdir -p "$H4/.claude/skills/cycle"; echo old > "$H4/.claude/skills/cycle/SKILL.md"
+ln -s "$FW/.claude/agents" "$H4/.claude/agents"
+out="$(HOME="$H4" bash "$D" link "$P" 2>&1)"
+chk "a stale copy of a framework skill is reported" \
+    "$(echo "$out" | grep -c 'USER .*skills/cycle is a copy')" 1
+chk "  ... and link does not clobber it" \
+    "$([ -L "$H4/.claude/skills/cycle" ] || echo kept)" kept
+HOME="$H4" bash "$D" check "$P" >/dev/null 2>&1
+chk "  ... and check fails on it" "$?" 1
+
+# The same layout for agents, whose entries are files as well as directories.
+H9="$R/home9"; mkdir -p "$H9/.claude/agents"; echo mine > "$H9/.claude/agents/mine.md"
+ln -s "$FW/.claude/skills" "$H9/.claude/skills"
+HOME="$H9" bash "$D" link "$P" >/dev/null 2>&1
+chk "a real ~/.claude/agents gets framework agents item by item" \
+    "$(readlink "$H9/.claude/agents/scaffold")" "$FW/.claude/agents/scaffold"
+chk "  ... beside the machine's own" "$(cat "$H9/.claude/agents/mine.md")" mine
+HOME="$H9" bash "$D" check "$P" >/dev/null 2>&1
+chk "  ... and check passes" "$?" 0
+
+# --- Windows: links are real without the caller's environment ----------------
+# Git Bash's `ln -s` copies unless MSYS asks for native links, and a copy is the
+# exact failure `check` exists to catch. deploy.sh must not depend on how the
+# shell that runs it was configured.
+case "$(uname -s)" in
+  MINGW*|MSYS*)
+    new_project w
+    env -u MSYS bash "$D" link "$P" >/dev/null 2>&1
+    chk "windows: link makes real symlinks with MSYS unset" \
+        "$([ -L "$P/.claude/packs" ] && [ -L "$P/.claude/hooks/gate-log.py" ] && echo yes)" yes
+    env -u MSYS bash "$D" check "$P" >/dev/null 2>&1
+    chk "  ... which check accepts" "$?" 0
+    ;;
+esac
 
 # The ignore list is emitted, not hand-written — the same anti-drift property as
 # the manifest, applied to the project's .gitignore.
