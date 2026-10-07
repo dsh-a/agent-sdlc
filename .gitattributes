@@ -1,0 +1,11 @@
+# Check out LF everywhere. Git for Windows defaults core.autocrlf=true, which
+# writes CRLF into the working tree, and bash then reads `$'\r'` as part of
+# every command: `set -u\r` fails, a heredoc never finds its terminator.
+* text=auto eol=lf
+
+# Binary assets are never normalised.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pdf binary

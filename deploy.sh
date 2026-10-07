@@ -583,6 +583,23 @@ EOF_MANIFEST
   fi
 fi
 
+# ------------------------------------------------- framework line endings
+#
+# Every link points into this checkout, so a CRLF script here is CRLF in every
+# project. Git for Windows ships `core.autocrlf=true`, and before the framework
+# carried a `.gitattributes` a clone on Windows wrote all 301 files CRLF. Bash
+# then reads `\r` into every command — `set -u` fails, and a heredoc never finds
+# its terminator. A clone made before the attribute existed keeps those files
+# until they are checked out again, which is why this is reported, not assumed.
+crlf="$(git -C "$FW" ls-files --eol -- '*.sh' '*.py' '*.ts' 2>/dev/null \
+        | awk '$2 == "w/crlf" { print $NF }')"
+if [ -n "$crlf" ]; then
+  say "CRLF      $(printf '%s\n' "$crlf" | wc -l | tr -d ' ') framework script(s) have CRLF line endings, e.g. $(printf '%s\n' "$crlf" | head -1)"
+  say "          with no uncommitted changes in $FW, re-check them out as LF:"
+  say "          cd $FW && git ls-files --eol | awk '\$2==\"w/crlf\"{print \$NF}' | xargs rm -f && git checkout -- ."
+  PROBLEMS=$((PROBLEMS+1))
+fi
+
 # ------------------------------------------------- per-project files (not links)
 #
 # These are the project's own and are never linked. Their absence is still worth

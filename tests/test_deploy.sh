@@ -495,5 +495,29 @@ JSON
 out="$(bash "$D" check "$P" 2>&1)"
 chk "  ... and go quiet once wired" "$(echo "$out" | grep -c 'HOOK')" 0
 
+# ------------------------------------------------------ line endings ----
+#
+# Every link points into the framework checkout, so one CRLF script there is
+# CRLF in every project. A Windows clone made before `.gitattributes` existed
+# wrote all of them that way, and bash reads the `\r` into each command.
+# `-c core.autocrlf=false` pins the fixture: committed CRLF stays CRLF in both
+# index and working tree whatever this machine's git defaults to.
+new_project e
+bash "$D" link "$P" >/dev/null 2>&1
+printf 'set -u\r\necho hi\r\n' > "$FW/.claude/skills/cycle/crlf.sh"
+git -c core.autocrlf=false -C "$FW" add .claude/skills/cycle/crlf.sh
+git -c core.autocrlf=false -C "$FW" commit -qm crlf
+out="$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.autocrlf GIT_CONFIG_VALUE_0=false \
+       bash "$D" check "$P" 2>&1)"; rc=$?
+chk "a CRLF framework script is reported" "$(echo "$out" | grep -c '^  CRLF ')" 1
+chk "  ... naming it" "$(echo "$out" | grep -c 'skills/cycle/crlf.sh')" 1
+chk "  ... and failing the check" "$rc" 1
+printf 'set -u\necho hi\n' > "$FW/.claude/skills/cycle/crlf.sh"
+git -c core.autocrlf=false -C "$FW" commit -qam lf
+out="$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.autocrlf GIT_CONFIG_VALUE_0=false \
+       bash "$D" check "$P" 2>&1)"
+chk "  ... and goes quiet once it is LF" "$(echo "$out" | grep -c '^  CRLF ')" 0
+git -C "$FW" rm -q .claude/skills/cycle/crlf.sh; git -C "$FW" commit -qm "drop crlf fixture"
+
 printf '\ndeploy: %s\n' "$([ $FAILED = 0 ] && echo 'all checks passed.' || echo 'FAILURES above.')"
 exit $FAILED
