@@ -13,7 +13,7 @@ The PRD or feature to verify: **$ARGUMENTS**
 
 ## What to do
 
-1. If `$ARGUMENTS` is empty, ask the user which PRD or feature to verify. Search `agent_tasks/` for matching PRD files if a name is partial.
+1. If `$ARGUMENTS` is empty, ask the user which PRD or feature to verify. Search `agent_tasks/prds/` for matching PRD files if a name is partial.
 
 2. Resolve inputs:
    - **PRD path** — required. Ask if missing.

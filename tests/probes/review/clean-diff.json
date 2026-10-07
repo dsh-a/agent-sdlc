@@ -1,0 +1,8 @@
+{
+  "name": "clean-diff",
+  "why": "The negative case, and the one the existing keyword smoke probe cannot express. A rename with no behaviour change must not be reported as a correctness bug. False-positive rate is what makes a reviewer unusable, and nothing measured it.",
+  "user": "Review this diff and report any correctness issues.\n\n```diff\n--- a/lib/domain/usecases/fetch_order.dart\n+++ b/lib/domain/usecases/fetch_order.dart\n@@ class FetchOrder {\n-  final IOrderRepository _repo;\n-  FetchOrder(this._repo);\n+  final IOrderRepository _orderRepository;\n+  FetchOrder(this._orderRepository);\n \n   Future<Order> call(String id) async {\n-    return _repo.getById(id);\n+    return _orderRepository.getById(id);\n   }\n }\n```",
+  "format": "Respond with ONLY a JSON object: {\"has_correctness_bug\": true|false, \"detail\": \"one sentence\"}",
+  "grader": "bug_call",
+  "expect": {"has_correctness_bug": false}
+}

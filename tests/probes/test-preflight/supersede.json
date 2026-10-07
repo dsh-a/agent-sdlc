@@ -1,0 +1,8 @@
+{
+  "name": "supersede",
+  "why": "The core C1 duty: three tests, three different correct answers, one of which requires noticing that an AC contradicts an existing assertion rather than merely touching the same symbol.",
+  "user": "## Acceptance criteria for this task\n\nAC-1: `OrderRepository.getById` MUST return `null` for a missing order instead of throwing `NotFoundException`. Callers are being updated to handle null.\nAC-2: `OrderRepository.getById` must still return the order unchanged when one exists.\n\n## Changed symbols\n\n`OrderRepository.getById`\n\n## Existing tests that reference those symbols\n\n### T1 — test/data/order_repository_test.dart:12\n```dart\ntest('getById throws NotFoundException when the order is missing', () async {\n  when(api.fetch('x')).thenAnswer((_) async => null);\n  expect(() => repo.getById('x'), throwsA(isA<NotFoundException>()));\n});\n```\n\n### T2 — test/data/order_repository_test.dart:20\n```dart\ntest('getById returns the order when it exists', () async {\n  when(api.fetch('x')).thenAnswer((_) async => anOrder);\n  expect(await repo.getById('x'), anOrder);\n});\n```\n\n### T3 — test/data/order_api_test.dart:8\n```dart\ntest('OrderApi.fetch hits the right endpoint', () async {\n  await api.fetch('x');\n  verify(http.get(Uri.parse('/orders/x'))).called(1);\n});\n```\n",
+  "format": "Respond with ONLY these three lines and nothing else:\nT1: <KEEP|UPDATE|DELETE>\nT2: <KEEP|UPDATE|DELETE>\nT3: <KEEP|UPDATE|DELETE>",
+  "grader": "labels",
+  "expect": {"T1": "DELETE", "T2": "KEEP", "T3": "KEEP"}
+}

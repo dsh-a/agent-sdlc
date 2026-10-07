@@ -1,0 +1,77 @@
+# agent-sdlc:requires-board
+# Mark the board Done when a PR merges.
+#
+# Issue closure used to have two owners that disagreed about when. The PR body
+# says `Closes #n`, which GitHub honours **on merge**. The cycle skill's step 9
+# closed the issue and set the board to Done at Finalize, which runs immediately
+# after `gh pr create` — so an issue read `completed` and the board read `Done`
+# while the fix was still unmerged, and stayed wrong if the PR was abandoned.
+# A cycle stopped and asked about this rather than guessing (M31).
+#
+# The obvious fix — drop step 9's close and let GitHub do it — loses something,
+# because GitHub's auto-close sets no board field. Only the *close* was
+# duplicated; the board update had a single owner.
+#
+# So both facts move to the moment they become true. GitHub closes the issue on
+# merge, and this sets the board field for the same issues, read from the PR's
+# own `closingIssuesReferences` rather than by parsing the body — GitHub already
+# resolved that link and re-deriving it would be a second home for one fact.
+#
+# Does nothing when a PR is closed without merging, which is the case that made
+# the old behaviour wrong.
+
+name: PR merged → board Done
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  done:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set Status=Done for every issue this PR closed
+        env:
+          # Projects v2 is user/org scoped, so GITHUB_TOKEN cannot write to it.
+          # Without the secret this step reports and exits 0: a missing board
+          # update must not fail a merge that already happened.
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::no PROJECT_TOKEN secret — board not updated for PR #$PR"
+            exit 0
+          fi
+
+          issues=$(gh pr view "$PR" --repo "$REPO" \
+            --json closingIssuesReferences \
+            -q '.closingIssuesReferences[].number' 2>/dev/null || true)
+          if [ -z "$issues" ]; then
+            echo "PR #$PR closes no issue — nothing to mark."
+            exit 0
+          fi
+
+          for n in $issues; do
+            url="https://github.com/$REPO/issues/$n"
+            # item-add is idempotent: it returns the existing item if the issue
+            # is already on the board, so a story added at refinement time is
+            # updated rather than duplicated.
+            item=$(gh project item-add @@BOARD_NUMBER@@ --owner @@BOARD_OWNER@@ \
+                     --url "$url" --format json 2>/dev/null \
+                   | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' 2>/dev/null) || {
+              echo "::warning::could not place #$n on the board"; continue; }
+            if gh project item-edit --id "$item" \
+                 --project-id @@PROJECT_ID@@ \
+                 --field-id @@STATUS_FIELD_ID@@ \
+                 --single-select-option-id @@DONE_OPTION_ID@@; then
+              echo "#$n → Done"
+            else
+              echo "::warning::could not set Status=Done on #$n"
+            fi
+          done

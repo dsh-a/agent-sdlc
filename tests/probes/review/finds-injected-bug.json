@@ -1,0 +1,8 @@
+{
+  "name": "finds-injected-bug",
+  "why": "The positive case. A force-unwrap replaced an explicit null check, so a missing order now throws a runtime null error instead of NotFoundException.",
+  "user": "Review this diff and report any correctness issues.\n\n```diff\n@FIXTURE:buggy_diff.diff@\n```",
+  "format": "Respond with ONLY a JSON object: {\"has_correctness_bug\": true|false, \"detail\": \"one sentence\"}",
+  "grader": "bug_call",
+  "expect": {"has_correctness_bug": true, "detail_mentions_any": ["null", "unwrap", "!", "notfound"]}
+}

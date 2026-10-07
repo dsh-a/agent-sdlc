@@ -9,20 +9,34 @@ This walks a new engineer from zero to a first `/cycle` run. The pipeline is lan
 - [omp](https://omp.sh) installed (`brew install omp` or download from omp.sh).
 - An OpenRouter account + API key ([openrouter.ai](https://openrouter.ai)).
 - Your project is a git repository.
+- **`python3`** — every pipeline script is Python. No packages needed; all are stdlib-only.
+- **`gh`**, authenticated (`gh auth login`). Stories, PRs and CI runs are read through it, and
+  `/refine` does nothing else — a failed `gh` call stops the run rather than falling back.
+- **`jq`** — used by a few scripts.
 - Access to the team's MCP servers (e.g. `company-a-docs`) if you intend to wire them in.
 
 ---
 
 ## 1. Install the pipeline
 
-From the fork, copy `.claude/` and `.omp/` into your project root:
+Clone the fork once, then link it into each project:
 
 ```bash
-cp -r /path/to/agent-sdlc/.claude/ /path/to/your-project/.claude/
-cp -r /path/to/agent-sdlc/.omp/ /path/to/your-project/.omp/
+git clone <fork-url> ~/dev/agent-sdlc
+
+cd /path/to/your-project
+bash ~/dev/agent-sdlc/deploy.sh link .
+bash ~/dev/agent-sdlc/deploy.sh gitignore --apply .
+bash ~/dev/agent-sdlc/deploy.sh grants             # paste into .claude/settings.json
 ```
 
-This brings the orchestrator, the agent team, the skills, the packs, and the omp adapter layer.
+That links the orchestrator, the agent team, the skills, the packs, and the omp adapter layer.
+
+**Links, not copies.** A copy stops receiving framework updates and nothing says so. Re-run
+`link` after pulling the framework; `deploy.sh check .` reports anything missing or copied.
+
+The links hold one machine's absolute paths, so they are per machine and must not be committed.
+On a second machine: clone the framework, then re-run `link`.
 
 ---
 
@@ -136,3 +150,6 @@ orchestrator's decision-making for team review or post-mortem analysis.
 | Conventions feel wrong | The active pack/`project-conventions` wasn't populated — re-run `/setup` or copy from `packs/<lang>/conventions.md` |
 | Silent-skip gate never fires | The **Test anti-patterns** regexes don't match your framework — fix `packs/<lang>/test-antipatterns.md` |
 | Supervisor not emitting whispers | Check that implementation agents have `irc` in their tools and the supervisor was spawned with a valid `id` |
+| A permission prompt mid-cycle | A framework script has no grant — `deploy.sh check .` names it, `deploy.sh grants` prints the lines |
+| Framework changes not taking effect | The project has copies, not links — re-run `deploy.sh link .`; `check` counts a copy as a problem |
+| Dangling links after cloning a project | Links are per machine. Clone the framework, then re-run `deploy.sh link .` |

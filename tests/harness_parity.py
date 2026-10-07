@@ -1,0 +1,188 @@
+"""Harness parity between `.claude/agents/` and `.omp/agents/`.
+
+Every agent is defined twice: once for Claude Code, once for omp. The omp file
+says its body is "sourced from" the Claude one, but nothing enforced that, so a
+fix applied to one side and forgotten on the other drifted silently — which is
+how an unclosed code fence sat in `.omp/agents/scaffold.md` long enough to hide
+all of Step 4 from the agent reading it.
+
+Divergence between the two is legitimate and expected: omp routes whispers over
+irc, exposes `lsp` instead of the IDE diagnostics tool, and spawns `task` agents
+rather than calling `Agent(...)`. The supervisor differs most, because its whole
+transport model does.
+
+So this does not assert the two are identical. It pins the divergence to a
+golden file. Mechanical, repo-wide substitutions are applied first (TOKEN_MAP)
+so they never reach the golden file as noise; whatever remains is recorded as a
+diff. Editing one side without the other changes that diff, which shows up in
+review as a change to `tests/fixtures/harness-parity.diff` — a prompt to either
+mirror the edit or accept the new divergence on purpose.
+
+Stdlib only, and runnable without pytest:
+
+    python3 tests/harness_parity.py            # check, exit 1 on drift
+    python3 tests/harness_parity.py --update   # re-record after an intended change
+"""
+
+from __future__ import annotations
+
+import difflib
+import pathlib
+import re
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+CLAUDE_DIR = ROOT / ".claude/agents"
+OMP_DIR = ROOT / ".omp/agents"
+GOLDEN = ROOT / "tests/fixtures/harness-parity.diff"
+
+# The banner every omp adapter carries. Structural, not a behaviour difference.
+ADAPTER_RE = re.compile(r"^<!-- omp-native adapter\..*?-->\n\n?", re.MULTILINE | re.DOTALL)
+
+# Purely mechanical swaps: the same concept spelled differently per harness.
+# Applied to the Claude body before diffing, so they never appear as divergence.
+# Add an entry only when the substitution is unambiguous everywhere it occurs —
+# a sentence-level rewrite is real divergence and belongs in the golden file.
+TOKEN_MAP = {
+    "mcp__ide__getDiagnostics": 'lsp(action:"diagnostics")',
+}
+
+
+def agent_names() -> list[str]:
+    return sorted(p.stem for p in CLAUDE_DIR.glob("*.md") if p.stem != "README")
+
+
+def split(path: pathlib.Path) -> tuple[str, str]:
+    """(frontmatter, body).
+
+    Frontmatter used to be dropped here, on the grounds that it legitimately
+    differs — Claude Code spells a tool `Bash(dart run*)` where omp holds bare
+    `bash`, and the model tiers are named per harness. Dropping it meant the
+    `tools:` grants were guarded by nothing at all, which is stated in
+    `framework_checks.check_phase3_permissions`'s docstring as a known hole.
+
+    Fan-out 8 fell in it. An orchestrator added `Bash(dart format*)` to one
+    harness's `coding.md` mid-run, and no check in the repo noticed: parity
+    compared bodies, and the phase-3 matrix pinned a fixed token list that had
+    never learned about the Format command.
+
+    So frontmatter is compared now — recorded, not asserted. Legitimate
+    divergence lives in the golden file exactly like body divergence does, and a
+    change to either side changes that file, which is what puts it in front of a
+    reviewer."""
+    text = path.read_text(encoding="utf-8")
+    m = re.match(r"^---\n.*?\n---\n", text, re.DOTALL)
+    if not m:
+        return "", text
+    return text[:m.end()], text[m.end():]
+
+
+def body(path: pathlib.Path) -> str:
+    return split(path)[1]
+
+
+def normalized(name: str) -> tuple[list[str], list[str]]:
+    c_front, c_body = split(CLAUDE_DIR / f"{name}.md")
+    o_front, o_body = split(OMP_DIR / f"{name}.md")
+    o_body = ADAPTER_RE.sub("", o_body)
+    for src, dst in TOKEN_MAP.items():
+        c_body = c_body.replace(src, dst)
+    # Frontmatter is prefixed so a diff line says which half it came from — a
+    # grant appearing on one side only should not read like prose drift.
+    claude = [f"[frontmatter] {l}" for l in c_front.strip().splitlines()] + c_body.strip().splitlines()
+    omp = [f"[frontmatter] {l}" for l in o_front.strip().splitlines()] + o_body.strip().splitlines()
+    return claude, omp
+
+
+def missing_pairs() -> list[str]:
+    problems = []
+    for name in agent_names():
+        if not (OMP_DIR / f"{name}.md").exists():
+            problems.append(f"{name}: present in .claude/agents, missing from .omp/agents")
+    for p in sorted(OMP_DIR.glob("*.md")):
+        if p.stem != "README" and not (CLAUDE_DIR / p.name).exists():
+            problems.append(f"{p.stem}: present in .omp/agents, missing from .claude/agents")
+    return problems
+
+
+def render() -> str:
+    """The current divergence, as the golden file records it."""
+    out: list[str] = [
+        "# Harness parity — recorded divergence between .claude/agents and .omp/agents",
+        "#",
+        "# Generated by tests/harness_parity.py. Do not hand-edit.",
+        "# Regenerate deliberately:  python3 tests/harness_parity.py --update",
+        "#",
+        "# '-' is the Claude Code side, '+' is the omp side, after the adapter banner",
+        "# is stripped and TOKEN_MAP substitutions are applied. An agent with no",
+        "# section below is a byte-identical mirror.",
+        "#",
+        "# Lines tagged [frontmatter] are the YAML header. It is compared because it",
+        "# was not: fan-out 8 saw a `tools:` grant added to one harness mid-run with",
+        "# nothing in the repo able to notice. Most of the frontmatter divergence",
+        "# below is legitimate and permanent — omp holds bare `bash` where Claude",
+        "# Code holds per-command grants, and the model tiers are named per harness.",
+        "# The point is not that it is zero. The point is that it is recorded, so a",
+        "# change to either side shows up here.",
+        "",
+    ]
+    for name in agent_names():
+        if not (OMP_DIR / f"{name}.md").exists():
+            continue
+        claude, omp = normalized(name)
+        diff = [
+            line
+            for line in difflib.unified_diff(claude, omp, lineterm="", n=0)
+            if line[:1] in "+-" and line[:3] not in ("---", "+++")
+        ]
+        if diff:
+            out.append(f"=== {name} ({len(diff)} lines) ===")
+            out.extend(diff)
+            out.append("")
+    return "\n".join(out).rstrip() + "\n"
+
+
+def check() -> int:
+    problems = missing_pairs()
+    if problems:
+        print("Harness parity: agent files are unpaired\n")
+        for p in problems:
+            print(f"  {p}")
+        return 1
+
+    current = render()
+    if not GOLDEN.exists():
+        print(f"Harness parity: golden file missing at {GOLDEN.relative_to(ROOT)}")
+        print("Record it with:  python3 tests/harness_parity.py --update")
+        return 1
+
+    recorded = GOLDEN.read_text(encoding="utf-8")
+    if current == recorded:
+        agents = len(agent_names())
+        print(f"Harness parity: OK — {agents} agent pairs match the recorded divergence.")
+        return 0
+
+    print("Harness parity: divergence changed.\n")
+    print("An agent body was edited on one side only, or a divergence was added.")
+    print("Either mirror the edit to the other harness, or re-record on purpose:")
+    print("    python3 tests/harness_parity.py --update\n")
+    sys.stdout.writelines(
+        difflib.unified_diff(
+            recorded.splitlines(keepends=True),
+            current.splitlines(keepends=True),
+            fromfile="recorded divergence",
+            tofile="current divergence",
+        )
+    )
+    return 1
+
+
+def update() -> int:
+    GOLDEN.parent.mkdir(parents=True, exist_ok=True)
+    GOLDEN.write_text(render(), encoding="utf-8")
+    print(f"Recorded divergence -> {GOLDEN.relative_to(ROOT)}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(update() if "--update" in sys.argv[1:] else check())

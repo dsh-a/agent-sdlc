@@ -16,7 +16,7 @@ The feature description: **$ARGUMENTS**
 1. If `$ARGUMENTS` is empty, ask the user for the feature description (one sentence to a paragraph).
 
 2. Optionally ask:
-   - **Roadmap story number** — if the project uses `documentation/ROADMAP.md` and the user has one in mind.
+   - **Story issue number** — if the user has one in mind (`gh issue list --label story`).
    - **Related PRDs** — if the user knows of overlapping or dependent PRDs; the agent will also scan independently.
 
 3. Spawn the `create-prd` agent:

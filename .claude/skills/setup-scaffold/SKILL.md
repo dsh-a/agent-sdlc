@@ -23,7 +23,7 @@ Read `.claude/skills/scaffold/pattern-template.md` for the required structure of
 
 ## Step 2 — Inventory existing pattern files
 
-Read `.claude/agents/scaffold/`:
+Read `.claude/agents/scaffold/INDEX.md` first — it lists every pattern file, its category, and its triggers, so you can inventory without opening each file. Then read `.claude/agents/scaffold/`:
 - Files with `Type: project-specific` are previously discovered patterns for this project.
 - The remaining files are the language-neutral default pattern shapes shipped with agent-sdlc (paired with the active pack's `scaffold-snippets.md` for the idiom).
 
@@ -92,8 +92,9 @@ For each approved pattern:
 
 1. Read the 2+ example files identified in Step 3
 2. Extract the common template following the standard in `pattern-template.md`
-3. Write to `.claude/agents/scaffold/<pattern-name>.md`
+3. Write to `.claude/agents/scaffold/<pattern-name>.md` — **all nine sections**, in the standard's order, with the full `> **Type**` / `**Category**` / `**Triggers**` / `**Related**` metadata block. A file with placeholder or missing sections breaks the uniformity the scaffold agent relies on.
 4. If this pattern matches a default shape, set `Replaces: <shape-name>` in the header
+5. **Register it in `.claude/agents/scaffold/INDEX.md`** — add a row to § Project-specific patterns with the pattern name, what it replaces, and its trigger keywords. An unregistered pattern file is invisible to the scaffold agent, which routes solely through INDEX.md.
 
 Treat the shipped language-neutral pattern shapes as defaults — a project-specific file with a `Replaces` header takes priority over the shape it names.
 
@@ -105,6 +106,9 @@ Present what was created:
 Pattern files created:
   - .claude/agents/scaffold/<name>.md (replaces: <default shape>)
   - .claude/agents/scaffold/<name>.md (new pattern)
+
+INDEX.md updated:
+  - <N> rows added to § Project-specific patterns
 
 Default shapes still active (no project equivalent found):
   - use-case.md, facade.md, ...

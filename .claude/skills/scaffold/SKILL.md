@@ -5,7 +5,7 @@ disable-model-invocation: true
 ---
 # Scaffold
 
-You are scaffolding a new component. This skill is an **index** — it routes you to the right pattern file. Per-type detail lives in `.claude/agents/scaffold/` (language-neutral pattern shapes + any project-specific patterns); language idioms come from the active pack's `scaffold-snippets.md`. Do not duplicate that detail here; load and follow it.
+You are scaffolding a new component. This skill routes you to the right pattern file via `.claude/agents/scaffold/INDEX.md`. Per-type detail lives in `.claude/agents/scaffold/` (language-neutral pattern shapes + any project-specific patterns); language idioms come from the active pack's `scaffold-snippets.md`. Do not duplicate that detail here; load and follow it.
 
 The component to scaffold: **$ARGUMENTS**
 
@@ -13,17 +13,20 @@ The component to scaffold: **$ARGUMENTS**
 
 ## Step 1 — Determine scaffold type
 
-Inspect `$ARGUMENTS`. If ambiguous, ask the user.
+Read `.claude/agents/scaffold/INDEX.md` — the routing table for every available pattern. Match `$ARGUMENTS` against its **Triggers** column, then check its **Disambiguation** table before committing to a choice. Open exactly **one** pattern file; do not glob the directory to find out what is available.
 
-| Type | Trigger | Pattern file |
+Two routes INDEX.md does not cover:
+
+| Type | Trigger | Route |
 |---|---|---|
-| Entity / model | "entity", "model", or a noun that implies a data object | `scaffold/interface.md` (+ pack snippets) |
-| Use case | "use case" or a verb phrase | `scaffold/use-case.md` |
-| Facade | "facade" | `scaffold/facade.md` |
-| Service | "service" | `scaffold/service.md` |
-| Command | "command", "handler" | `scaffold/command.md` |
-| Strategy / Observer / Interface | matching keyword | `scaffold/<pattern>.md` |
 | Presentation (view-model + view) | "view", "screen", "page", "component" | hand off to the `ui-story` agent |
+| Entity / model | "entity", "model", or a noun that implies a data object | `scaffold/interface.md` (+ pack snippets) |
+
+INDEX.md also flags patterns with a **cheaper default** in this stack (singleton, iterator, builder, prototype, flyweight, interpreter, visitor). Apply the cheaper default unless the pattern file's *When to use* criteria are genuinely met.
+
+**A deployed project may carry only a subset.** If `INDEX.md` is absent, list `.claude/agents/scaffold/` and match on filename and trigger keywords instead. If INDEX.md names a pattern file that is not present here, that shape simply was not linked — fall through to codebase exploration for it rather than inventing its contents. Report either gap; do not stop.
+
+If `$ARGUMENTS` is ambiguous, or nothing matches, ask the user rather than forcing a pattern onto the task.
 
 ---
 
@@ -36,8 +39,8 @@ Search the source tree for existing files/types with the same name. If found, st
 ## Step 3 — Load the pattern
 
 Priority order:
-1. **Project-specific** (`Type: project-specific`) — `.claude/agents/scaffold/<name>.md`. If present, follow it verbatim — it reflects this project's actual conventions.
-2. **Default pattern** — `.claude/agents/scaffold/<name>.md` (language-neutral shape) + the active pack's `scaffold-snippets.md` for the idiom. Use as a starting point, adapt to the codebase.
+1. **Project-specific** — any real file in `.claude/agents/scaffold/` that is not a shipped default, whether or not it carries `Type: project-specific` (projects wired before that convention have unmarked files). If present, follow it verbatim — it reflects this project's actual conventions and supersedes any default it names in a `Replaces` line.
+2. **Default pattern** — the file INDEX.md routed you to (language-neutral shape) + the active pack's idiom. `scaffold-snippets.md` is an index — match your shape in its § Coverage table and open that one snippet. Use as a starting point, adapt to the codebase; a snippet marked *illustrative* is reference only, not house convention. If there is no snippet for that shape, follow the index's fallback — idiom from the pack's `conventions.md`, no invented house style, and report the gap.
 3. **No pattern file** — explore the source tree for 1–2 existing examples of the same type, extract conventions.
 
 Also read `.omp/agent-config.md` § Architecture Review Rules for layer boundaries.

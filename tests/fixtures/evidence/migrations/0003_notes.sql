@@ -1,0 +1,2 @@
+-- this comment exists so a future reader of this migration does not conclude it was missed.
+-- the INSERT POLICY lives in 0004, deliberately.

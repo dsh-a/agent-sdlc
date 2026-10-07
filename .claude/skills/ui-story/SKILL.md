@@ -16,7 +16,7 @@ The screen, component, or feature: **$ARGUMENTS**
 1. If `$ARGUMENTS` is empty, ask the user what to build.
 
 2. Resolve context:
-   - **PRD or task** — if the work is PRD-driven, locate the file in `agent_tasks/`. If the user is making something one-off, ask for AC inline.
+   - **PRD or task** — if the work is PRD-driven, locate the file in `agent_tasks/prds/`. If the user is making something one-off, ask for AC inline.
    - **Existing code** — confirm whether the ViewModel/View already exists or needs creation.
 
 3. Spawn the `ui-story` agent:

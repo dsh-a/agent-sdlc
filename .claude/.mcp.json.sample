@@ -1,14 +1,14 @@
 {
-  "_comment": "Template for .claude/.mcp.json — connect the MCP servers referenced by config.md § Context Sources. Copy to .claude/.mcp.json and fill in real commands/URLs/credentials. Do NOT commit secrets; .claude/.mcp.json should be gitignored. After connecting, the registry in config.md drives when each is consulted.",
+  "_comment": "Template for .claude/.mcp.json \u2014 connect the MCP servers referenced by .omp/agent-config.md \u00a7 Context Sources. Copy to .claude/.mcp.json and fill in real commands/URLs/credentials. Do NOT commit secrets; .claude/.mcp.json should be gitignored. After connecting, the registry in .omp/agent-config.md drives when each is consulted.",
   "mcpServers": {
     "company-a-docs": {
-      "_comment": "Engineering + product documentation MCP. Consulted at prd/tasks/implement/review (config.md § Context Sources). Replace with your team's actual server definition (stdio command or remote URL + auth).",
+      "_comment": "Engineering + product documentation MCP. Consulted at prd/tasks/implement/review (.omp/agent-config.md \u00a7 Context Sources). Replace with your team's actual server definition (stdio command or remote URL + auth).",
       "command": "REPLACE_ME",
       "args": [],
       "env": {}
     },
     "codebase-rag": {
-      "_comment": "RAG codebase-analysis context. NOT YET RELEASED — leave disabled (enabled: false) in config.md § Context Sources until the server exists. When ready, fill this in and flip enabled to true.",
+      "_comment": "RAG codebase-analysis context. NOT YET RELEASED \u2014 leave disabled (enabled: false) in .omp/agent-config.md \u00a7 Context Sources until the server exists. When ready, fill this in and flip enabled to true.",
       "command": "REPLACE_ME",
       "args": [],
       "env": {}

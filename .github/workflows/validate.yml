@@ -15,3 +15,22 @@ jobs:
           python-version: "3.12"
       - run: pip install -r tests/requirements-dev.txt
       - run: pytest tests/test_structure.py -q
+
+      # Layer 0. Runs the script, hook and behaviour suites that pytest never
+      # collected: gate-log, guard-secrets, telemetry aggregation, vault sync,
+      # clear-agent-states, run-suite, publish-branch, reap-clones. Roughly 250
+      # assertions that were being written, run locally, and then gated by
+      # nothing — the gate ran one file of static markdown checks.
+      #
+      # Second, and separately: check.py is what the repo tells agents to run.
+      # A gate that does not include it means an agent can be told green by the
+      # command it was given while CI is red, which is how the § Model Versions
+      # rename reached a PR.
+      #
+      # Note for anyone hitting a flake here: test_run_suite.sh asserts wall
+      # clock — `start` returns in under 3s, `check` in under 2s. Those bounds
+      # are the point (a blocking start is what tripped the 600s agent watchdog
+      # in evidence-run2 F1), but they are the first thing that will misbehave
+      # on a loaded runner. Loosen those specific bounds if it happens; do not
+      # drop the step.
+      - run: python3 tests/check.py

@@ -1,0 +1,91 @@
+{
+  "name": "ac-coverage-narrowed",
+  "kind": "chain",
+  "why": "Third arm. The decomposed chain keeps its accuracy at realistic evidence size but costs 3.7x the tokens at 8k of evidence and 5.05x at 25k, because every step re-sends the whole context. This arm gives each step only the slice it needs: the implementation question sees the diff, the assertion questions see the test suite, and neither sees unrelated repository files.\n\nThe honest limit: knowing which slice a step needs is a static declaration here, because the duty is fixed and its evidence is named. That is the favourable case. A duty whose relevant evidence varies per invocation would need a selector, which is unbuilt and is more work than the chain runner itself.",
+  "evidence": {
+    "criteria": "## Acceptance criteria\n\nAC-1: `getById` returns null for a missing order.\nAC-2: `getById` logs a warning when the order is missing.\nAC-3: `getById` retries once on a network timeout.",
+    "implementation": "## Implementation \u2014 the complete `OrderRepository` class after the change\n\nNothing else in the codebase touches order fetching; there is no retry, backoff or interceptor layer anywhere.\n\n```dart\n  Future<Order?> getById(String id) async {\n    final Order? order = await _api.fetch(id);\n    if (order == null) {\n      _log.warning('order $id not found');\n      return null;\n    }\n    return order;\n  }\n```",
+    "tests": "## The complete test suite for this class, after the change\n\n```dart\n// test/data/order_repository_test.dart \u2014 this is the entire file\ntest('getById returns null when the order is missing', () async {\n  when(api.fetch('x')).thenAnswer((_) async => null);\n  expect(await repo.getById('x'), isNull);\n});\n\ntest('getById returns the order when it exists', () async {\n  when(api.fetch('x')).thenAnswer((_) async => anOrder);\n  expect(await repo.getById('x'), anOrder);\n});\n```",
+    "other_files": ""
+  },
+  "criteria": {
+    "AC-1": "`getById` returns null for a missing order.",
+    "AC-2": "`getById` logs a warning when the order is missing.",
+    "AC-3": "`getById` retries once on a network timeout."
+  },
+  "steps": [
+    {
+      "id": "impl",
+      "needs": [
+        "criteria",
+        "implementation"
+      ],
+      "system": "You answer one question about a code change. Reply with exactly one word: YES or NO.",
+      "ask": "Does the implementation shown satisfy this criterion?\n\nCriterion: {criterion}"
+    },
+    {
+      "id": "asserted",
+      "skip_if": {
+        "impl": "NO"
+      },
+      "needs": [
+        "criteria",
+        "tests"
+      ],
+      "system": "You answer one question about a test suite. Reply with exactly one word: YES or NO.",
+      "ask": "Would any assertion in the test suite shown FAIL if this criterion were violated \u2014 that is, if the behaviour it describes were removed?\n\nCriterion: {criterion}"
+    },
+    {
+      "id": "naive",
+      "skip_if": {
+        "asserted": "NO"
+      },
+      "needs": [
+        "criteria",
+        "tests"
+      ],
+      "system": "You answer one question about a test. Reply with exactly one word: YES or NO.",
+      "ask": "If the method's body were replaced with a hardcoded value that made this one assertion pass, would the test still pass?\n\nCriterion: {criterion}"
+    }
+  ],
+  "decide": [
+    {
+      "when": {
+        "impl": "NO"
+      },
+      "verdict": "NO_IMPL"
+    },
+    {
+      "when": {
+        "impl": "YES",
+        "asserted": "NO"
+      },
+      "verdict": "NO_TEST"
+    },
+    {
+      "when": {
+        "impl": "YES",
+        "asserted": "YES",
+        "naive": "YES"
+      },
+      "verdict": "WEAK"
+    },
+    {
+      "when": {
+        "impl": "YES",
+        "asserted": "YES",
+        "naive": "NO"
+      },
+      "verdict": "PASS"
+    }
+  ],
+  "grader": "chain_verdicts",
+  "expect": {
+    "AC-1": [
+      "PASS",
+      "WEAK"
+    ],
+    "AC-2": "NO_TEST",
+    "AC-3": "NO_IMPL"
+  }
+}

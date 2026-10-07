@@ -1,7 +1,7 @@
 import type { HookAPI } from "@oh-my-pi/pi-coding-agent/extensibility/hooks";
 import { execSync } from "node:child_process";
 import { mkdirSync, appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, isAbsolute, resolve } from "node:path";
 
 /**
  * log-event — omp telemetry hook (supplementary).
@@ -83,14 +83,35 @@ export default function (pi: HookAPI): void {
   });
 }
 
+/**
+ * The checkout whose `agent_states/` these events belong to.
+ *
+ * `--git-common-dir` is right for a Phase-3 agent worktree, whose events belong
+ * to the cycle running in the main checkout. It is wrong for a fan-out clone
+ * (`start-parallel-cycles.sh`), which is a cycle in its own right but is also a
+ * linked worktree of the origin — under a parallel run that sent every clone's
+ * events into one directory in the origin (see parallel-cycles-evidence-run1 E1).
+ * Git topology cannot distinguish the two, so the launcher marks a clone and the
+ * marker wins. Kept byte-for-byte in step with `.claude/hooks/log-event.py`.
+ */
 function resolveMainRoot(): string | null {
-  try {
-    const common = execSync("git rev-parse --git-common-dir", {
+  const git = (args: string): string =>
+    execSync(`git ${args}`, {
       stdio: ["ignore", "pipe", "ignore"],
       encoding: "utf8",
     }).trim();
-    return dirname(common);
+
+  let top: string | null = null;
+  try {
+    top = git("rev-parse --show-toplevel");
+    if (top && existsSync(join(top, "agent_states", ".fanout-clone"))) return top;
   } catch {
     return null;
+  }
+  try {
+    const common = git("rev-parse --git-common-dir");
+    return dirname(isAbsolute(common) ? common : resolve(process.cwd(), common));
+  } catch {
+    return top;
   }
 }

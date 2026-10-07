@@ -113,7 +113,35 @@ Ask: **"Scan the codebase for recurring patterns to improve scaffold accuracy?"*
 - No → the scaffold agent uses the language-neutral pattern shapes + the active pack's
   `scaffold-snippets.md`, and can discover patterns on first use.
 
-## Step 10 — Summary
+## Step 10 — Repository workflows (optional)
+
+Ask: **"Install the framework's GitHub workflows into this repository?"**
+
+List what is available first — `bash <framework>/install-workflows.sh list` — and what each
+one costs. Today there is one:
+
+| Template | Does | Costs |
+|---|---|---|
+| `review-comment-to-issue.yml` | `/bug`, `/story`, `/feature` at the start of a line in a PR comment files a labelled issue and replies with its number | seconds of Actions time per comment |
+
+- Yes → `bash <framework>/install-workflows.sh install .`
+- No → print that command so the decision is reversible without re-running setup.
+
+**Offer; do not install by default.** This writes to `.github/`, changes what runs on the
+project's pull requests, and spends their Actions minutes. None of that should happen because
+a default said so.
+
+Two things the installer reports that are worth reading aloud to the user, because both fail
+silently in production:
+
+- An `issue_comment` workflow runs from the repository's **default branch only**. If the
+  default is `main` and cycles merge to `develop`, it will not fire until it reaches `main`,
+  and nothing will say so.
+- Board placement needs a `PROJECT_TOKEN` secret, because Projects v2 is user-scoped and
+  `GITHUB_TOKEN` cannot write to it. Without it, issues are still filed and labelled and the
+  workflow reports board placement as skipped.
+
+## Step 11 — Summary
 
 ```
 Configuration complete:
@@ -127,9 +155,11 @@ Configuration complete:
   Auto review:     [enabled | disabled]
   Context sources: [N configured — M enabled]
   Scaffold:        [N pattern files created | using pack defaults]
+  Workflows:       [N installed | offered, not installed]
 
 Next steps:
   - Review .omp/agent-config.md and .omp/config.yml and adjust any values
   - Copy .omp/models.yml.sample → ~/.omp/agent/models.yml and pick your OpenRouter models
   - Connect MCP servers in .omp/mcp.json
   - Run /cycle to start your first feature cycle
+```

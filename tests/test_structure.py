@@ -10,9 +10,16 @@ YAML, dangling skill names, missing pack files).
 """
 import pathlib
 import re
+import sys
 
 import pytest
 import yaml
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import context_budget  # noqa: E402  (stdlib-only; also runnable without pytest)
+import framework_checks  # noqa: E402  (stdlib-only; also runnable without pytest)
+import model_allocation  # noqa: E402
+import harness_parity  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -127,7 +134,10 @@ def test_no_claude_code_agent_call_in_skill_shims():
 def test_no_stale_bare_config_md_reference():
     # bare `config.md` (not `.omp/agent-config.md`, not `.claude/config.md`) is
     # the renamed file — a live reference to it breaks /setup and /cycle.
-    pat = re.compile(r"(?<![-/])config\.md")
+    # lookbehind excludes -, / and . so that .omp/agent-config.md,
+    # .claude/config.md, and dotted filenames like example-skill.config.md
+    # are not mistaken for the renamed bare file.
+    pat = re.compile(r"(?<![-/.])config\.md")
     for p in list((ROOT / ".claude/skills").rglob("*.md")) + list(
         (ROOT / ".omp/agents").glob("*.md")
     ):
@@ -166,17 +176,101 @@ def test_model_versions_table_is_populated():
         )
 
 
-# -------------------------------- G. critical agent-config sections exist ---
-_REQUIRED_SECTIONS = [
-    "Active Pack", "Artifact Paths", "Docs Vault", "Model Allocation",
-    "Model Versions", "Effort Allocation", "Optional Agents", "Project Commands",
-    "Architecture Review Rules", "Layer Boundaries", "Pattern Compliance",
-    "Convention Checks", "Context Sources", "Cycle Options", "Branch Configuration",
-]
+# ------------------------------------------- G. harness parity (.claude/.omp) ---
+def test_agent_pairs_exist():
+    problems = harness_parity.missing_pairs()
+    assert not problems, "unpaired agent definitions: " + "; ".join(problems)
+
+
+def test_harness_divergence_matches_golden():
+    """Every agent is defined twice (Claude Code + omp). Divergence is expected,
+    but it is pinned: an edit to one side only changes the recorded diff."""
+    golden = ROOT / "tests/fixtures/harness-parity.diff"
+    assert golden.exists(), (
+        "missing tests/fixtures/harness-parity.diff — record it with "
+        "`python3 tests/harness_parity.py --update`"
+    )
+    current = harness_parity.render()
+    assert current == golden.read_text(encoding="utf-8"), (
+        "harness divergence changed: an agent body was edited on one side only, or a "
+        "divergence was added. Mirror the edit to the other harness, or re-record with "
+        "`python3 tests/harness_parity.py --update`. "
+        "Run `python3 tests/harness_parity.py` to see which agent."
+    )
+
+
+# ------------------------------------------------ H. structural invariants ---
+@pytest.mark.parametrize("label", sorted(framework_checks.ALL_CHECKS))
+def test_structural_invariant(label):
+    """Backed by tests/framework_checks.py so the same checks run without pytest
+    via `python3 tests/check.py`."""
+    problems = framework_checks.ALL_CHECKS[label]()
+    assert not problems, f"{label}:\n  " + "\n  ".join(problems)
+
+
+# -------------------------------- I. critical agent-config sections exist ---
+# Delegated to framework_checks so the stdlib-only Layer 0 runs it too. It used
+# to live only here, where it needs pytest and PyYAML — so on a machine without
+# them `python3 tests/check.py` reported green while this failed in CI, which is
+# how a renamed heading (`### Model Versions — **omp only**`) reached a PR. The
+# list and the normalization now have one home.
 
 
 def test_agent_config_has_all_referenced_sections():
-    headers = re.findall(r"^#{1,4}\s+(.+?)\s*$", read(".omp/agent-config.md"), re.MULTILINE)
-    norm = {h.split("(")[0].strip().lower() for h in headers}
-    for s in _REQUIRED_SECTIONS:
-        assert s.lower() in norm, f".omp/agent-config.md missing § {s}"
+    problems = framework_checks.check_agent_config_sections()
+    assert not problems, "\n  ".join(problems)
+
+
+def test_section_name_trims_qualifiers_but_not_names():
+    """The normalization that let the renamed heading through.
+
+    A citation names the section, not its qualifier, so both the parenthetical
+    and em-dash forms must reduce to the same name — while a hyphen inside a
+    real section name must survive.
+    """
+    n = framework_checks._section_name
+    assert n("Model Versions — **omp only**") == "model versions"
+    assert n("Hygiene flags (§5.8)") == "hygiene flags"
+    assert n("Per-phase skip flags (5.6.2)") == "per-phase skip flags"
+    assert n("Context Sources (MCP / RAG plug-in points)") == "context sources"
+
+
+# ------------------------------------------------------- X. context budget ---
+# Static token load per agent, pinned. The framework grew 60% in three weeks with
+# nobody in a position to see the sum, which is the bug this guards against — not
+# any single edit. Delegated to the stdlib module so Layer 0 runs it too.
+
+
+def test_context_budget_within_tolerance():
+    problems = context_budget.run()
+    assert not problems, (
+        "\n  " + "\n  ".join(problems)
+        + "\n\nTrim the addition, or re-record deliberately:"
+        + "\n  python3 tests/context_budget.py --update"
+    )
+
+
+def test_shared_skill_growth_counts_against_every_agent_that_loads_it():
+    """The multiplier this exists to surface.
+
+    `whispers` is autoloaded by five agents, so a paragraph added to it is paid
+    five times per Phase-3 wave. Editing one skill file gives no hint of that,
+    which is precisely how the +13,117 accumulated unnoticed.
+    """
+    measured = context_budget.measure()
+    loaders = [n for n, d in measured["agents"].items() if "whispers" in d["autoload"]]
+    assert len(loaders) > 1, "expected whispers to be shared across agents"
+    cost = measured["skills"]["whispers"]
+    assert all(measured["agents"][n]["skills"] >= cost for n in loaders)
+
+
+# -------------------------------------------------- XI. per-agent model ids ---
+# A concrete model id per agent is only useful if it fits what the agent
+# actually holds. `gpt-oss-20b` won the qualification matrix and holds 131k,
+# where verify peaks at 251k — an assignment that fails late, on long runs,
+# after the work is done.
+
+
+def test_every_concrete_model_clears_its_agents_measured_peak():
+    problems = model_allocation.run()
+    assert not problems, "\n  " + "\n  ".join(problems)

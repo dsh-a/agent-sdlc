@@ -44,6 +44,8 @@ If the implementation passes: the new test still improves coverage — keep it.
 
 ## Step 4 — Report
 
+Before reporting, run the **Format** command (§ Project Commands) to auto-format any test files you added — committing unformatted files fails CI.
+
 Return:
 - List of gaps found (with the new test names)
 - Which gaps revealed actual implementation bugs

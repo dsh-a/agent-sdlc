@@ -1,0 +1,14 @@
+{
+  "name": "name-collision",
+  "why": "Adversarial. T1's name contains the changed symbol but it asserts on a different class entirely, so a model matching on strings rather than on what the test asserts will wrongly mark it UPDATE. T1 is the probe; T2 is a control whose assertion the AC inverts.\n\nGround-truth correction, 2026-09-20. T2 was first keyed UPDATE; both models said DELETE, so it was re-keyed DELETE; on the next run deepseek said UPDATE three times out of three, having said DELETE twice out of three before. The case is genuinely ambiguous \u2014 a test whose assertion an AC inverts can defensibly be rewritten or dropped \u2014 so it now accepts either. Adjudicating it would have measured agreement with the fixture's author rather than competence. T1 is what this probe actually tests; T2 is a control. Recorded rather than quietly edited: a key that independent models reject is the first thing to doubt.",
+  "user": "## Acceptance criteria for this task\n\nAC-1: `CartTotal.compute` must apply the discount before tax, not after.\n\n## Changed symbols\n\n`CartTotal.compute`\n\n## Existing tests that reference those symbols\n\n### T1 \u2014 test/ui/cart_total_widget_test.dart:5\n```dart\ntest('CartTotalWidget renders the value that CartTotal.compute returned', () async {\n  await tester.pumpWidget(CartTotalWidget(total: 42.0));\n  expect(find.text('42.00'), findsOneWidget);\n});\n```\n\n### T2 \u2014 test/domain/cart_total_test.dart:9\n```dart\ntest('compute applies tax then discount', () {\n  expect(CartTotal.compute(subtotal: 100, taxRate: 0.1, discount: 0.5), 55.0);\n});\n```\n",
+  "format": "Respond with ONLY these two lines and nothing else:\nT1: <KEEP|UPDATE|DELETE>\nT2: <KEEP|UPDATE|DELETE>",
+  "grader": "labels",
+  "expect": {
+    "T1": "KEEP",
+    "T2": [
+      "UPDATE",
+      "DELETE"
+    ]
+  }
+}

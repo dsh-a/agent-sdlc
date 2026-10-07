@@ -1,0 +1,61 @@
+{
+ "repo": "dsh-a/example",
+ "issue": {
+  "number": 413,
+  "title": "A story",
+  "state": "OPEN",
+  "url": "https://github.com/dsh-a/example/issues/413",
+  "body": "Intro.\n\n## Acceptance Criteria\n\n- [ ] (+) it does the thing\n- [ ] (\u2212) it does not do the other thing\n\n## Open questions\n\n- [x] ~~(Risk) **Q-1** \u2014 settled?~~ \u2192 yes (resolved 2026-10-01)\n",
+  "labels": {
+   "nodes": [
+    {
+     "name": "story"
+    }
+   ]
+  },
+  "projectItems": {
+   "nodes": [
+    {
+     "id": "ITEM_1",
+     "project": {
+      "id": "PRJ_1",
+      "number": 2,
+      "title": "Roadmap",
+      "fields": {
+       "nodes": [
+        {
+         "id": "F_ref",
+         "name": "Refinement",
+         "options": [
+          {
+           "id": "o1",
+           "name": "REFINING"
+          },
+          {
+           "id": "o2",
+           "name": "Refined"
+          }
+         ]
+        },
+        {
+         "id": "F_status",
+         "name": "Status"
+        }
+       ]
+      }
+     },
+     "fieldValues": {
+      "nodes": [
+       {
+        "name": "REFINING",
+        "field": {
+         "name": "Refinement"
+        }
+       }
+      ]
+     }
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,74 @@
+{
+  "name": "ac-coverage-decomposed",
+  "kind": "chain",
+  "why": "The treatment arm for the co-adaptation question. `ac-coverage` asks one call to hold `ac-audit-rubric` \u2014 six checks, five verdicts, a precedence table \u2014 and emit three verdicts. Premium models score 100%; the open-weight roster scores 30%. That gap is capability PLUS co-adaptation: the prompts were authored and iterated against frontier models for months, and assume a reader who can apply a dense rubric in one pass.\n\nThis arm asks the identical evidence in the identical words, restructured: three binary questions per criterion, each with its own minimal prompt and a one-token contract, and **the verdict computed in code from the answers**. No rubric is shown; no verdict vocabulary is required of the model.\n\nThat is `capability-tiered-duties-plan.md`'s thesis made testable. If decomposition closes most of the gap, the framework becomes portable by being restructured rather than by buying better models, and workstreams A/F stop being cost optimisations and become the migration itself. If it closes little, that is a real capability floor and the search budget belongs on finding stronger open weights.",
+  "context": "## Acceptance criteria\n\nAC-1: `getById` returns null for a missing order.\nAC-2: `getById` logs a warning when the order is missing.\nAC-3: `getById` retries once on a network timeout.\n\n## Implementation \u2014 this is the complete `OrderRepository` class after the change\n\nNothing else in the codebase touches order fetching; there is no retry, backoff or interceptor layer anywhere.\n\n```diff\n--- a/lib/data/repositories/order_repository.dart\n+++ b/lib/data/repositories/order_repository.dart\n   Future<Order?> getById(String id) async {\n-    final Order? order = await _api.fetch(id);\n-    if (order == null) throw NotFoundException(id);\n-    return order;\n+    final Order? order = await _api.fetch(id);\n+    if (order == null) {\n+      _log.warning('order $id not found');\n+      return null;\n+    }\n+    return order;\n   }\n```\n\n## The complete test suite for this class, after the change\n\n```dart\n// test/data/order_repository_test.dart \u2014 this is the entire file\ntest('getById returns null when the order is missing', () async {\n  when(api.fetch('x')).thenAnswer((_) async => null);\n  expect(await repo.getById('x'), isNull);\n});\n\ntest('getById returns the order when it exists', () async {\n  when(api.fetch('x')).thenAnswer((_) async => anOrder);\n  expect(await repo.getById('x'), anOrder);\n});\n```",
+  "criteria": {
+    "AC-1": "`getById` returns null for a missing order.",
+    "AC-2": "`getById` logs a warning when the order is missing.",
+    "AC-3": "`getById` retries once on a network timeout."
+  },
+  "steps": [
+    {
+      "id": "impl",
+      "system": "You answer one question about a code change. Reply with exactly one word: YES or NO.",
+      "ask": "Does the implementation shown satisfy this criterion?\n\nCriterion: {criterion}"
+    },
+    {
+      "id": "asserted",
+      "skip_if": {
+        "impl": "NO"
+      },
+      "system": "You answer one question about a test suite. Reply with exactly one word: YES or NO.",
+      "ask": "Would any assertion in the test suite shown FAIL if this criterion were violated \u2014 that is, if the behaviour it describes were removed?\n\nCriterion: {criterion}"
+    },
+    {
+      "id": "naive",
+      "skip_if": {
+        "asserted": "NO"
+      },
+      "system": "You answer one question about a test. Reply with exactly one word: YES or NO.",
+      "ask": "If the method's body were replaced with a hardcoded value that made this one assertion pass, would the test still pass?\n\nCriterion: {criterion}"
+    }
+  ],
+  "decide": [
+    {
+      "when": {
+        "impl": "NO"
+      },
+      "verdict": "NO_IMPL"
+    },
+    {
+      "when": {
+        "impl": "YES",
+        "asserted": "NO"
+      },
+      "verdict": "NO_TEST"
+    },
+    {
+      "when": {
+        "impl": "YES",
+        "asserted": "YES",
+        "naive": "YES"
+      },
+      "verdict": "WEAK"
+    },
+    {
+      "when": {
+        "impl": "YES",
+        "asserted": "YES",
+        "naive": "NO"
+      },
+      "verdict": "PASS"
+    }
+  ],
+  "grader": "chain_verdicts",
+  "expect": {
+    "AC-1": [
+      "PASS",
+      "WEAK"
+    ],
+    "AC-2": "NO_TEST",
+    "AC-3": "NO_IMPL"
+  }
+}

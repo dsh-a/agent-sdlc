@@ -432,6 +432,15 @@ agent_states/
 .claude/worktrees/
 # <<< agent-sdlc <<<
 
+# Claude Code's skill-sync cache: UUID-named buckets, per-machine, meaningless in
+# another checkout. `deploy.sh` already refuses to deploy it (the manifest skips
+# any skill dir git does not track, deploy.sh § manifest) — but nothing stopped it
+# being *committed*, and one `git add -A` stages all 218 files. If it ever landed,
+# the manifest would start linking a per-machine cache into every project. Same
+# shape as `docs/personal/` above: a path that must stay untracked and was not
+# ignored.
+.claude/skills/synced/
+
 # Local model routing (may carry OPENROUTER_API_KEY). Commit models.yml.sample instead.
 .omp/models.yml
 # Env files, all variants
@@ -441,3 +450,13 @@ agent_states/
 tests/assess-report.md
 .pytest_cache/
 .venv/
+
+# personal notes — never tracked. Both paths: `/personal/` is root-anchored and
+# does NOT match `docs/personal/`, which existed untracked-and-unignored until
+# 2026-09-27 — anything put there would have been committed.
+/personal/
+docs/personal/
+
+# qualify.py streams raw probe rows here; the matrix is the artifact
+docs/internal/qualification-matrix.raw.jsonl
+docs/internal/qualification-matrix*-smoke*

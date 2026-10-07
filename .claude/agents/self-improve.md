@@ -13,7 +13,7 @@ You are a pipeline performance analyst. You read historical run reports and veri
 
 ## Step 1 — Gather data
 
-Read all files in `agent_tasks/reports/`. If your scope specifies a dimension or specific report, narrow accordingly. Extract per-report data along the three dimensions defined in `pipeline-metrics-rubric` (Economy / Efficiency / Effectiveness) plus the cross-cutting Supervisor health and Mode-+-depth patterns.
+Read all files in `agent_tasks/reports/`. If your scope specifies a dimension or specific report, narrow accordingly. Extract per-report data along the three dimensions defined in `pipeline-metrics-rubric` (Economy / Efficiency / Effectiveness) plus the cross-cutting Supervisor health and Mode-+-depth patterns. Also read each report's `## Harness findings` section — per-cycle process faults, analysed across runs per `pipeline-metrics-rubric` § Harness finding patterns.
 
 ## Step 2 — Analyze patterns
 
@@ -44,19 +44,20 @@ Add a note to the most recent run report in `agent_tasks/reports/`:
 
 ## Step 5b — Aggregate bugs (5.8.4)
 
-If `.omp/agent-config.md` § Hygiene flags has `aggregate_bugs_into` set to a non-empty path (default `documentation/bugs.md`):
+If `.omp/agent-config.md` § Hygiene flags has `aggregate_bugs_into` set to a non-empty **repo slug** (e.g. `<owner>/<repo>`):
 
 1. Scan every run report in `agent_tasks/reports/` for `## Bugs discovered` (or "Bugs discovered" sub-section) entries.
-2. For each entry, compute a stable title hash (the first line of the entry, trimmed and lowercased).
-3. Read the target file (e.g., `documentation/bugs.md`) and collect existing title hashes.
-4. Append only new entries to the target file under a date-stamped block:
-   ```markdown
-   ## [YYYY-MM-DD] from cycle <feature-name>
-   - **<bug title>** — <one-line description> _(source: <report path>)_
-   ```
-5. Do not delete or modify existing entries — the file is append-only. The project owns curation (collapsing, fixing typos, marking resolved).
+2. For each entry, check whether it is already filed: `gh issue list --repo <slug> --label bug --state all --search "<bug title in quotes>"`. A non-empty result is a duplicate — skip it. This replaces the old title-hash dedupe against a local file.
+3. File each new entry as its own issue:
+   ```sh
+   gh issue create --repo <slug> --label bug \
+     --title "<bug title>" \
+     --body "<one-line description>
 
-If the target file does not exist, create it with a one-line header: `# Bugs Discovered (aggregated by self-improve)`.
+   _Source: <report path> — cycle <feature-name>, YYYY-MM-DD._"
+   ```
+4. Never close or edit an existing issue here — this step only files. The project owns curation.
+5. If `gh` fails or is unauthenticated, **stop and report**. Do not fall back to writing a file: the local bug tracker was deleted in the GitHub tracker migration, and recreating it is exactly the failure that stranded five bugs in `documentation/meta/` for a month.
 
 ## Step 6 — Report
 

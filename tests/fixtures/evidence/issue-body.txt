@@ -1,0 +1,1 @@
+The issue body discusses scheduling and says nothing about the guard.

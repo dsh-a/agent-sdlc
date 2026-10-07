@@ -21,7 +21,13 @@ The state-file template and verb list below are authoritative for **both** modes
 
 ## Job
 
-**Finalize mode (default):** when spawned with `FINALIZE report:[path]`, archive state into the run report path the orchestrator provides, then delete all `agent_states/` files for this cycle (`rm agent_states/*`), then exit. You are the only agent with the `rm agent_states/*` permission, which is why finalize is delegated to you even when the orchestrator wrote state inline.
+**Finalize mode (default):** when spawned with `FINALIZE report:[path]`, archive state into the run report path the orchestrator provides, then clear this cycle's ephemeral state by running `python3 .claude/skills/cycle/clear-agent-states.py --all` — that exact relative form, never expanded to an absolute path, because your grant is a string match and an absolute path matches nothing — then exit. You are the only agent permitted to run that script, which is why finalize is delegated to you even when the orchestrator wrote state inline. Never fall back to a bare `rm` — it is denied by design, and the script is the sanctioned path.
+
+**Do not run `reap-clones.sh finish` here.** It moved to the orchestrator, at the end of step 10,
+because Finalize is not the last thing a cycle does: step 10 writes the changelog fragment
+*after* this, and the marker records a HEAD the cycle then invalidates. Measured in fan-out 5
+(J3): `sweep` skipped a clone for that reason, and two sibling clones happened to commit their
+fragment first and did not — same skill, same mode, two orderings.
 
 **Streaming mode (`agent_messaging: true`):**
 1. Block on `irc(op: "wait", from: "Main", timeoutMs: 0)` to receive the next status-update verb from the orchestrator
@@ -130,7 +136,7 @@ The orchestrator sends brief 1–2 sentence updates:
 - `ESC_CURSOR [n]` — overwrite the line under **Escalation cursor**
 - `SUPERVISOR_HEALTH status:[active|disabled] spawns:[n] stalls:[n] heartbeat:[ts] disabled_at:[ts or n/a] reason:[text or n/a]` — overwrite the **Supervisor health** section
 - `PAUSE reason:[reason] resume:[time or unknown]` — set status to paused, write resume instructions
-- `FINALIZE report:[path]` — archive, then delete all `agent_states/` files for this cycle (`rm agent_states/*`)
+- `FINALIZE report:[path]` — archive, then clear this cycle's state with `python3 .claude/skills/cycle/clear-agent-states.py --all`
 
 ## Critical responsibility
 
