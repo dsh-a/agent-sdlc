@@ -23,6 +23,7 @@
 #
 #   deploy.sh link [project]     create or repair every link (idempotent)
 #   deploy.sh check [project]    change nothing; exit 1 if anything is wrong
+#   deploy.sh doctor             check this machine's prerequisites; exit 1 on a FAIL
 #   deploy.sh list               print the manifest and exit
 #   deploy.sh gitignore          print .gitignore lines for a deployment
 #
@@ -368,6 +369,101 @@ grants() {
   return 0
 }
 
+# Machine prerequisites, checked by doing rather than by asking. On the first
+# Windows machine every hook failed silently for hours — `python3` was the
+# Store's "Python was not found" stub, and a hook error is non-fatal — and
+# `link` produced copies because nothing made a symlink and looked at it. Each
+# finding names its fix. FAIL is something the pipeline cannot run without;
+# WARN degrades one feature. Needs no project.
+doctor() {
+  local n_ok=0 n_warn=0 n_fail=0 py ver py_ok= enc nat tmp
+  d_ok()   { printf '  ok    %s\n' "$1"; n_ok=$((n_ok+1)); }
+  d_warn() { printf '  WARN  %s\n        fix: %s\n' "$1" "$2"; n_warn=$((n_warn+1)); }
+  d_fail() { printf '  FAIL  %s\n        fix: %s\n' "$1" "$2"; n_fail=$((n_fail+1)); }
+
+  py="$(command -v python3 2>/dev/null)"
+  if [ -z "$py" ]; then
+    d_fail "python3 is not on PATH — every hook and pipeline script needs it" \
+           "install Python 3.8+ and put it on PATH as python3"
+  elif [ -n "$WINDOWS" ] && case "$py" in *[/\\]WindowsApps[/\\]*) true ;; *) false ;; esac; then
+    d_fail "python3 is the WindowsApps Store stub ($py)" \
+           "Settings → Apps → Advanced app settings → App execution aliases: turn off python.exe and python3.exe, then put a real Python first on the user PATH"
+  elif ! ver="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null | tr -d '\r')" \
+       || [ -z "$ver" ]; then
+    d_fail "python3 does not run ($py)" \
+           "install Python 3.8+; on Windows, a python3 that prints 'Python was not found' is the Store stub"
+  elif [ "${ver%%.*}" -lt 3 ] 2>/dev/null \
+       || { [ "${ver%%.*}" = 3 ] && [ "${ver#*.}" -lt 8 ] 2>/dev/null; }; then
+    d_fail "python3 is $ver; the pipeline scripts need 3.8+" "install Python 3.8 or newer"
+  else
+    d_ok "python3 $ver ($py)"; py_ok=1
+  fi
+
+  if [ -n "$py_ok" ]; then
+    # Piped, because that is how hooks and scripts run: a console can be UTF-8
+    # while a pipe is cp1252, and a hook that prints `→` then crashes — a guard
+    # that crashes exits 0, so it fails open.
+    enc="$(python3 -c 'import sys; print(sys.stdout.encoding)' 2>/dev/null | tr -d '\r')"
+    case "$enc" in
+      [Uu][Tt][Ff]*8) d_ok "python3 writes UTF-8 to a pipe" ;;
+      *) d_fail "python3 writes ${enc:-an unknown encoding} to a pipe; scripts that print non-ASCII crash" \
+                "set PYTHONUTF8=1 as a user environment variable, then restart the terminal app, not just the shell" ;;
+    esac
+  fi
+
+  if [ -n "$WINDOWS" ] && [ -n "$py_ok" ]; then
+    # What a native program — Claude Code itself — finds, not what bash finds.
+    nat="$(python3 -c 'import shutil; print(shutil.which("python3") or "")' 2>/dev/null | tr -d '\r')"
+    case "$nat" in
+      ''|*WindowsApps*)
+        d_fail "native programs resolve python3 to ${nat:-nothing}" \
+               "copy python.exe to python3.exe in your Python directory, and put that directory first on the user PATH" ;;
+      *) d_ok "native programs resolve python3 to $nat" ;;
+    esac
+    nat="$(python3 -c 'import shutil; print(shutil.which("bash") or "")' 2>/dev/null | tr -d '\r')"
+    case "$nat" in
+      *[Ss]ystem32*)
+        d_warn "native programs resolve bash to WSL ($nat), not Git Bash" \
+               "put Git's usr\\bin before C:\\Windows\\System32 on PATH, or scripts may run in Linux" ;;
+      '') d_warn "native programs find no bash" "install Git for Windows" ;;
+      *) d_ok "native programs resolve bash to $nat" ;;
+    esac
+  fi
+
+  if command -v git >/dev/null 2>&1; then d_ok "git"
+  else d_fail "git is not on PATH" "install git"; fi
+
+  # A real link, made and inspected: the only test that tells a symlink from
+  # the copy Git Bash makes when Windows refuses one.
+  tmp="$(mktemp -d 2>/dev/null)"
+  if [ -n "$tmp" ] && echo x > "$tmp/target" && ln -s "$tmp/target" "$tmp/link" 2>/dev/null \
+     && [ -L "$tmp/link" ]; then
+    d_ok "symlinks are real links"
+  else
+    d_fail "symlinks cannot be created — link would fail, or copy" \
+           "Windows: Settings → System → For developers → Developer Mode on"
+  fi
+  [ -n "$tmp" ] && rm -rf "$tmp"
+
+  if [ -n "$WINDOWS" ] && [ "$(git config --get core.autocrlf 2>/dev/null)" = true ]; then
+    d_warn "core.autocrlf=true — a project or vault repo without a .gitattributes checks out CRLF" \
+           "git config --global core.autocrlf input"
+  fi
+
+  if ! command -v gh >/dev/null 2>&1; then
+    d_warn "gh is not on PATH — stories, PRs and CI runs are read through it" "install the GitHub CLI"
+  elif ! gh auth status >/dev/null 2>&1; then
+    d_warn "gh is not authenticated" "gh auth login"
+  else
+    d_ok "gh (authenticated)"
+  fi
+  if command -v jq >/dev/null 2>&1; then d_ok "jq"
+  else d_warn "jq is not on PATH — a few scripts use it" "install jq"; fi
+
+  printf 'doctor: %d ok, %d warn, %d fail\n' "$n_ok" "$n_warn" "$n_fail"
+  [ "$n_fail" -eq 0 ]
+}
+
 CMD="${1:-}"; shift 2>/dev/null || true
 # `gitignore --apply` writes the block instead of printing it. Parsed before PROJ
 # so the flag does not become the project path.
@@ -379,6 +475,10 @@ PROJ_GIVEN="${1:-}"
 PROJ="${1:-$PWD}"
 
 case "$CMD" in
+  doctor)
+    doctor
+    exit $?
+    ;;
   list)
     manifest
     exit 0
@@ -438,7 +538,7 @@ case "$CMD" in
     ;;
   link|check) ;;
   ""|-h|--help) sed -n '3,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-  *) die "unknown command '$CMD'. Usage: $PROG link|check|list|gitignore [--apply]|grants|workflows [project]" ;;
+  *) die "unknown command '$CMD'. Usage: $PROG link|check|doctor|list|gitignore [--apply]|grants|workflows [project]" ;;
 esac
 
 PROJ="$(cd "$PROJ" 2>/dev/null && pwd -P)" || die "no such directory: ${1:-$PWD}"

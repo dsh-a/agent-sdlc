@@ -580,5 +580,44 @@ out="$(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.autocrlf GIT_CONFIG_VALUE_0=fals
 chk "  ... and goes quiet once it is LF" "$(echo "$out" | grep -c '^  CRLF ')" 0
 git -C "$FW" rm -q .claude/skills/cycle/crlf.sh; git -C "$FW" commit -qm "drop crlf fixture"
 
+# ------------------------------------------------------------ doctor ----
+#
+# The machine prerequisites, checked by doing rather than by asking: on the
+# first Windows machine every hook failed silently for hours because `python3`
+# was the Store's "Python was not found" stub, and `link` copied rather than
+# linked because nothing tried to make a symlink and looked at the result.
+out="$(bash "$D" doctor 2>&1)"; rc=$?
+chk "doctor passes on a machine that runs this suite" "$rc" 0
+chk "  ... and reports a summary" "$(echo "$out" | grep -c '^doctor: .* 0 fail')" 1
+chk "  ... naming python3 and its version" "$(echo "$out" | grep -c '^  ok    python3 [0-9]')" 1
+
+FAKE="$R/fakebin"; mkdir -p "$FAKE"
+printf '#!/bin/sh\necho "Python was not found; run without arguments to install from the Microsoft Store" >&2\nexit 9009\n' \
+  > "$FAKE/python3"; chmod +x "$FAKE/python3"
+out="$(PATH="$FAKE:$PATH" bash "$D" doctor 2>&1)"; rc=$?
+chk "a python3 that does not run fails doctor" "$rc" 1
+chk "  ... naming python3" "$(echo "$out" | grep -c '^  FAIL .*python3')" 1
+chk "  ... with a fix" "$(echo "$out" | grep -A1 '^  FAIL .*python3' | grep -c 'fix:')" 1
+
+printf '#!/bin/sh\necho 3.6\n' > "$FAKE/python3"
+out="$(PATH="$FAKE:$PATH" bash "$D" doctor 2>&1)"; rc=$?
+chk "a python3 older than 3.8 fails doctor" "$(echo "$out" | grep -c '^  FAIL .*python3.*3\.6')" 1
+rm -rf "$FAKE"
+
+case "$(uname -s)" in
+  MINGW*|MSYS*)
+    # The stub runs as far as `--version` on some builds; where it lives is the tell.
+    STUB="$R/WindowsApps"; mkdir -p "$STUB"
+    printf '#!/bin/sh\nexec "%s" "$@"\n' "$(command -v python3)" > "$STUB/python3"; chmod +x "$STUB/python3"
+    out="$(PATH="$STUB:$PATH" bash "$D" doctor 2>&1)"; rc=$?
+    chk "windows: a python3 under WindowsApps fails doctor" "$rc" 1
+    chk "  ... naming the App execution alias" \
+        "$(echo "$out" | grep -c 'App execution aliases')" 1
+    rm -rf "$STUB"
+    chk "windows: doctor checks symlinks by making one" \
+        "$(bash "$D" doctor 2>&1 | grep -c '^  ok .*symlink')" 1
+    ;;
+esac
+
 printf '\ndeploy: %s\n' "$([ $FAILED = 0 ] && echo 'all checks passed.' || echo 'FAILURES above.')"
 exit $FAILED
