@@ -616,6 +616,54 @@ case "$(uname -s)" in
     rm -rf "$STUB"
     chk "windows: doctor checks symlinks by making one" \
         "$(bash "$D" doctor 2>&1 | grep -c '^  ok .*symlink')" 1
+
+    # --fix writes user-scope environment only, through DEPLOY_WINENV so this
+    # never touches the real one: a fake that keeps each variable in a file.
+    WE="$R/winenv"; mkdir -p "$WE/vars"
+    cat > "$WE/winenv" <<'SH'
+#!/bin/sh
+d="$(dirname "$0")/vars"
+case "$1" in
+  get) [ -f "$d/$2" ] && cat "$d/$2" ;;
+  set) printf '%s' "$3" > "$d/$2"; echo "$2" >> "$d/.calls" ;;
+esac
+SH
+    chmod +x "$WE/winenv"
+    PYD="$R/Python99"; mkdir -p "$PYD"; echo exe > "$PYD/python.exe"
+    PYD_W="$(cygpath -w "$PYD")"
+    printf '%s' 'C:\Tools;C:\Users\x\AppData\Local\Microsoft\WindowsApps;C:\Other' > "$WE/vars/Path"
+    fix() { DEPLOY_WINENV="$WE/winenv" DEPLOY_PYTHON_DIR="$PYD" bash "$D" doctor --fix 2>&1; }
+    out="$(fix)"
+    chk "windows: --fix sets PYTHONUTF8 at user scope" "$(cat "$WE/vars/PYTHONUTF8" 2>/dev/null)" 1
+    chk "  ... puts the real Python first on the user PATH" \
+        "$(cut -d';' -f1 "$WE/vars/Path")" "$PYD_W"
+    chk "  ... keeping every existing entry, in order" \
+        "$(cut -d';' -f2- "$WE/vars/Path")" 'C:\Tools;C:\Users\x\AppData\Local\Microsoft\WindowsApps;C:\Other'
+    chk "  ... after backing the old PATH up" \
+        "$(cat "$HOME"/.agent-sdlc/user-path-backup-* 2>/dev/null | head -1)" \
+        'C:\Tools;C:\Users\x\AppData\Local\Microsoft\WindowsApps;C:\Other'
+    chk "  ... adds python3.exe beside python.exe" "$(cat "$PYD/python3.exe" 2>/dev/null)" exe
+    chk "  ... leaving python.exe as it was" "$(cat "$PYD/python.exe")" exe
+    chk "  ... and says to restart the terminal app" "$(echo "$out" | grep -c 'restart')" 1
+    calls="$(wc -l < "$WE/vars/.calls" | tr -d ' ')"
+    out="$(fix)"
+    chk "windows: a second --fix changes nothing" "$(wc -l < "$WE/vars/.calls" | tr -d ' ')" "$calls"
+    chk "  ... and does not duplicate the PATH entry" \
+        "$(tr ';' '\n' < "$WE/vars/Path" | grep -cxF "$PYD_W")" 1
+
+    # A trailing `;` is an empty entry, not a difference. Found on a real
+    # machine: --fix rewrote an already-correct PATH only to drop it.
+    printf '%s' "$PYD_W;C:\\Other;" > "$WE/vars/Path"
+    calls="$(wc -l < "$WE/vars/.calls" | tr -d ' ')"
+    fix >/dev/null
+    chk "windows: a correct PATH ending in ';' is left alone" \
+        "$(wc -l < "$WE/vars/.calls" | tr -d ' ')|$(cat "$WE/vars/Path")" "$calls|$PYD_W;C:\\Other;"
+
+    # Present but behind WindowsApps is the stub winning: move, do not add.
+    printf '%s' "C:\\Users\\x\\AppData\\Local\\Microsoft\\WindowsApps;$PYD_W;C:\\Other" > "$WE/vars/Path"
+    fix >/dev/null
+    chk "windows: a Python entry behind WindowsApps is moved to the front" \
+        "$(cat "$WE/vars/Path")" "$PYD_W;C:\\Users\\x\\AppData\\Local\\Microsoft\\WindowsApps;C:\\Other"
     ;;
 esac
 

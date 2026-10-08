@@ -23,7 +23,8 @@
 #
 #   deploy.sh link [project]     create or repair every link (idempotent)
 #   deploy.sh check [project]    change nothing; exit 1 if anything is wrong
-#   deploy.sh doctor             check this machine's prerequisites; exit 1 on a FAIL
+#   deploy.sh doctor [--fix]     check this machine's prerequisites; exit 1 on a FAIL.
+#                                --fix applies the Windows user-level ones (PATH, env)
 #   deploy.sh list               print the manifest and exit
 #   deploy.sh gitignore          print .gitignore lines for a deployment
 #
@@ -466,6 +467,118 @@ doctor() {
   [ "$n_fail" -eq 0 ]
 }
 
+# Windows user-scope environment, through the registry rather than setx (which
+# truncates at 1024 characters and folds the machine PATH into the user one) or
+# .NET's SetEnvironmentVariable (which expands `%USERPROFILE%`-style entries and
+# rewrites PATH as REG_SZ). Values are read unexpanded and written back with
+# their existing type; a new PATH is REG_EXPAND_SZ, as Windows creates it.
+# Deleting a variable that does not exist is what broadcasts WM_SETTINGCHANGE,
+# so Explorer — and anything it launches next — sees the change.
+# DEPLOY_WINENV substitutes a program with the same `get NAME` / `set NAME
+# VALUE` contract; the tests use it so they never touch the real environment.
+winenv() {
+  if [ -n "${DEPLOY_WINENV:-}" ]; then "$DEPLOY_WINENV" "$@"; return; fi
+  case "$1" in
+    get) powershell.exe -NoProfile -NonInteractive -Command "
+           \$k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment')
+           \$v = \$k.GetValue('$2', \$null, 'DoNotExpandEnvironmentNames')
+           if (\$v) { [Console]::Out.Write(\$v) }" 2>/dev/null ;;
+    set) WINENV_VALUE="$3" powershell.exe -NoProfile -NonInteractive -Command "
+           \$k = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment', \$true)
+           try { \$kind = \$k.GetValueKind('$2') }
+           catch { \$kind = if ('$2' -eq 'Path') { 'ExpandString' } else { 'String' } }
+           \$k.SetValue('$2', \$env:WINENV_VALUE, \$kind)
+           [Environment]::SetEnvironmentVariable('AGENT_SDLC_SETTINGCHANGE', \$null, 'User')" ;;
+  esac
+}
+
+# The user-level half of doctor, applied: PYTHONUTF8, a python3.exe beside a
+# real python.exe, and that directory ahead of WindowsApps on the user PATH.
+# Additive and idempotent — PATH entries are only added or moved, never
+# dropped, and the old value is backed up first. Machine scope and Developer
+# Mode need an administrator, so they are printed rather than attempted.
+doctor_fix() {
+  local changed=0 failed=0 pydir pyw path new e lc stamp bak
+  if [ -z "$WINDOWS" ]; then
+    say "nothing to fix automatically here — --fix applies Windows user settings only"
+    return 0
+  fi
+
+  if [ "$(winenv get PYTHONUTF8)" = 1 ]; then
+    say "ok        PYTHONUTF8=1 (user)"
+  elif winenv set PYTHONUTF8 1; then
+    say "set       PYTHONUTF8=1 (user)"; changed=$((changed+1))
+  else
+    say "FAILED    could not set PYTHONUTF8"; failed=$((failed+1))
+  fi
+
+  # A real Python: the py launcher knows where it installed one; failing that,
+  # whatever `python` is, provided it is not the WindowsApps stub.
+  pydir="${DEPLOY_PYTHON_DIR:-}"
+  if [ -z "$pydir" ] && command -v py >/dev/null 2>&1; then
+    pydir="$(py -3 -c 'import os, sys; print(os.path.dirname(sys.executable))' 2>/dev/null | tr -d '\r')"
+    [ -n "$pydir" ] && pydir="$(cygpath -u "$pydir")"
+  fi
+  if [ -z "$pydir" ]; then
+    e="$(command -v python 2>/dev/null)"
+    case "$e" in ''|*WindowsApps*) ;; *) pydir="$(dirname "$e")" ;; esac
+  fi
+  if [ -z "$pydir" ] || [ ! -f "$pydir/python.exe" ]; then
+    say "FAILED    no real Python found — install Python 3.8+ (python.org or winget), then re-run"
+    failed=$((failed+1))
+  else
+    if [ -f "$pydir/python3.exe" ]; then
+      say "ok        $pydir/python3.exe"
+    elif cp "$pydir/python.exe" "$pydir/python3.exe" 2>/dev/null; then
+      say "added     $pydir/python3.exe (a copy of python.exe)"; changed=$((changed+1))
+    else
+      say "FAILED    could not write $pydir/python3.exe — is Python installed for all users?"
+      failed=$((failed+1))
+    fi
+
+    # Ahead of WindowsApps, compared case- and trailing-slash-insensitively.
+    pyw="$(cygpath -w "$pydir")"; lc() { printf '%s' "${1%\\}" | tr '[:upper:]' '[:lower:]'; }
+    # Compared entry by entry, empties ignored: a PATH ending in `;` is the
+    # same PATH, and rewriting it would break "a fixed machine is left alone".
+    path="$(winenv get Path)"
+    new="$pyw"; local cur=""
+    local IFS=';'
+    for e in $path; do
+      [ -n "$e" ] || continue
+      cur="${cur:+$cur;}$e"
+      [ "$(lc "$e")" = "$(lc "$pyw")" ] && continue
+      new="$new;$e"
+    done
+    unset IFS
+    if [ "$(lc "$new")" = "$(lc "$cur")" ]; then
+      say "ok        $pyw is first on the user PATH"
+    else
+      stamp="$(date +%Y%m%d-%H%M%S)"; bak="$HOME/.agent-sdlc/user-path-backup-$stamp.txt"
+      mkdir -p "$HOME/.agent-sdlc" && printf '%s\n' "$path" > "$bak"
+      if winenv set Path "$new"; then
+        say "set       user PATH: $pyw first (previous value saved to $bak)"
+        changed=$((changed+1))
+      else
+        say "FAILED    could not write the user PATH (unchanged; backup at $bak)"
+        failed=$((failed+1))
+      fi
+    fi
+  fi
+
+  local tmp; tmp="$(mktemp -d 2>/dev/null)"
+  if ! { [ -n "$tmp" ] && echo x > "$tmp/t" && ln -s "$tmp/t" "$tmp/l" 2>/dev/null && [ -L "$tmp/l" ]; }; then
+    say "MANUAL    symlinks need Developer Mode: Settings → System → For developers (needs an administrator)"
+  fi
+  [ -n "$tmp" ] && rm -rf "$tmp"
+
+  if [ "$changed" -gt 0 ]; then
+    say ""
+    say "$changed change(s). Close every Windows Terminal and VS Code window and restart them —"
+    say "a running app keeps the environment it started with — then run: deploy.sh doctor"
+  fi
+  [ "$failed" -eq 0 ]
+}
+
 CMD="${1:-}"; shift 2>/dev/null || true
 # `gitignore --apply` writes the block instead of printing it. Parsed before PROJ
 # so the flag does not become the project path.
@@ -478,7 +591,7 @@ PROJ="${1:-$PWD}"
 
 case "$CMD" in
   doctor)
-    doctor
+    if [ "${PROJ_GIVEN:-}" = --fix ]; then doctor_fix; else doctor; fi
     exit $?
     ;;
   list)
