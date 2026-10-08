@@ -210,6 +210,12 @@ delete it in the same step that records its output — "later" is the pass that 
 bare test run sweeps it and one `git add -A` commits it. Log where it ran and that it is gone, so
 a reader can tell a deleted probe from one nobody looked for.
 
+Delete it with this, and nothing else — `rm` is denied and `git clean -f` asks:
+
+```sh
+python3 .claude/skills/cycle/discard-untracked.py <path> --apply
+```
+
 A story carrying an unproven mechanism claim is **not READY** (Step 8). `rationale.md` § Mechanism
 has the case that pays for this step: a tag taxonomy that was rejected outright by the tool, in
 seven open issues, found by running it.

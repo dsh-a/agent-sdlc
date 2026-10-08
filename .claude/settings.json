@@ -26,6 +26,8 @@
       "Bash(python3 ~/.claude/skills/cycle/gate-report.py*)",
       "Bash(python3 ~/.claude/skills/cycle/prune-analyzer-baselines.py*)",
       "Bash(python3 ~/.claude/skills/evidence/evidence.py*)",
+      "Bash(python3 .claude/skills/cycle/discard-untracked.py*)",
+      "Bash(python3 ~/.claude/skills/cycle/discard-untracked.py*)",
       "Bash(python3 .claude/skills/cycle/config-get.py*)",
       "Bash(python3 ~/.claude/skills/cycle/config-get.py*)",
       "Bash(python3 .claude/skills/cycle/suite-result.py*)",
