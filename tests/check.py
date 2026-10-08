@@ -25,6 +25,7 @@ import model_allocation  # noqa: E402
 import models_config  # noqa: E402
 import test_aggregate_telemetry  # noqa: E402
 import test_clear_agent_states  # noqa: E402
+import test_discard_untracked  # noqa: E402
 import test_gate_log  # noqa: E402
 import test_guard_secrets  # noqa: E402
 import test_log_event_root  # noqa: E402
@@ -97,6 +98,9 @@ def main() -> int:
 
     print()
     rc |= test_clear_agent_states.main()
+
+    print()
+    rc |= test_discard_untracked.main()
 
     print()
     rc |= test_log_event_root.main()
