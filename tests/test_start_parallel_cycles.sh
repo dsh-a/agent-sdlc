@@ -66,10 +66,12 @@ mkdir -p "$REPO/.claude" "$REPO/.omp"
 # the framework rather than written out, so adding a hook or a script does not
 # silently make this fixture stale — the drift this suite's sibling exists for.
 python3 - "$ROOT_DIR" > "$REPO/.claude/settings.json" <<'PY'
-import json, pathlib, re, subprocess, sys
+import json, pathlib, re, shutil, subprocess, sys
 fw = pathlib.Path(sys.argv[1])
 hooks = sorted(p.name for p in (fw / ".claude/hooks").glob("*.py"))
-grants = subprocess.run(["bash", str(fw / "deploy.sh"), "grants"],
+# shutil.which, not a bare "bash": on Windows that is System32's WSL bash, which
+# cannot see the framework, so this printed no grants and every case failed.
+grants = subprocess.run([shutil.which("bash") or "bash", (fw / "deploy.sh").as_posix(), "grants"],
                         capture_output=True, text=True).stdout
 allow = [m.group(1) for m in re.finditer(r'"(Bash\([^"]+\))",', grants)]
 print(json.dumps({
@@ -312,6 +314,36 @@ chk "  ... and a detached clone reports its sha, not the word HEAD" \
     "$(printf '%s' "$out" | grep -c 'detached at')" 1
 chk "  ... never 'branch HEAD'" \
     "$(printf '%s' "$out" | grep -c 'branch HEAD')" 0
+
+# --- no omp: a plain git worktree, rebuilt to the same working state ---------
+#
+# Claude Code alone, and every Windows machine, has no omp. The launcher used to
+# refuse outright. A git worktree shares the repo's config, so origin survives
+# (the property omp was chosen for); what it lacks is the untracked half, which
+# the launcher must rebuild or every clone runs with no framework at all.
+NO_OMP="$R/bin-no-omp"; mkdir -p "$NO_OMP"; cp "$BIN/gh" "$NO_OMP/gh"
+NR="$R/noomp"; mkdir -p "$NR"
+git clone -q "$REPO" "$NR/app"; git -C "$NR/app" config user.email t@t
+git -C "$NR/app" config user.name t
+git -C "$NR/app" remote set-url origin https://github.com/acme/app.git
+echo '{"permissions":{"allow":["Bash(make test*)"]}}' > "$NR/app/.claude/settings.local.json"
+echo .claude/settings.local.json >> "$NR/app/.git/info/exclude"   # ignored, as Claude Code's is
+bash "$ROOT_DIR/deploy.sh" link "$NR/app" >/dev/null 2>&1
+out="$(PATH="$NO_OMP:${PATH#"$BIN:"}" bash "$S" --repo "$NR/app" --base develop \
+        --clones-root "$NR/cycles" --no-sync --no-launch --no-claim 101 2>&1)"; rc=$?
+C1="$NR/cycles/app-c1"
+chk "without omp the launcher still creates clones" "$rc|$([ -d "$C1" ] && echo yes)" "0|yes"
+chk "  ... saying it used git worktree add" "$(printf '%s' "$out" | grep -c 'via git worktree add')" 1
+chk "  ... and what that does not reproduce" "$(printf '%s' "$out" | grep -c 'build caches start cold')" 1
+chk "  ... keeping the real origin, so gh works inside" \
+    "$(git -C "$C1" remote get-url origin 2>/dev/null)" https://github.com/acme/app.git
+chk "  ... with the framework linked in" \
+    "$([ -L "$C1/.claude/skills/cycle" ] && [ -L "$C1/.claude/hooks/gate-log.py" ] && echo yes)" yes
+chk "  ... and the untracked per-project settings copied" \
+    "$(cat "$C1/.claude/settings.local.json" 2>/dev/null)" '{"permissions":{"allow":["Bash(make test*)"]}}'
+chk "  ... a deployment check passes inside the clone" \
+    "$(bash "$ROOT_DIR/deploy.sh" check "$C1" >/dev/null 2>&1; echo $?)" 0
+chk "  ... and the clone is clean" "$(git -C "$C1" status --porcelain -- ':!agent_states' | wc -l | tr -d ' ')" 0
 
 printf '\nstart-parallel-cycles: %s\n' \
   "$([ $FAILED = 0 ] && echo 'all checks passed.' || echo 'FAILURES above.')"

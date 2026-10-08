@@ -6,7 +6,8 @@
 #
 # What it does, in order:
 #   1. Preflight — refuses unless the tree is genuinely quiet (see CONTRACT below)
-#   2. One detached clone per issue, via `omp worktree add` (preserves origin so gh works)
+#   2. One detached clone per issue, via `omp worktree add` (preserves origin so gh works),
+#      or `git worktree add` + deploy.sh link where omp is not installed
 #   3. Clears each clone's inherited agent_states/
 #   4. Claims each issue by assignment
 #   5. Records framework SHA + disk baseline, initialises the gate log
@@ -137,8 +138,10 @@ dirty_clone_report() {
   # `.git` in a linked worktree is a *file* pointing at the real git dir, so
   # testing `$wt/.git/MERGE_HEAD` finds nothing and the interrupted merge this
   # function exists to name goes unreported. Ask git where its dir is.
-  gd="$(git -C "$wt" rev-parse --git-dir 2>/dev/null)"
-  case "$gd" in /*) ;; *) gd="$wt/$gd" ;; esac
+  # --absolute-git-dir, not a "starts with /" test: Git for Windows prints
+  # `C:/...`, which that test read as relative and prefixed with $wt, so the
+  # interrupted merge went unnamed on Windows.
+  gd="$(git -C "$wt" rev-parse --absolute-git-dir 2>/dev/null)"
   if   [ -e "$gd/MERGE_HEAD" ];       then op="merge"
   elif [ -d "$gd/rebase-merge" ] || [ -d "$gd/rebase-apply" ]; then op="rebase"
   elif [ -e "$gd/CHERRY_PICK_HEAD" ]; then op="cherry-pick"
@@ -198,8 +201,15 @@ esac
 
 [ -n "$REPO" ] || REPO="$(git rev-parse --show-toplevel 2>/dev/null)" || die "not in a git repo (pass --repo)"
 command -v git >/dev/null 2>&1 || die "git not found"
-command -v omp >/dev/null 2>&1 || die "omp not found — clone creation uses 'omp worktree add', which is
-             the only mechanism verified to preserve origin so gh resolves inside a clone"
+# Clone mechanism. `omp worktree add` copies the whole working tree — framework
+# links, settings, vault links, warm build caches — copy-on-write on APFS
+# (sd-wire § 5c), so it stays first choice wherever omp is installed. Without
+# omp (Claude Code alone, and Windows, where NTFS has no cheap whole-tree copy)
+# a plain `git worktree add` keeps origin just as well — a worktree shares the
+# repo's config, which is what a `git clone --local` gets wrong — and the
+# untracked half is rebuilt: framework links by deploy.sh, per-project config
+# copied, vault links by each cycle's own vault link guard.
+if command -v omp >/dev/null 2>&1; then CLONER=omp; else CLONER=git; fi
 [ "$CLAIM" = 0 ] || command -v gh >/dev/null 2>&1 || die "gh not found (or pass --no-claim)"
 
 # base_branch from the deployment's config, unless overridden
@@ -516,7 +526,7 @@ if [ "$DRY" = 1 ]; then
   else
     say "! would NOT inhibit system sleep — no caffeinate on this host"
   fi
-  step "Dry run — would create ${#ISSUES[@]} clone(s) under $ROOT"
+  step "Dry run — would create ${#ISSUES[@]} clone(s) under $ROOT via $CLONER worktree add"
   n=0; for i in "${ISSUES[@]}"; do n=$((n+1)); say "c$n → $ROOT/$(basename "$REPO")-c$n  (issue #$i)"; done
   exit 0
 fi
@@ -524,15 +534,31 @@ fi
 mkdir -p "$ROOT" || die "cannot create clones root $ROOT"
 
 # ---------------------------------------------------- clones (local, reversible)
-step "Creating clones"
+step "Creating clones (via $CLONER worktree add)"
+[ "$CLONER" = git ] && say "no omp: clones get tracked files, framework links and per-project config;
+             build caches start cold, and other untracked files (.env, ...) are not copied"
 CLONES=() ; n=0
 for i in "${ISSUES[@]}"; do
   n=$((n+1)); C="$ROOT/$(basename "$REPO")-c$n"
   [ -e "$C" ] && die "$C already exists. Remove it (git worktree remove) or use --clones-root."
   # --detach and NO -b: /cycle creates the feature branch itself at Phase 2B, and the
   # clone cannot be on $BASE because the primary has it checked out.
-  omp worktree add --detach --cwd "$REPO" "$C" "$BASE" >/dev/null 2>&1 \
-    || die "omp worktree add failed for $C. Clones so far: ${CLONES[*]:-none}"
+  if [ "$CLONER" = omp ]; then
+    omp worktree add --detach --cwd "$REPO" "$C" "$BASE" >/dev/null 2>&1 \
+      || die "omp worktree add failed for $C. Clones so far: ${CLONES[*]:-none}"
+  else
+    git -C "$REPO" worktree add -q --detach "$C" "$BASE" >/dev/null 2>&1 \
+      || die "git worktree add failed for $C. Clones so far: ${CLONES[*]:-none}"
+    # A worktree carries tracked files only. These are the per-project files a
+    # cycle needs that a project may keep untracked; copied only when absent.
+    for f in .claude/settings.json .claude/settings.local.json .omp/agent-config.md; do
+      if [ -f "$REPO/$f" ] && [ ! -e "$C/$f" ]; then
+        mkdir -p "$(dirname "$C/$f")" && cp "$REPO/$f" "$C/$f"
+      fi
+    done
+    bash "$FW_ROOT/deploy.sh" link "$C" >/dev/null 2>&1 \
+      || die "deploy.sh link failed for $C — run: bash $FW_ROOT/deploy.sh check $C"
+  fi
   python3 "$C/.claude/skills/cycle/clear-agent-states.py" --all >/dev/null 2>&1 || true
   # A clone is a linked worktree of $REPO, so the telemetry hook's `--git-common-dir`
   # resolution points at $REPO and every clone commingles its events there
