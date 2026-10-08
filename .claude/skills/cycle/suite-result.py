@@ -45,6 +45,7 @@ measurement, and that is what the distinct code is for.
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import re
 import subprocess
@@ -230,6 +231,22 @@ def state_dir(root: pathlib.Path, name: str) -> pathlib.Path:
     return root / "agent_states" / "suite" / name
 
 
+def windows_bash() -> str | None:
+    """Git Bash on Windows, or None to keep the platform shell.
+
+    The platform shell is /bin/sh everywhere else and cmd.exe on Windows, where
+    a suite command such as `N=3; flutter test --reporter=$R` is not an
+    assignment, a separator or an expansion — the same Project Commands row
+    meant two different things. Found through PATH, never by bare name:
+    CreateProcess searches System32 first, and System32\\bash.exe is WSL.
+    """
+    if os.name != "nt":
+        return None
+    import shutil
+    bash = shutil.which("bash")
+    return bash if bash and "system32" not in bash.lower() else None
+
+
 def cmd_run(args: argparse.Namespace, root: pathlib.Path,
             pats: dict[str, re.Pattern[str]]) -> int:
     if not args.command:
@@ -244,8 +261,14 @@ def cmd_run(args: argparse.Namespace, root: pathlib.Path,
     with log.open("w", encoding="utf-8", errors="replace") as fh:
         # Output goes to the file, never to our stdout. This is the line that
         # keeps 22,819 characters out of a context window.
-        proc = subprocess.run(" ".join(args.command), shell=True,
-                              stdout=fh, stderr=subprocess.STDOUT, cwd=root)
+        cmd = " ".join(args.command)
+        bash = windows_bash()
+        if bash:
+            proc = subprocess.run([bash, "-c", cmd],
+                                  stdout=fh, stderr=subprocess.STDOUT, cwd=root)
+        else:
+            proc = subprocess.run(cmd, shell=True,
+                                  stdout=fh, stderr=subprocess.STDOUT, cwd=root)
     elapsed = int(time.time() - began)
     (sd / "rc").write_text(f"{proc.returncode}\n", encoding="utf-8")
 

@@ -594,6 +594,22 @@ def canonical(s: str) -> str:
     return "\n".join(ln.rstrip() for ln in s.splitlines()).rstrip("\n")
 
 
+def windows_bash() -> str | None:
+    """Git Bash on Windows, or None to keep the platform shell.
+
+    The platform shell is /bin/sh everywhere else and cmd.exe on Windows, so one
+    documented `--remote-cmd` parsed two ways: `cat x; printf '\\n'` worked on a
+    Mac and was "nothing usable" on Windows. Found through PATH, never by bare
+    name — CreateProcess searches System32 first, and System32\\bash.exe is
+    WSL, which cannot see C:\\ paths.
+    """
+    if os.name != "nt":
+        return None
+    import shutil
+    bash = shutil.which("bash")
+    return bash if bash and "system32" not in bash.lower() else None
+
+
 def cmd_round_trip(a: argparse.Namespace) -> int:
     """Compare what was pushed against what the destination now returns.
 
@@ -607,8 +623,13 @@ def cmd_round_trip(a: argparse.Namespace) -> int:
         print(f"ROUND-TRIP verdict=undetermined — local unreadable: {label}", file=sys.stderr)
         return UNDETERMINED
     try:
-        r = subprocess.run(a.remote_cmd, shell=True, capture_output=True, text=True,
-                           timeout=a.timeout)
+        bash = windows_bash()
+        if bash:
+            r = subprocess.run([bash, "-c", a.remote_cmd], capture_output=True,
+                               text=True, timeout=a.timeout)
+        else:
+            r = subprocess.run(a.remote_cmd, shell=True, capture_output=True, text=True,
+                               timeout=a.timeout)
     except (OSError, subprocess.TimeoutExpired) as e:
         print(f"ROUND-TRIP verdict=undetermined — read-back failed: {e}", file=sys.stderr)
         return UNDETERMINED

@@ -13,6 +13,7 @@ Exits non-zero if any check fails. No third-party imports anywhere in the path.
 from __future__ import annotations
 
 import pathlib
+import shutil
 import subprocess
 import sys
 
@@ -36,7 +37,10 @@ def sh_suite(name: str, script: str) -> int:
     """Run a bash test file and surface its output. Kept in the same runner so
     `python3 tests/check.py` stays the single command an agent can rely on."""
     print(f"\n{name}")
-    r = subprocess.run(["bash", (pathlib.Path(__file__).resolve().parent / script).as_posix()],
+    # shutil.which, not a bare "bash": on Windows CreateProcess searches System32
+    # before PATH, and System32\bash.exe is WSL — Linux, not Git Bash.
+    r = subprocess.run([shutil.which("bash") or "bash",
+                        (pathlib.Path(__file__).resolve().parent / script).as_posix()],
                        capture_output=True, text=True)
     print(r.stdout.rstrip() or r.stderr.rstrip())
     return r.returncode

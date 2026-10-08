@@ -13,6 +13,7 @@ from __future__ import annotations
 import importlib.util
 import pathlib
 import re
+import shutil
 import subprocess
 import sys
 
@@ -802,7 +803,7 @@ def check_settings_sample_grants() -> list[str]:
     except Exception as e:                                  # noqa: BLE001
         return [f"settings.json.sample is unreadable: {e}"]
 
-    r = subprocess.run(["bash", (ROOT / "deploy.sh").as_posix(), "grants"],
+    r = subprocess.run([shutil.which("bash") or "bash", (ROOT / "deploy.sh").as_posix(), "grants"],
                        capture_output=True, text=True, cwd=ROOT)
     if r.returncode != 0:
         return [f"deploy.sh grants failed: {r.stderr.strip()[:200]}"]

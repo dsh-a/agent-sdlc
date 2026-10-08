@@ -86,10 +86,19 @@ def shells() -> list[str]:
 
 def run_sync(vault: pathlib.Path, feature: str, shell: str = "bash") -> str:
     script = (staging_snippet()
-              .replace("{vault_root}", str(vault))
+              .replace("{vault_root}", vault.as_posix())
               .replace("{app_slug}", "myapp")
               .replace("{feature}", feature))
-    p = subprocess.run([shell, "-c", script], capture_output=True, text=True, timeout=60)
+    return run_script(shell, script)
+
+
+def run_script(shell: str, script: str) -> str:
+    # Resolved through PATH, never by bare name: Windows' CreateProcess searches
+    # System32 before PATH, so a bare "bash" there is WSL's bash.exe — Linux,
+    # which cannot see C:\ paths and re-quotes the script on the way in — even
+    # when PATH puts Git Bash first. Every case failed that way.
+    exe = shutil.which(shell) or shell
+    p = subprocess.run([exe, "-c", script], capture_output=True, text=True, timeout=60)
     return p.stdout + p.stderr
 
 
@@ -243,7 +252,7 @@ def main() -> int:
         vault = make_vault(t)
         feat = "reset-password-deep-link"
         script = (staging_snippet()
-                  .replace("{vault_root}", str(vault))
+                  .replace("{vault_root}", vault.as_posix())
                   .replace("{app_slug}", "myapp")
                   .replace("{feature}", feat))
         # Simulate the race: stage a foreign file and make `restore --staged` a no-op,
@@ -251,9 +260,8 @@ def main() -> int:
         subprocess.run(["git", "-C", str(vault), "add", "--",
                         "cycle_reports/myapp/pr-body-404-migration-fixture-schema-snapshots-2026-09-06.md"],
                        check=True, capture_output=True)
-        neutered = script.replace('git -C "%s" restore --staged -- "$f"' % vault, "true")
-        out = subprocess.run(["bash", "-c", neutered], capture_output=True, text=True, timeout=60)
-        blob = out.stdout + out.stderr
+        neutered = script.replace('git -C "%s" restore --staged -- "$f"' % vault.as_posix(), "true")
+        blob = run_script("bash", neutered)
         check("a foreign file left staged blocks the commit",
               "REFUSING to commit" in blob, blob[:400])
         check("  ... and nothing was committed",
