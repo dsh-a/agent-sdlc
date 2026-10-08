@@ -171,9 +171,16 @@ agents reported, not a shared scratchpad.**
    it is linked but gets **no** `Edit` grant from `deploy.sh grants`.
 
    For each: if the repo path is already the correct symlink, skip; if it is a real directory,
-   move its contents into the vault target then `rm -rf` it; finally `ln -s` the vault target to
-   the repo path. Moving before linking is what makes this safe to run on a repo that already
-   has local PRDs — they migrate into the vault rather than being orphaned.
+   move its contents into the vault target then `rm -rf` it; finally link the vault target to
+   the repo path with `MSYS=winsymlinks:nativestrict ln -s <vault target> <repo path>`, and
+   confirm `test -L <repo path>`. Moving before linking is what makes this safe to run on a repo
+   that already has local PRDs — they migrate into the vault rather than being orphaned.
+
+   The `MSYS=` prefix is for Git Bash on Windows, whose plain `ln -s` silently *copies*: reports
+   would then land in a copy the vault never sees, and the next run would migrate and re-copy
+   it. With the prefix a refused link fails instead; everywhere else the variable is ignored. If
+   `test -L` fails, stop and report it — on Windows that is Developer Mode being off
+   (`deploy.sh doctor` names it) — rather than continuing with a copy.
 
 4. **Hand over the grant this creates.** Every report write now leaves the repo, so each one
    prompts — ~14 minutes of one cycle's 35-minute permission total, recurring every cycle.
