@@ -802,7 +802,7 @@ def check_settings_sample_grants() -> list[str]:
     except Exception as e:                                  # noqa: BLE001
         return [f"settings.json.sample is unreadable: {e}"]
 
-    r = subprocess.run(["bash", str(ROOT / "deploy.sh"), "grants"],
+    r = subprocess.run(["bash", (ROOT / "deploy.sh").as_posix(), "grants"],
                        capture_output=True, text=True, cwd=ROOT)
     if r.returncode != 0:
         return [f"deploy.sh grants failed: {r.stderr.strip()[:200]}"]

@@ -26,6 +26,12 @@ git init -q "$P"; git -C "$P" config user.email t@t; git -C "$P" config user.nam
 # gh is not available in the test environment, and must not be required: the
 # installer degrades to "could not read the default branch" rather than failing.
 export PATH="$R/bin:$PATH"; mkdir -p "$R/bin"
+# ...and on a developer's machine gh *is* installed and authenticated, so the
+# board cases made real `gh project` calls against an `acme` org with that
+# person's credentials, and the suite took minutes waiting on the network. A
+# gh that fails like an unauthenticated one is the environment the cases mean.
+printf '#!/bin/sh\necho "gh: not authenticated (test stub)" >&2\nexit 4\n' > "$R/bin/gh"
+chmod +x "$R/bin/gh"
 
 WF=".github/workflows/review-comment-to-issue.yml"
 

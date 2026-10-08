@@ -36,7 +36,7 @@ def sh_suite(name: str, script: str) -> int:
     """Run a bash test file and surface its output. Kept in the same runner so
     `python3 tests/check.py` stays the single command an agent can rely on."""
     print(f"\n{name}")
-    r = subprocess.run(["bash", str(pathlib.Path(__file__).resolve().parent / script)],
+    r = subprocess.run(["bash", (pathlib.Path(__file__).resolve().parent / script).as_posix()],
                        capture_output=True, text=True)
     print(r.stdout.rstrip() or r.stderr.rstrip())
     return r.returncode
