@@ -38,6 +38,16 @@ identical, and CI on Linux is still the gate.
 | W5 | done, folded into W6: `evidence.py round-trip` runs through Git Bash on Windows | `bccd280` |
 | W6 | done: test runners reach Git Bash, not WSL; vault-sync, evidence, suite-result, refine-story, preflight-deploy green on Windows; `suite-result run` uses Git Bash; vault `ln -s` is native or stops; guarded-edit keeps line endings; CR stripped from Python pipes; install-workflows off the network | `e74f7d9` … `6a7e30b` |
 
+| W7 | done: no-omp clones via `git worktree add` + `deploy.sh link` + per-project config copy; `--absolute-git-dir` fixes interrupted-merge detection on Windows; fixture's bare `bash` fixed. Windows 52/52, Linux 52/52 | `2b4703e` |
+
+Found during W7:
+
+- **F23 — vault grants for a Windows `vault_root`.** `deploy.sh grants` writes `Edit(//<root>/…)`
+  rules; for `C:/vault` that is `//C:/vault/…`. Unverified whether Claude Code matches that form
+  on Windows. Test for real in W10 before documenting a vault on Windows.
+- **F24 — the launcher's "a clone is ~4 MB at rest" hint** describes an APFS copy-on-write clone.
+  A git worktree on NTFS is a full checkout of tracked files. Cosmetic; word it per cloner.
+
 Found during W6:
 
 - **F19 — a bare `"bash"` in `subprocess` is WSL.** CreateProcess searches System32 before PATH,
