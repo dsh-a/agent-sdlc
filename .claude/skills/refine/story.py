@@ -102,12 +102,22 @@ class GhError(RuntimeError):
     """A `gh` call that did not return usable JSON. Always exit 3, never a default."""
 
 
-def gh(args: argparse.Namespace, *argv: str, allow_fail: bool = False):
-    """Run `gh` with list argv — no shell, no interpolation."""
+def gh_cmd(args: argparse.Namespace) -> list[str]:
+    """The argv prefix that runs `gh`.
+
+    A `--gh` that is a Python script — the tests' stub — runs under this
+    interpreter: Windows cannot execute a shebang, and refused it with
+    WinError 193 before a single case ran.
+    """
     exe = args.gh or shutil.which("gh")
     if not exe:
         raise GhError("gh is not on PATH")
-    p = subprocess.run([exe, *argv], capture_output=True, text=True)
+    return [sys.executable, exe] if exe.endswith(".py") else [exe]
+
+
+def gh(args: argparse.Namespace, *argv: str, allow_fail: bool = False):
+    """Run `gh` with list argv — no shell, no interpolation."""
+    p = subprocess.run([*gh_cmd(args), *argv], capture_output=True, text=True)
     if p.returncode != 0:
         if allow_fail:
             return None
@@ -557,7 +567,7 @@ def cmd_split(args: argparse.Namespace) -> int:
         "> Closed to further refinement. Original prose retained below for "
         "archival; the children carry the live specification.")
     new_body = notice + "\n\n" + (issue.get("body") or "")
-    p = subprocess.run([args.gh or shutil.which("gh"), "issue", "edit",
+    p = subprocess.run([*gh_cmd(args), "issue", "edit",
                         str(args.number), "--repo", repo, "--body-file", "-"],
                        input=new_body, capture_output=True, text=True)
     if p.returncode != 0:
