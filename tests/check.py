@@ -124,6 +124,9 @@ def main() -> int:
     rc |= sh_suite("start-parallel-cycles", "test_start_parallel_cycles.sh")
     rc |= sh_suite("deploy", "test_deploy.sh")
     rc |= sh_suite("install-workflows", "test_install_workflows.sh")
+    # Not wired here until 2026-10: unrun, its fixture fell behind `check` and
+    # its "correct deployment" cases failed on every platform, unnoticed.
+    rc |= sh_suite("preflight-deploy", "test_preflight_deploy.sh")
     # These three assert at import time, so they run as subprocesses. The first
     # two were not in this runner at all until 2026-09-14 — `check.py` is billed
     # as the one command an agent can rely on, and it was silently skipping the

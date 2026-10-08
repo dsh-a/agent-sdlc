@@ -37,10 +37,25 @@ cp "$ROOT_DIR/.claude/skills/cycle/preflight-deploy.sh" "$FW/.claude/skills/cycl
 chmod +x "$FW/.claude/skills/cycle/preflight-deploy.sh"
 git -C "$FW" add -A; git -C "$FW" commit -qm fw
 
+# A sandbox HOME wired to this fixture, as test_deploy.sh does. Without it
+# `deploy.sh link` below reached the real ~/.claude — on a machine without one
+# it created ~/.claude/skills pointing into this temp dir — and every `check`
+# judged the developer's own machine instead of the fixture.
+export HOME="$R/home"; mkdir -p "$HOME/.claude"
+ln -s "$FW/.claude/skills" "$HOME/.claude/skills"
+ln -s "$FW/.claude/agents" "$HOME/.claude/agents"
+
 P="$R/proj"; mkdir -p "$P/.claude" "$P/.omp"
 git init -q "$P"
-echo '{}' > "$P/.claude/settings.json"
+# Wired and ignored, as a project someone actually set up is. `check` grew both
+# requirements — a deployed-but-unwired hook, a link git can still see — after
+# this fixture was written, and because nothing ran this suite, every "ok on a
+# correct deployment" case had been failing unnoticed on every platform.
+echo '{ "hooks": { "Stop": [ { "matcher": "*", "hooks": [
+  { "type": "command", "command": "python3 .claude/hooks/gate-log.py" } ] } ] } }' \
+  > "$P/.claude/settings.json"
 printf '## Active Pack\n## Artifact Paths\n## Model Versions\n' > "$P/.omp/agent-config.md"
+bash "$FW/deploy.sh" gitignore > "$P/.gitignore" 2>/dev/null
 bash "$FW/deploy.sh" link "$P" >/dev/null 2>&1
 chk "fixture deploys cleanly" "$?" 0
 
@@ -126,10 +141,17 @@ git init -q "$C2"
 cp "$FW/.claude/skills/cycle/preflight-deploy.sh" "$C2/$SHIM"
 cp "$FW/deploy.sh" "$C2/deploy.sh"; chmod -x "$C2/deploy.sh"
 cd "$C2"
-out="$(bash "$SHIM" 2>&1)"; rc=$?
-chk "refuses a non-executable deploy.sh" "$rc" 2
-chk "  ... as unreachable, not as a pass" \
-    "$(printf '%s' "$out" | tail -1)" "PREFLIGHT: unreachable"
+# Not on Windows: Git Bash decides executability from a file's shebang, not a
+# mode bit, so `chmod -x` changes nothing and the file stays runnable.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) ;;
+  *)
+    out="$(bash "$SHIM" 2>&1)"; rc=$?
+    chk "refuses a non-executable deploy.sh" "$rc" 2
+    chk "  ... as unreachable, not as a pass" \
+        "$(printf '%s' "$out" | tail -1)" "PREFLIGHT: unreachable"
+    ;;
+esac
 
 # --- it changes nothing ---------------------------------------------------
 #
