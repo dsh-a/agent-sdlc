@@ -432,7 +432,7 @@ for it in json.load(sys.stdin).get("items",[]):
     n=it.get("content",{}).get("number")
     if n is not None: have[str(n)]=(it.get("depth") or "").strip()
 print(" ".join(sorted(i for i in want if not have.get(i))))
-' "${ISSUES[@]}")"
+' "${ISSUES[@]}" | tr -d '\r')"   # Windows Python writes CRLF
       if [ -n "$MISSING" ]; then
         die "no Depth set on issue(s): $MISSING
              Depth (full|lean|hotfix) is set by /refine at Step 8 and is part of the Definition of

@@ -24,6 +24,7 @@ import importlib.util
 import pathlib
 import subprocess
 import sys
+import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / ".claude" / "skills" / "evidence" / "evidence.py"
@@ -193,6 +194,26 @@ def check_anchors_are_read_not_retyped() -> None:
     check("the real bytes are unique", text.count(wrapped_anchor) == 1)
 
 
+def check_guarded_edit_keeps_line_endings() -> None:
+    """An edit changes the bytes it names and no others.
+
+    read_text normalises line endings and write_text writes the platform's, so
+    one anchored edit rewrote every line ending in the file: an LF file came
+    back CRLF on Windows, a CRLF file came back LF everywhere else. Both are a
+    whole-file diff the edit never asked for.
+    """
+    print("\nguarded-edit leaves the file's line endings alone")
+    edit = '[{"tag":"b","old":"beta","new":"BETA"}]'
+    for name, nl in (("LF", b"\n"), ("CRLF", b"\r\n")):
+        with tempfile.TemporaryDirectory() as td:
+            f = pathlib.Path(td) / "x.md"
+            f.write_bytes(nl.join([b"alpha", b"beta", b"gamma", b""]))
+            run("guarded-edit", str(f), "--edits", "-", "--apply", stdin=edit)
+            check(f"an {name} file stays {name}",
+                  f.read_bytes() == nl.join([b"alpha", b"BETA", b"gamma", b""]),
+                  repr(f.read_bytes()))
+
+
 def check_guarded_edit_is_all_or_nothing() -> None:
     print("\nguarded edits")
     src = ROOT / FIX / "anchor.md"
@@ -337,6 +358,7 @@ def main() -> int:
     check_round_trip_never_assumes_acceptance()
     check_enumerate_takes_no_expected_total()
     check_usage_errors()
+    check_guarded_edit_keeps_line_endings()
     print()
     if failures:
         print(f"{len(failures)} failure(s): {', '.join(failures)}")

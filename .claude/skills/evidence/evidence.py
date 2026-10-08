@@ -403,8 +403,14 @@ def cmd_guarded_edit(a: argparse.Namespace) -> int:
               "retyping them — `evidence.py anchor` prints them with uniqueness proved.")
         return NO
     if a.apply:
+        # Written back with the file's own line ending, not the platform's:
+        # read_text normalised it away, and write_text alone turned an LF file
+        # CRLF on Windows (and a CRLF one LF elsewhere) — every line changed by
+        # an edit that named one.
         try:
-            path.write_text(new or "", encoding="utf-8")
+            nl = "\r\n" if b"\r\n" in path.read_bytes() else "\n"
+            with path.open("w", encoding="utf-8", newline=nl) as fh:
+                fh.write(new or "")
         except OSError as e:
             print(f"GUARDED-EDIT verdict=undetermined — write failed: {e}", file=sys.stderr)
             return UNDETERMINED

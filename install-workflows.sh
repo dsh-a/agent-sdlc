@@ -172,7 +172,7 @@ for f in d.get("fields",[]):
         opts={o.get("name"): o.get("id","") for o in f.get("options",[])}
         print(opts.get("Backlog",""))
         print(opts.get("Done",""))
-' 2>/dev/null)"
+' 2>/dev/null | tr -d '\r')"   # Windows Python writes CRLF; an id must not end in \r
   FID="$(printf '%s\n' "$IDS" | sed -n 1p)"
   OID="$(printf '%s\n' "$IDS" | sed -n 2p)"
   DID="$(printf '%s\n' "$IDS" | sed -n 3p)"
