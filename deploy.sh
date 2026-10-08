@@ -445,10 +445,12 @@ doctor() {
   fi
   [ -n "$tmp" ] && rm -rf "$tmp"
 
-  if [ -n "$WINDOWS" ] && [ "$(git config --get core.autocrlf 2>/dev/null)" = true ]; then
-    d_warn "core.autocrlf=true — a project or vault repo without a .gitattributes checks out CRLF" \
-           "git config --global core.autocrlf input"
-  fi
+  # No core.autocrlf check, deliberately. Git for Windows defaults it to true,
+  # but the only files that must be LF are the framework's own scripts, and the
+  # framework's .gitattributes pins those; a project holds links into them. The
+  # project-side readers tolerate CRLF — sync-gitignore.sh and `check`'s config
+  # comparison were both run against a CRLF checkout and stayed correct — so
+  # telling every Windows user to change a global git setting buys nothing.
 
   if ! command -v gh >/dev/null 2>&1; then
     d_warn "gh is not on PATH — stories, PRs and CI runs are read through it" "install the GitHub CLI"
