@@ -127,6 +127,7 @@ cd /path/to/your-project
 bash ~/dev/agent-sdlc/deploy.sh link .
 bash ~/dev/agent-sdlc/deploy.sh gitignore --apply .
 bash ~/dev/agent-sdlc/deploy.sh grants             # paste into .claude/settings.json
+bash ~/dev/agent-sdlc/deploy.sh doctor             # check this machine (Windows: doctor --fix)
 ```
 
 Symlinks, not copies: one checkout, every project current. `deploy.sh check .` verifies a
@@ -134,6 +135,9 @@ deployment and reports what is missing.
 
 The links hold absolute paths, so they are per machine. Don't commit them — that is what the
 `gitignore` block is for.
+
+**On Windows**, do [`docs/SETUP.md` § Windows](docs/SETUP.md#windows) first: Git Bash, Developer
+Mode, and `deploy.sh doctor --fix`, then restart the terminal app.
 
 ### 2. Pick your OpenRouter models
 
@@ -516,13 +520,15 @@ bash .claude/skills/cycle/open-terminal.sh --tab --cwd ~/dev/app -- 'claude "/cy
 ```
 
 `--tab` opens a tab in the current window instead. Supported on Ghostty 1.3+ through its
-AppleScript dictionary; everywhere else it falls back to a window rather than failing, since
+AppleScript dictionary and on Windows Terminal; everywhere else it falls back to a window rather than failing, since
 the caller's command still runs either way. macOS will ask for automation consent the first
 time, and every AppleScript call is time-bounded so an unanswered dialog degrades to a window
 instead of hanging.
 
 Terminals it opens into: Ghostty, iTerm2, WezTerm, kitty, Terminal.app on macOS; Ghostty, WezTerm,
-kitty, gnome-terminal, konsole, alacritty, xterm on Linux (or `$TERMINAL`). It exits 0 when a
+kitty, gnome-terminal, konsole, alacritty, xterm on Linux (or `$TERMINAL`); Windows Terminal, else
+Git Bash's mintty, on Windows — running the command under Git Bash, handed over as a launcher file
+because `wt.exe` re-parses a command string and loses its quotes. It exits 0 when a
 window opened and 1 when none could be — in an SSH or CI session, or with no emulator found — and
 deliberately does **not** decide what that means. A cycle launcher must treat a missing window as a
 failure; something advisory should not.

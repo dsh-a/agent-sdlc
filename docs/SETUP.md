@@ -6,8 +6,11 @@ This walks a new engineer from zero to a first `/cycle` run. The pipeline is lan
 
 ## 0. Prerequisites
 
-- [omp](https://omp.sh) installed (`brew install omp` or download from omp.sh).
-- An OpenRouter account + API key ([openrouter.ai](https://openrouter.ai)).
+- A harness: [omp](https://omp.sh) (`brew install omp` or download from omp.sh) with an
+  OpenRouter account + API key ([openrouter.ai](https://openrouter.ai)), **or** Claude Code.
+  The steps below are written for omp; on Claude Code skip § 2 and run `claude` where they say
+  `omp`.
+- **On Windows**, also Git for Windows, Developer Mode, and the user settings in § Windows.
 - Your project is a git repository.
 - **`python3`** — every pipeline script is Python. No packages needed; all are stdlib-only.
 - **`gh`**, authenticated (`gh auth login`). Stories, PRs and CI runs are read through it, and
@@ -31,6 +34,11 @@ bash ~/dev/agent-sdlc/deploy.sh grants             # paste into .claude/settings
 ```
 
 That links the orchestrator, the agent team, the skills, the packs, and the omp adapter layer.
+
+Check the machine itself with `bash ~/dev/agent-sdlc/deploy.sh doctor`. It exercises each
+prerequisite rather than asking about it — runs `python3`, makes a symlink and looks at the
+result — and names the fix for anything that fails. On Windows, `doctor --fix` applies the
+user-level fixes for you (§ Windows).
 
 **Links, not copies.** A copy stops receiving framework updates and nothing says so. Re-run
 `link` after pulling the framework; `deploy.sh check .` reports anything missing or copied.
@@ -140,6 +148,47 @@ orchestrator's decision-making for team review or post-mortem analysis.
 
 ---
 
+## Windows
+
+The pipeline runs on Windows 11 under Claude Code and **Git Bash** — not PowerShell, and not
+WSL. Every script is bash or Python, so Git Bash is the shell they need.
+
+**Once per machine:**
+
+1. Install [Git for Windows](https://git-scm.com/download/win) (it provides Git Bash) and
+   Python 3.8+ ([python.org](https://www.python.org/downloads/windows/) or `winget install
+   Python.Python.3.12`).
+2. Turn on **Developer Mode**: Settings → System → For developers. It lets an ordinary user
+   create symlinks, and the deployment is symlinks. This one needs an administrator.
+3. From Git Bash, run:
+
+   ```bash
+   bash ~/dev/agent-sdlc/deploy.sh doctor --fix
+   ```
+
+   It changes your **user** settings only, and only adds or reorders:
+   - sets `PYTHONUTF8=1`, so Python writes UTF-8 to a pipe — without it a script that prints
+     `→` crashes, and a crashed guard hook lets everything through;
+   - copies `python.exe` to `python3.exe` beside your real Python, since every script calls
+     `python3`;
+   - moves that Python ahead of `WindowsApps` on your user PATH. Windows ships a `python3`
+     there that only prints "Python was not found", and while it wins, every hook fails silently.
+
+   Your previous PATH is saved to `~/.agent-sdlc/` first, and a second run changes nothing.
+4. **Close every Windows Terminal and VS Code window, then reopen them.** A running app keeps
+   the environment it started with, and so does anything it launches — restarting Claude Code
+   alone is not enough. Then confirm with `deploy.sh doctor`.
+
+**Things that differ on Windows:**
+
+| What | On Windows |
+|---|---|
+| Paths in `.omp/agent-config.md` | Forward slashes: `C:/work/docs` or `/c/work/docs`. Scripts substitute these into bash, which reads `\` as an escape. |
+| `/cycle --parallel` without omp | Clones are `git worktree add` + `deploy.sh link`, with per-project settings copied. Build caches start cold, and other untracked files (`.env`, …) are not copied. |
+| Cycle windows | Windows Terminal (tabs with `--tab`), else Git Bash's mintty. |
+| WSL | Not used. If WSL is installed, `doctor` warns when native programs would find its `bash.exe` before Git Bash's. |
+| Docs vault (`vault_root`) | **Unverified on Windows.** `deploy.sh grants` writes `Edit(//<vault_root>/…)` rules, and it has not been confirmed that Claude Code matches that form for a `C:/` path. |
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -153,3 +202,7 @@ orchestrator's decision-making for team review or post-mortem analysis.
 | A permission prompt mid-cycle | A framework script has no grant — `deploy.sh check .` names it, `deploy.sh grants` prints the lines |
 | Framework changes not taking effect | The project has copies, not links — re-run `deploy.sh link .`; `check` counts a copy as a problem |
 | Dangling links after cloning a project | Links are per machine. Clone the framework, then re-run `deploy.sh link .` |
+| Windows: hooks do nothing, no telemetry, guards never block | `python3` is the WindowsApps stub. `deploy.sh doctor --fix`, then restart the terminal app. |
+| Windows: `link` made copies, or `check` reports them | Developer Mode is off. Turn it on, then `deploy.sh link .` again. |
+| Windows: `doctor` still fails after `--fix` | The terminal app predates the change. Close every window of it (and VS Code), then reopen. |
+| Windows: `$'\r': command not found` from a framework script | The framework clone predates its `.gitattributes`. `deploy.sh check` names the files and the fix. |

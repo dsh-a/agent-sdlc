@@ -42,6 +42,8 @@ identical, and CI on Linux is still the gate.
 
 | W8 | done: Windows branch runs Git Bash in Windows Terminal / mintty via a launcher file (PowerShell branch could never start a cycle); verified with real windows and tabs; suite wired into `check.py`. Windows 18/18, Linux 18/18 | `6088be8` |
 
+| W9 | done: `docs/SETUP.md` § Windows (doctor --fix, restart the terminal app, forward-slash paths, no-omp clones, WSL, vault marked unverified) + troubleshooting rows; README quick start + terminals | see `git log` |
+
 Found during W8:
 
 - **F25 — `wt.exe` re-parses its command line.** An argument with inner double quotes lost them;
