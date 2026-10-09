@@ -54,6 +54,10 @@ for s in open osascript pgrep wezterm kitty; do mkstub "$s"; done
 export PATH="$BIN:/usr/bin:/bin:/usr/sbin:/sbin"
 # A clean environment: no emulator hints, no remote/CI short-circuit.
 unset TERM_PROGRAM KITTY_WINDOW_ID SSH_CONNECTION SSH_TTY CI TERMINAL 2>/dev/null || true
+# Windows sets OS=Windows_NT for every process, and the script's fallback
+# detection reads it — so on a Windows host the stubbed-Linux case ran the
+# Windows branch instead.
+unset OS 2>/dev/null || true
 
 # `launch` backgrounds with `& disown`, so the script exits before the stub has
 # necessarily written. Wait for the recording to appear rather than reading it
@@ -71,36 +75,50 @@ run() {
 #
 # The case the script could not express at all before.
 set_uname 'MINGW64_NT-10.0'
-mkstub 'powershell.exe'
-out="$(run --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
-has  "Windows dispatches to PowerShell, not an X11 emulator" "$out" "powershell.exe"
-has  "  ... with -NoExit, so the window survives the command" "$out" "-NoExit"
-has  "  ... and Set-Location, since POSIX cd && cmd is a 5.1 syntax error" "$out" "Set-Location"
-hasnt "  ... and never hands the POSIX string to a shell" "$out" "bash -lc"
-
-mkstub 'pwsh.exe'
-out="$(run --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
-has  "pwsh is preferred over the bundled powershell.exe" "$out" "pwsh.exe"
-
-mkstub 'wt.exe'
+# Pinned, so the assertions do not depend on where this host keeps Git; and the
+# host's real mintty is pointed away from, or the no-wt case opens a window.
+export OPEN_TERMINAL_GITBASH='C:\Git\bin\bash.exe'
+export OPEN_TERMINAL_MINTTY="$R/no-such-mintty"
+# The previous branch ran the command in PowerShell. The launcher's command is
+# POSIX — `cd … && claude "/cycle N"` — so `&&` failed to parse in 5.1 and the
+# MSYS-form cd failed in 7: every window opened and no cycle started.
+# wt.exe records MSYS2_ARG_CONV_EXCL too: without it MSYS rewrites the
+# arguments it passes to a native program.
+cat > "$BIN/wt.exe" <<STUB
+#!/usr/bin/env bash
+printf 'wt.exe %s CONV=%s\n' "\$*" "\${MSYS2_ARG_CONV_EXCL:-}" >> "$REC/calls"
+STUB
+chmod +x "$BIN/wt.exe"
+for s in powershell.exe pwsh.exe; do mkstub "$s"; done
 out="$(run --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
 has  "Windows Terminal is used when present" "$out" "wt.exe"
+has  "  ... running Git Bash, not PowerShell" "$out" 'C:\Git\bin\bash.exe -l '
+hasnt "  ... never PowerShell" "$out" "powershell"
+hasnt "  ... nor pwsh" "$out" "pwsh"
+has  "  ... with MSYS path conversion off for the call" "$out" "CONV=*"
+# wt.exe re-parses its own command line: quotes inside an -lc string did not
+# survive it (measured), and `;` is its separator. Only a file path is passed.
+hasnt "  ... handing it a file, never the command string" "$out" "/cycle 184"
+LW="$(printf '%s' "$out" | sed -n 's/.* -l \([^ ]*\) CONV=.*/\1/p')"
+L="$(cygpath -u "$LW" 2>/dev/null || printf '%s' "$LW")"
+has  "  ... whose file holds the command, quotes intact" "$(cat "$L" 2>/dev/null)" 'claude "/cycle 184"'
+rm -f "$L"
 hasnt "  ... and without --tab it opens a window, not a tab" "$out" " nt "
 out="$(run --tab --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
 has  "  ... while --tab asks Windows Terminal for a tab" "$out" " nt "
+rm -f "$(cygpath -u "$(printf '%s' "$out" | sed -n 's/.* -l \([^ ]*\) CONV=.*/\1/p')" 2>/dev/null)"
 
 rm -f "$BIN/wt.exe"
-mkstub 'cmd.exe'
+mkstub 'mintty'; export OPEN_TERMINAL_MINTTY="$BIN/mintty"
 out="$(run --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
-has  "without Windows Terminal, a new window comes from cmd start" "$out" "cmd.exe /c start"
-# `start` takes its first quoted argument as the window title, so the empty ""
-# is load-bearing: without it the shell is swallowed and nothing launches.
-has  "  ... keeping start's empty title argument" "$out" 'start  pwsh.exe'
+has  "without Windows Terminal, Git Bash's own mintty opens the window" "$out" "mintty -t T --dir"
+has  "  ... running the launcher under bash" "$out" "/usr/bin/bash -l "
 
-rm -f "$BIN/pwsh.exe" "$BIN/powershell.exe"
+export OPEN_TERMINAL_MINTTY="$R/no-such-mintty"
 bash "$S" --cwd "$WORK" -- 'x' >/dev/null 2>"$R/err"; rc=$?
-chk "no PowerShell at all refuses rather than silently doing nothing" "$rc" 1
-has  "  ... naming what it looked for" "$(cat "$R/err")" "pwsh.exe or powershell.exe"
+chk "no terminal at all refuses rather than silently doing nothing" "$rc" 1
+has  "  ... naming what it looked for" "$(cat "$R/err")" "wt.exe, or Git Bash's mintty"
+unset OPEN_TERMINAL_GITBASH OPEN_TERMINAL_MINTTY
 
 # -------------------------------------------------------------------- macos ----
 #
@@ -111,6 +129,9 @@ set_uname 'Darwin'
 # in — is otherwise unreachable, and this assertion silently tested the
 # developer's own install instead.
 export OPEN_TERMINAL_GHOSTTY_APP="$R/no-such-Ghostty.app"
+# And a zsh that exists, since the host may have none at /bin/zsh (Linux CI,
+# Windows) — the case is "a Mac", not "this machine".
+mkstub zsh; export OPEN_TERMINAL_ZSH="$BIN/zsh"
 out="$(run --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
 has  "macOS with no Ghostty falls back to Terminal.app" "$out" "open -a Terminal"
 # The launcher is a temp file; read the one the stub was handed.

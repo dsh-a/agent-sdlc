@@ -127,6 +127,8 @@ def main() -> int:
     # Not wired here until 2026-10: unrun, its fixture fell behind `check` and
     # its "correct deployment" cases failed on every platform, unnoticed.
     rc |= sh_suite("preflight-deploy", "test_preflight_deploy.sh")
+    # Also unwired until 2026-10, while its Windows branch could not start a cycle.
+    rc |= sh_suite("open-terminal", "test_open_terminal.sh")
     # These three assert at import time, so they run as subprocesses. The first
     # two were not in this runner at all until 2026-09-14 — `check.py` is billed
     # as the one command an agent can rely on, and it was silently skipping the

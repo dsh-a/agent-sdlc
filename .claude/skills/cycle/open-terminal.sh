@@ -22,8 +22,8 @@
 # Platforms, and the shell each runs the command under:
 #   macOS    Ghostty / iTerm / WezTerm / kitty, else Terminal.app — under zsh,
 #            the default login shell since Catalina, not bash.
-#   Windows  Ghostty if ever built for it, else PowerShell (pwsh, then the
-#            bundled powershell.exe) in Windows Terminal when present.
+#   Windows  Ghostty if ever built for it, else Windows Terminal, else Git
+#            Bash's mintty — under Git Bash, since the command is POSIX.
 #   Linux    $TERMINAL, then ghostty / wezterm / kitty / gnome-terminal /
 #            konsole / alacritty / xterm — under bash.
 #
@@ -86,7 +86,10 @@ esac
 #
 # `$INNER` is POSIX (`cd 'dir' && cmd`) and runs identically in both, so this
 # changes which login files load and nothing else.
-mac_shell() { [ -x /bin/zsh ] && printf 'zsh' || printf 'bash'; }
+#
+# The probe path is overridable, like GHOSTTY_APP below: the zsh branch is
+# otherwise untestable on a host without /bin/zsh (Linux CI, Windows).
+mac_shell() { [ -x "${OPEN_TERMINAL_ZSH:-/bin/zsh}" ] && printf 'zsh' || printf 'bash'; }
 
 # Where Ghostty is installed. An absolute path baked into a conditional cannot be
 # driven from a test: on a developer machine that has Ghostty, the no-Ghostty
@@ -186,48 +189,52 @@ elif [ "$PLATFORM" = windows ]; then
     exit 0
   fi
 
-  # PowerShell, not bash. `$INNER` is POSIX and will not run here: `&&` is a
-  # syntax error in PowerShell 5.1, and the quoting rules differ, so the command
-  # is rebuilt rather than reused.
+  # Git Bash, as on every other platform — not PowerShell. The previous branch
+  # ran `Set-Location …; <command>` in PowerShell, but the launcher's command is
+  # POSIX (`cd /c/… && claude "/cycle N"`): `&&` is a syntax error in Windows
+  # PowerShell 5.1, and in 7 the `/c/…` cd fails first, so every window opened
+  # and no cycle ever started. Running `$INNER` in the same POSIX shell the
+  # pipeline already requires means one command string means one thing.
   #
-  # The path needs converting too. Under MSYS the cwd is `/c/Users/...`, which
-  # PowerShell cannot resolve; cygpath is the supported translation and is
-  # present in every Git-Bash/MSYS2/Cygwin install that got us here.
-  WINCWD="$CWD"
-  if command -v cygpath >/dev/null 2>&1; then
-    WINCWD="$(cygpath -w "$CWD" 2>/dev/null || printf '%s' "$CWD")"
+  # Git's bin\bash.exe, not usr\bin\bash.exe: the bin\ wrapper sets MSYSTEM so
+  # the login profile puts git itself on PATH; the bare usr\bin one does not.
+  WINCWD="$(cygpath -w "$CWD" 2>/dev/null || printf '%s' "$CWD")"
+  GITBASH="${OPEN_TERMINAL_GITBASH:-}"
+  if [ -z "$GITBASH" ]; then
+    groot="$(cygpath -w / 2>/dev/null)"
+    if [ -n "$groot" ] && [ -f "$(cygpath -u "$groot")/bin/bash.exe" ]; then
+      GITBASH="${groot%\\}\\bin\\bash.exe"
+    else
+      GITBASH="$(cygpath -w "$(command -v bash)" 2>/dev/null)"
+    fi
   fi
-  # Single quotes are PowerShell's literal string; the escape for one inside is
-  # to double it. Nothing else needs escaping in a literal.
-  ps_lit() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/''/g")"; }
-  PSCMD="Set-Location -LiteralPath $(ps_lit "$WINCWD"); $CMD"
+  [ -n "$GITBASH" ] || { echo "open-terminal: no Git Bash found" >&2; exit 1; }
+  # Overridable for the same reason as GHOSTTY_APP: a test host has a real
+  # mintty in /usr/bin, and the no-Windows-Terminal branch would open it.
+  MINTTY="${OPEN_TERMINAL_MINTTY:-$(command -v mintty 2>/dev/null)}"
 
-  # pwsh is PowerShell 7+ and the one to prefer; powershell.exe is the 5.1 that
-  # ships with Windows and is always there.
-  PSEXE=""
-  for c in pwsh.exe pwsh powershell.exe powershell; do
-    command -v "$c" >/dev/null 2>&1 && { PSEXE="$c"; break; }
-  done
-  [ -n "$PSEXE" ] || { echo "open-terminal: no PowerShell found (pwsh.exe or powershell.exe)" >&2; exit 1; }
-
-  # Windows Terminal is the only one of these that can do a tab, and it is also
-  # the better window when present. `-NoExit` keeps the pane open after the
-  # command finishes, which is what a cycle window is for.
+  # The command goes in a launcher file, as for Terminal.app, and the terminal
+  # is handed only its path. Measured: wt.exe re-parses its own command line,
+  # so an `-lc "$INNER"` survived only while $INNER had no double quotes — and
+  # the launcher's is `claude "/cycle N"` — and wt treats `;` as its own
+  # separator. A path carries neither.
+  L="$(make_launcher bash)" || { echo "open-terminal: mktemp failed" >&2; exit 1; }
   if command -v wt.exe >/dev/null 2>&1; then
+    # Windows Terminal: the only one here that can do a tab. MSYS rewrites any
+    # argument that looks like a POSIX path when it starts a native program;
+    # conversion is off for this call and every path is given Windows-form.
+    LW="$(cygpath -m "$L" 2>/dev/null || printf '%s' "$L")"
     if [ "$TAB" = 1 ]; then
-      launch wt.exe -w 0 nt -d "$WINCWD" --title "$TITLE" "$PSEXE" -NoExit -Command "$PSCMD"
+      MSYS2_ARG_CONV_EXCL='*' launch wt.exe -w 0 nt -d "$WINCWD" --title "$TITLE" "$GITBASH" -l "$LW"
     else
-      launch wt.exe -d "$WINCWD" --title "$TITLE" "$PSEXE" -NoExit -Command "$PSCMD"
+      MSYS2_ARG_CONV_EXCL='*' launch wt.exe -d "$WINCWD" --title "$TITLE" "$GITBASH" -l "$LW"
     fi
+  elif [ -n "$MINTTY" ] && [ -x "$MINTTY" ]; then
+    # mintty is Git Bash's own terminal and an MSYS program, so no conversion.
+    launch "$MINTTY" -t "$TITLE" --dir "$CWD" /usr/bin/bash -l "$L"
   else
-    # Bare PowerShell gets its own window via cmd's `start`. The empty "" is
-    # start's title argument: without it, a quoted first argument is consumed as
-    # the title and the shell never launches.
-    if command -v cmd.exe >/dev/null 2>&1; then
-      launch cmd.exe /c start "" "$PSEXE" -NoExit -Command "$PSCMD"
-    else
-      launch "$PSEXE" -NoExit -Command "$PSCMD"
-    fi
+    echo "open-terminal: no terminal found (Windows Terminal wt.exe, or Git Bash's mintty)" >&2
+    exit 1
   fi
 else
   for t in "${TERMINAL:-}" ghostty wezterm kitty gnome-terminal konsole alacritty xterm; do
