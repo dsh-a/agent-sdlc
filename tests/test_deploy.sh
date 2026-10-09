@@ -102,6 +102,9 @@ chk "link is idempotent" "$(echo "$out" | grep -c 'already correct 10')" 1
 rm "$P/.claude/hooks/guard-secrets.py"
 out="$(bash "$D" check "$P" 2>&1)"
 chk "a missing hook is reported as missing" "$(echo "$out" | grep -c 'MISSING.*guard-secrets')" 1
+# The converse of the grants case below: a broken link still names link.
+chk "  ... and the summary names link" \
+    "$(echo "$out" | grep -c "run: bash.*link $P")" 1
 bash "$D" link "$P" >/dev/null 2>&1
 chk "  ... and link repairs it" "$([ -L "$P/.claude/hooks/guard-secrets.py" ] && echo yes)" yes
 
@@ -307,9 +310,22 @@ bash "$D" link "$P" >/dev/null 2>&1
 out="$(bash "$D" check "$P" 2>&1)"; rc=$?
 chk "a missing framework grant is reported" "$(echo "$out" | grep -c 'GRANT')" 1
 chk "  ... naming the script" "$(echo "$out" | grep -c 'cycle/thing.py')" 1
+# Twice now: once on the GRANT detail line, once in the summary's `run:` line.
+# Both are the point — the detail says what is missing, the summary says what to
+# run, and the summary used to name `link` instead.
 chk "  ... and the command that prints just those lines" \
-    "$(echo "$out" | grep -c "grants $P")" 1
+    "$(echo "$out" | grep -c "grants $P")" 2
 chk "  ... and failing the check" "$rc" 1
+# The summary must name the command that fixes what failed. It printed
+# `deploy.sh link` for every failure class, so a project whose symlinks were
+# already complete and whose only gap was a new script's grant was sent to run
+# `link` — which re-verified the links, changed nothing, and left the operator
+# with a passing repair command and a failing check. Measured on a real
+# deployment: "74/74 correct" directly above "run: deploy.sh link".
+chk "  ... and the summary names grants, not link" \
+    "$(echo "$out" | grep -c "run: bash.*grants $P")" 1
+chk "  ... and never names link when no link is broken" \
+    "$(echo "$out" | grep -c "run: bash.*link $P")" 0
 
 # One grant, either form, is the whole fact: "this project may run this script".
 # The hooks block is here so a passing rc means the grant was satisfied rather
