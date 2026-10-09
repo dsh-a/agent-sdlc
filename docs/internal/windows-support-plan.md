@@ -40,6 +40,14 @@ identical, and CI on Linux is still the gate.
 
 | W7 | done: no-omp clones via `git worktree add` + `deploy.sh link` + per-project config copy; `--absolute-git-dir` fixes interrupted-merge detection on Windows; fixture's bare `bash` fixed. Windows 52/52, Linux 52/52 | `2b4703e` |
 
+| W8 | done: Windows branch runs Git Bash in Windows Terminal / mintty via a launcher file (PowerShell branch could never start a cycle); verified with real windows and tabs; suite wired into `check.py`. Windows 18/18, Linux 18/18 | `6088be8` |
+
+Found during W8:
+
+- **F25 — `wt.exe` re-parses its command line.** An argument with inner double quotes lost them;
+  `;` is wt's own separator. Anything handed to Windows Terminal must be a file path, not a
+  command string.
+
 Found during W7:
 
 - **F23 — vault grants for a Windows `vault_root`.** `deploy.sh grants` writes `Edit(//<root>/…)`
