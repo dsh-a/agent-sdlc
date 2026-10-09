@@ -596,9 +596,21 @@ done
 # `link`'s job is symlinks, and `.claude/settings.json` is the project's own file
 # — the same reason the gitignore block is printed rather than written. A `link`
 # that succeeded at linking should say what is left to paste, not exit non-zero.
+# Counted apart from the link problems, because they are fixed by a different
+# command and the summary used to suggest the wrong one. See the dispatch at the
+# end of `check`.
+SETTINGS_PROBLEMS=0
+GRANT_PROBLEMS=0
+
 settings_problem() {
   say "$1"
-  [ "$CMD" = check ] && PROBLEMS=$((PROBLEMS+1))
+  if [ "$CMD" = check ]; then
+    PROBLEMS=$((PROBLEMS+1))
+    SETTINGS_PROBLEMS=$((SETTINGS_PROBLEMS+1))
+    case "$1" in
+      GRANT*) GRANT_PROBLEMS=$((GRANT_PROBLEMS+1)) ;;
+    esac
+  fi
   return 0
 }
 
@@ -647,8 +659,8 @@ if [ -f "$PROJ/.omp/agent-config.md" ] && [ -f "$FW/.omp/agent-config.md" ]; the
   while read -r s; do
     [ -n "$s" ] || continue
     grep -qxF "$s" <(norm "$PROJ/.omp/agent-config.md") \
-      || { say "CONFIG    § $s present in the framework template, absent from the project"; \
-           PROBLEMS=$((PROBLEMS+1)); }
+      || settings_problem \
+           "CONFIG    § $s present in the framework template, absent from the project"
   done < <(norm "$FW/.omp/agent-config.md")
 fi
 
@@ -672,7 +684,34 @@ printf '  %s/%s correct' "$OK" "$TOTAL"
 [ "$SHADOWED" -gt 0 ] && printf ', %s overridden' "$SHADOWED"
 printf '\n'
 if [ "$PROBLEMS" -gt 0 ]; then
-  printf '  run: bash %s/deploy.sh link %s\n' "$FW" "$PROJ"
+  # Name the command that fixes what actually failed.
+  #
+  # This printed `deploy.sh link` for every failure, including the ones link
+  # cannot touch. A new framework script is a new grant, so `check` failed on a
+  # project whose symlinks were already 74/74; the fan-out launcher reported
+  # "deployment is incomplete" and pointed at `link`, which re-verified 74 correct
+  # links and changed nothing. The operator then has a passing repair command and
+  # a failing check, which reads as the check being broken.
+  #
+  # The three classes have three different fixes, and only the first is `link`:
+  LINK_PROBLEMS=$((MISSING + DANGLING + FOREIGN + COPIED))
+  if [ "$LINK_PROBLEMS" -gt 0 ]; then
+    printf '  run: bash %s/deploy.sh link %s\n' "$FW" "$PROJ"
+  fi
+  if [ "$GRANT_PROBLEMS" -gt 0 ]; then
+    printf '  run: bash %s/deploy.sh grants %s   # then paste into .claude/settings.json "allow"\n' \
+      "$FW" "$PROJ"
+  fi
+  # A wired-hook or missing-config-section gap is a hand edit to the project's
+  # own files; no command generates it, so say that rather than name one.
+  #
+  # Deliberately avoids the words HOOK and CONFIG: those are the markers on the
+  # detail lines above, and tests count them to assert how many gaps were
+  # reported. A summary that repeats a marker inflates the thing it summarises.
+  if [ "$((SETTINGS_PROBLEMS - GRANT_PROBLEMS))" -gt 0 ]; then
+    printf '  the wiring and section gaps above are hand edits to %s — no command generates them\n' \
+      "$PROJ"
+  fi
   exit 1
 fi
 exit 0
