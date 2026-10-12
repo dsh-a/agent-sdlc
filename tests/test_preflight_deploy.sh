@@ -39,10 +39,15 @@ git -C "$FW" add -A; git -C "$FW" commit -qm fw
 
 P="$R/proj"; mkdir -p "$P/.claude" "$P/.omp"
 git init -q "$P"
-echo '{}' > "$P/.claude/settings.json"
+# `check` fails a deployed hook that settings.json does not wire, so the fixture
+# wires its one hook.
+WIRED='{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"python3 .claude/hooks/gate-log.py"}]}]}}'
+echo "$WIRED" > "$P/.claude/settings.json"
 printf '## Active Pack\n## Artifact Paths\n## Model Versions\n' > "$P/.omp/agent-config.md"
 bash "$FW/deploy.sh" link "$P" >/dev/null 2>&1
 chk "fixture deploys cleanly" "$?" 0
+# ... and ignores what was linked: `check` fails a deployed link git still tracks.
+bash "$FW/deploy.sh" gitignore >> "$P/.gitignore" 2>/dev/null
 
 SHIM=".claude/skills/cycle/preflight-deploy.sh"
 
@@ -75,6 +80,19 @@ chk "  ... says PREFLIGHT: problems" \
     "$(printf '%s' "$out" | tail -1 | grep -c '^PREFLIGHT: problems')" 1
 chk "  ... and prints a repair command naming the project" \
     "$(printf '%s' "$out" | tail -1 | grep -c "deploy.sh link")" 1
+
+# The repair command is the one `check` named. An unwired hook is a hand edit,
+# so the verdict names no command.
+rm -f "$P/.claude/hooks/gate-log.py"
+bash "$FW/deploy.sh" link "$P" >/dev/null 2>&1
+echo '{}' > "$P/.claude/settings.json"
+out="$(bash "$SHIM" 2>&1)"; rc=$?
+chk "non-zero on an unwired hook" "$rc" 1
+chk "  ... verdict still last" \
+    "$(printf '%s' "$out" | tail -1 | grep -c '^PREFLIGHT: problems')" 1
+chk "  ... and does not name link, which cannot fix it" \
+    "$(printf '%s' "$out" | tail -1 | grep -c 'deploy.sh link')" 0
+echo "$WIRED" > "$P/.claude/settings.json"
 
 # A COPY is a failure too: a copied hook goes stale invisibly, which is the bug
 # that made a whole fan-out log every row unclassified while looking healthy.

@@ -21,7 +21,7 @@ The state-file template and verb list below are authoritative for **both** modes
 
 ## Job
 
-**Finalize mode (default):** when spawned with `FINALIZE report:[path]`, archive state into the run report path the orchestrator provides, then clear this cycle's ephemeral state by running `python3 .claude/skills/cycle/clear-agent-states.py --all` — that exact relative form, never expanded to an absolute path, because your grant is a string match and an absolute path matches nothing — then exit. You are the only agent permitted to run that script, which is why finalize is delegated to you even when the orchestrator wrote state inline. Never fall back to a bare `rm` — it is denied by design, and the script is the sanctioned path.
+**Finalize mode (default):** when spawned with `FINALIZE report:[path]`, archive state into the run report path the orchestrator provides, then clear this cycle's ephemeral state by running `python3 .claude/skills/cycle/clear-agent-states.py --all` — issue it alone and exactly as written, because your grant is a string match. Do NOT expand the path or join anything to it — then exit. You are the only agent permitted to run that script, which is why finalize is delegated to you even when the orchestrator wrote state inline. Never fall back to a bare `rm` — it is denied by design, and the script is the sanctioned path.
 
 **Do not run `reap-clones.sh finish` here.** It moved to the orchestrator, at the end of step 10,
 because Finalize is not the last thing a cycle does: step 10 writes the changelog fragment

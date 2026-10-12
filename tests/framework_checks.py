@@ -856,8 +856,20 @@ def check_hooks_are_wired() -> list[str]:
         return [f"settings.json.sample is unreadable: {e}"]
     wired = set(re.findall(r"hooks/([\w.-]+)", cfg))
     shipped = {h.name for h in (ROOT / ".claude/hooks").glob("*.py")}
-    return [f"{h} is shipped but not wired in settings.json.sample"
-             for h in sorted(shipped - wired)]
+    problems = [f"{h} is shipped but not wired in settings.json.sample"
+                for h in sorted(shipped - wired)]
+    # ... and on every event it handles: `deploy.sh check`'s rule for a project.
+    r = subprocess.run(
+        ["bash", "-c", 'eval "$(sed -n \'/^hook_event_gaps() {/,/^}/p\' "$1")"; '
+                       'hook_event_gaps "$2" "$3"', "_",
+         str(ROOT / "deploy.sh"), str(ROOT / ".claude/hooks"), str(sample)],
+        capture_output=True, text=True)
+    if r.returncode != 0:
+        problems.append(f"could not run deploy.sh's hook_event_gaps: {r.stderr.strip()[:120]}")
+    for line in r.stdout.splitlines():
+        name, _, missing = line.partition("\t")
+        problems.append(f"{name} is wired in settings.json.sample, but not on: {missing}")
+    return problems
 
 
 ALL_CHECKS = {

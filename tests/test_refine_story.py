@@ -118,6 +118,14 @@ def check_every_gate_fires() -> None:
     check("the fixture really holds the board's own casing",
           any(f["name"] == "Refined" for f in stored), str(stored))
 
+    p = run("already-refined.json", "load", "413")
+    check("a refined `full` story with no slices is pointed at the slices-only pass",
+          "slices-only: " in p.stdout and "slicing.md" in p.stdout, p.stdout)
+    p = run("already-refined-sliced.json", "load", "413")
+    check("  ... and one that has slices is not",
+          "gate=already-refined" in p.stdout and "slices-only: " not in p.stdout,
+          p.stdout)
+
     p = run("split-parent.json", "load", "413")
     check("a split parent names its children", "#414" in p.stdout
           and "#415" in p.stdout,
@@ -198,12 +206,61 @@ def check_dor_is_a_gate_not_a_sentence() -> None:
               "second home" in p.stdout or "into the\n" in p.stdout
               or "body" in p.stdout)
 
+        p = run("full-no-slices.json", "dor", "413", "--coverage", str(cov))
+        check("a full-depth story with no slices is NEEDS-WORK",
+              p.returncode == st.REFUSED and "no `## Slices`" in p.stdout,
+              p.stdout.splitlines()[0])
+
+        p = run("full-one-slice.json", "dor", "413", "--coverage", str(cov))
+        check("one slice needs a stated reason",
+              p.returncode == st.REFUSED and "Single slice" in p.stdout,
+              p.stdout.splitlines()[0])
+
+        p = run("full-one-slice-reasoned.json", "dor", "413",
+                "--coverage", str(cov))
+        check("  ... and is READY with one", p.returncode == st.OK
+              and "slices=1" in p.stdout, p.stdout.splitlines()[0])
+
+        p = run("slices-ac-duplicated.json", "dor", "413",
+                "--coverage", str(cov))
+        check("a misallocated AC blocks READY",
+              p.returncode == st.REFUSED and "slices: AC 2 is in slices 1, 2"
+              in p.stdout, p.stdout)
+
         p = run("ready.json", "dor", "413", "--coverage", str(cov))
         check("what the script cannot check is named as the agent's, not "
               "silently assumed true",
               "Still yours to assert" in p.stdout and "INVEST" in p.stdout)
     finally:
         cov.unlink(missing_ok=True)
+
+
+def check_slices_place_every_ac_once() -> None:
+    print("\nslices")
+    p = run("ready.json", "slices", "413")
+    rows = p.stdout.splitlines()
+    check("a clean allocation is ok at exit 0",
+          p.returncode == st.OK and "verdict=ok count=2 acs=2" in rows[0],
+          rows[0])
+    check("  ... one tab-separated row per slice, bottom first",
+          rows[1] == "1\tModel\t`lib/domain/`\t1"
+          and rows[2] == "2\tScreen\t`lib/ui/`\t2", repr(rows[1:3]))
+
+    p = run("full-no-slices.json", "slices", "413")
+    check("no section is verdict=absent at exit 0",
+          p.returncode == st.OK and "verdict=absent" in p.stdout, p.stdout)
+
+    p = run("full-one-slice-reasoned.json", "slices", "413")
+    check("`all ACs` expands, and the reason is printed",
+          "\t1,2" in p.stdout and "SINGLE\tone file" in p.stdout, p.stdout)
+
+    p = run("slices-ac-duplicated.json", "slices", "413")
+    check("anomalies are exit 1", p.returncode == st.REFUSED
+          and "verdict=anomalous" in p.stdout, p.stdout.splitlines()[0])
+    for want in ("AC 2 is in slices 1, 2", "AC 3 is out of range",
+                 "slice 3 names no ACs"):
+        check(f"  ... names: {want}", f"PROBLEM\t" in p.stdout
+              and want in p.stdout, p.stdout)
 
 
 def check_writes_are_dry_by_default() -> None:
@@ -322,6 +379,7 @@ def main() -> int:
     check_every_gate_fires()
     check_a_failed_gh_call_is_undetermined()
     check_dor_is_a_gate_not_a_sentence()
+    check_slices_place_every_ac_once()
     check_writes_are_dry_by_default()
     check_split_refuses_and_orders()
     check_no_shell_is_used()

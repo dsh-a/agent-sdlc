@@ -16,7 +16,7 @@ lifetime change as `hotfix`.
     board     Refinement=REFINED Status=Backlog Depth=unset        project=3
     links     parent=none children=none blocked_by=#412 blocking=#554,#488
     labels    story, epic:0.36
-    sections  ac=present questions=present spikes=absent
+    sections  ac=present questions=present spikes=absent slices=absent
 
 **This script states facts and never writes prose.** The 2–4 sentence restatement
 in Step 1 is the agent's: a summary is a reading of the story, and the whole
@@ -33,6 +33,7 @@ Verbs:
   load       issue + labels + board fields + both dependency directions, and the
              gate verdict; one invocation in place of five calls
   dor        the Definition-of-Ready table as an executable gate
+  slices     the `## Slices` section as rows, with every AC placed exactly once
   set-depth  the board's `Depth` field, after resolving four ids
   split      create children, link, chain, notice, close — **`--dry-run` is the
              default**, as it is for every outward-facing operation here
@@ -63,6 +64,9 @@ import re
 import shutil
 import subprocess
 import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import probes  # noqa: E402
 
 OK, REFUSED, USAGE, UNDETERMINED = 0, 1, 2, 3
 
@@ -294,13 +298,99 @@ def cmd_load(args: argparse.Namespace) -> int:
             f"{n}={'present' if has_section(body, t) else 'absent'}"
             for n, t in (("ac", r"Acceptance [Cc]riteria"),
                          ("questions", r"Open questions"),
-                         ("spikes", r"Open spikes"))))
+                         ("spikes", r"Open spikes"),
+                         ("slices", r"Slices"))))
         print(f"url       {issue['url']}")
         if why:
             print(f"\nstop: {why}")
+        if (verdict == "already-refined" and not has_section(body, r"Slices")
+                and (fields.get("Depth") or "").strip().lower() == "full"):
+            print("slices-only: a `full` story with no `## Slices` — offer the "
+                  "slices-only pass (slicing.md § A story already refined)")
         print("\nNow restate the story to the user in your own words "
               "(Step 1.7). This script does not summarise bodies.")
     return OK if verdict == "ok" else REFUSED
+
+
+# --------------------------------------------------------------------------- #
+
+SLICE_ACS = re.compile(r"^(?:ACs?\s+(.+)|all ACs)$", re.I)
+
+
+def parse_slices(body: str) -> dict | None:
+    """The `## Slices` section: one ordered item per slice, bottom of the stack first.
+
+        1. <title> — <area> — AC 1, 2, 5
+        Single slice: <reason>
+
+    Returns None when the section is absent. ACs are ordinals into
+    `## Acceptance Criteria`; `AC 2-4`, `all ACs` and `AC none` are accepted.
+    """
+    lines = body.splitlines()
+    span = probes.section(lines, r"Slices\b")
+    if span is None:
+        return None
+    ac_span = probes.section(lines, r"Acceptance Criteria\b")
+    n_acs = len(probes.list_items(lines, ac_span)) if ac_span else 0
+    reason = next((m.group(1).strip() for i in range(*span)
+                   if (m := re.match(r"^\s*Single slice:\s*(\S.*)$", lines[i], re.I))),
+                  "")
+    slices, problems = [], []
+    for n, item in enumerate(probes.list_items(lines, span), 1):
+        parts = [x.strip() for x in re.split(r"\s+[—–]\s+", item["head"])]
+        m = SLICE_ACS.match(parts[-1]) if len(parts) > 1 else None
+        acs: list[int] = []
+        if not m:
+            problems.append(f"slice {n} names no ACs — end it with `— AC 1, 2` "
+                            f"or `— AC none`")
+        elif m.group(1) is None:
+            acs = list(range(1, n_acs + 1))
+        elif m.group(1).strip().lower() != "none":
+            for tok in re.split(r"[,\s]+", m.group(1).strip()):
+                r = re.fullmatch(r"(\d+)(?:-(\d+))?", tok)
+                if not r:
+                    problems.append(f"slice {n}: `{tok}` is not an AC ordinal")
+                    continue
+                acs += range(int(r.group(1)), int(r.group(2) or r.group(1)) + 1)
+        middle = parts[1:-1] if m else parts[1:]
+        slices.append({"n": n, "title": parts[0], "area": " — ".join(middle),
+                       "acs": acs})
+    for s in slices:
+        for a in s["acs"]:
+            if not 1 <= a <= n_acs:
+                problems.append(f"slice {s['n']}: AC {a} is out of range "
+                                f"(the story has {n_acs})")
+    for a in range(1, n_acs + 1):
+        homes = [s["n"] for s in slices if a in s["acs"]]
+        if not homes:
+            problems.append(f"AC {a} is in no slice")
+        elif len(homes) > 1:
+            problems.append(f"AC {a} is in slices "
+                            f"{', '.join(map(str, homes))}")
+    if not slices:
+        problems.append("`## Slices` holds no numbered slice")
+    return {"slices": slices, "reason": reason, "acs": n_acs,
+            "problems": problems}
+
+
+def cmd_slices(args: argparse.Namespace) -> int:
+    repo = resolve_repo(args)
+    issue = fetch(args, repo, args.number)
+    parsed = parse_slices(issue.get("body") or "")
+    if parsed is None:
+        print(f"SLICES #{issue['number']} verdict=absent count=0")
+        return OK
+    verdict = "anomalous" if parsed["problems"] else "ok"
+    print(f"SLICES #{issue['number']} verdict={verdict} "
+          f"count={len(parsed['slices'])} acs={parsed['acs']}")
+    for s in parsed["slices"]:
+        print(f"{s['n']}\t{s['title']}\t{s['area']}\t"
+              f"{','.join(map(str, s['acs'])) or 'none'}")
+    if parsed["reason"]:
+        print(f"SINGLE\t{parsed['reason']}")
+    for x in parsed["problems"]:
+        print(f"PROBLEM\t{x}")
+    return REFUSED if parsed["problems"] else OK
 
 
 # --------------------------------------------------------------------------- #
@@ -376,6 +466,17 @@ def cmd_dor(args: argparse.Namespace) -> int:
             unknown.append("the board has no `Depth` field — say so in the "
                            "verdict rather than writing a `Depth:` line into "
                            "the body")
+
+    if (depth or "").lower() == "full":
+        parsed = parse_slices(body)
+        if parsed is None:
+            unmet.append("no `## Slices` — a full-depth story is cut for a stack")
+        elif parsed["problems"]:
+            unmet += [f"slices: {x}" for x in parsed["problems"]]
+        elif len(parsed["slices"]) < 2 and not parsed["reason"]:
+            unmet.append("one slice and no `Single slice: <reason>` line")
+        else:
+            met.append(f"slices={len(parsed['slices'])}")
 
     verdict = ("READY" if not unmet and not unknown
                else "NEEDS-WORK" if unmet else "UNDETERMINED")
@@ -591,6 +692,10 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("number", type=int)
     d.add_argument("--coverage", help="output of `probes.py coverage`, or -")
     d.set_defaults(func=cmd_dor)
+
+    sl = sub.add_parser("slices", help="the stack's slices, AC allocation checked")
+    sl.add_argument("number", type=int)
+    sl.set_defaults(func=cmd_slices)
 
     s = sub.add_parser("set-depth", help="write the board's Depth field")
     s.add_argument("number", type=int)

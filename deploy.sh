@@ -107,6 +107,34 @@ for h in sorted(set(re.findall(r"hooks/([\w.-]+)", json.dumps(cfg)))):
 PY
 }
 
+# Hooks that are wired, but not on every event they handle: `name<TAB>events`.
+#
+# The events are read from the hook's own dispatch (`event == "Stop"`,
+# `event in ("PostToolUse", ...)`), so a hook that learns a new event raises
+# this on its own. A hook with no such dispatch — a guard — asks for nothing.
+hook_event_gaps() {
+  [ -f "$2" ] || return 0
+  python3 - "$1" "$2" <<'PY'
+import json, pathlib, re, sys
+try:
+    cfg = json.load(open(sys.argv[2])).get("hooks", {})
+except Exception:
+    sys.exit(0)
+for hook in sorted(pathlib.Path(sys.argv[1]).glob("*.py")):
+    try:
+        src = hook.read_text(errors="replace")
+    except OSError:
+        continue
+    handled = set()
+    for m in re.finditer(r'\bevent\s*(?:==|in)\s*\(?((?:\s*"[A-Za-z]+"\s*,?)+)', src):
+        handled.update(re.findall(r'"([A-Za-z]+)"', m.group(1)))
+    on = {ev for ev, blocks in cfg.items()
+          if hook.name in re.findall(r"hooks/([\w.-]+)", json.dumps(blocks))}
+    if on and handled - on:        # unwired entirely is reported by the caller
+        print(f"{hook.name}\t{' '.join(sorted(handled - on))}")
+PY
+}
+
 # With a project, only what that project is missing; without one, all of them.
 # `check` names eight missing grants on a project that already holds six, and a
 # full list is then something to diff by hand — which is how the ones already
@@ -643,6 +671,10 @@ if [ -f "$PROJ/.claude/settings.json" ]; then
     hooks_wired_in "$PROJ/.claude/settings.json" | grep -qxF "$hn" \
       || settings_problem "HOOK      $hn is deployed but not wired in .claude/settings.json"
   done
+  while IFS="$(printf '\t')" read -r hn miss; do
+    [ -n "$hn" ] || continue
+    settings_problem "HOOK      $hn is wired, but not on: $miss — it handles those events and never sees them"
+  done < <(hook_event_gaps "$FW/.claude/hooks" "$PROJ/.claude/settings.json")
 fi
 
 # Config sections, compared against this framework's own agent-config.md rather

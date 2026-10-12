@@ -3,7 +3,7 @@ name: ui-story
 label: "[UI]"
 description: Implement a UI / presentation-layer feature. Use when the cycle pipeline needs a screen, component, or view-model built or modified. Receives a task description with acceptance criteria and produces implemented, tested UI code.
 model: sonnet
-tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), Bash(flutter pub run build_runner*), Bash(dart run*), Bash(dart format*), Bash(git*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), mcp__ide__getDiagnostics
+tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), Bash(flutter pub run build_runner*), Bash(dart run*), Bash(dart format*), Bash(git*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), Bash(python3 .claude/skills/cycle/discard-untracked.py*), mcp__ide__getDiagnostics
 skills: autonomous-agent, scaffold, project-conventions, ui-test-patterns, minimalism, whispers
 ---
 
@@ -103,8 +103,6 @@ Measured in fan-out 6, every case a command the project had already granted:
 
 - `git checkout -- <path> && git status --short` — **4m19s** across two asks. The restore on its
   own was granted; the `&&` un-granted it.
-- `git clean -f /Users/…/cycles/myapp-c3/test/…` — **3m39s**, an absolute path where the relative
-  one was granted.
 - A finalize monitor expanded `python3 .claude/skills/cycle/clear-agent-states.py` into the clone's
   absolute path and was refused outright, leaving the cycle's state uncleaned.
 
@@ -112,6 +110,9 @@ Fan-out 4 measured the same defect as `cd`-prefixing: **18.5h of dialog wait acr
 
 So a granted command is the whole call: `git diff --stat`, and then `git status --short` as a
 second call if you want both facts. Never join them.
+
+**Delete a throwaway file** — a probe, a mutation scratch file — with
+`python3 .claude/skills/cycle/discard-untracked.py <path> --apply`. It is the one granted delete.
 
 ## Numbers in your handoff
 

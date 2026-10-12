@@ -100,6 +100,16 @@ chk "agent_states churn does not block a sweep" "$([ -d "$WT" ] && echo yes || e
 chk "the feature branch survives removal" "$(git -C "$ORIGIN" branch --list 443/x | wc -l | tr -d ' ')" 1
 chk "  ... and the marker is cleared" "$([ -e "$ROOT/.reapable/c1.json" ] && echo yes || echo no)" no
 
+# A clone's telemetry leaves with it, so sweep copies it to the run root first.
+setup; cd "$WT"
+printf 'clone=c1\ngate_log=%s/gate-log.tsv\n' "$ROOT" > "$WT/agent_states/.fanout-clone"
+mkdir -p "$WT/agent_states/events"; echo '{"n":1}' > "$WT/agent_states/events/orchestrator.jsonl"
+bash "$S" finish --apply >/dev/null 2>&1
+bash "$S" sweep --root "$ROOT" --apply >/dev/null 2>&1
+chk "sweep archives a clone's telemetry before removing it" \
+    "$(cat "$ROOT/telemetry/c1/events/orchestrator.jsonl" 2>/dev/null)" '{"n":1}'
+chk "  ... and still removes the clone" "$([ -d "$WT" ] && echo yes || echo no)" no
+
 # An unmarked clone is invisible to sweep — that is the launcher reap's job.
 setup
 out="$(bash "$S" sweep --root "$ROOT" --apply 2>&1)"

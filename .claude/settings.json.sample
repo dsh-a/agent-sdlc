@@ -22,6 +22,8 @@
       "Bash(bash ~/.claude/skills/cycle/preflight-deploy.sh*)",
       "Bash(bash .claude/skills/cycle/publish-branch.sh*)",
       "Bash(bash ~/.claude/skills/cycle/publish-branch.sh*)",
+      "Bash(bash .claude/skills/cycle/publish-stack.sh*)",
+      "Bash(bash ~/.claude/skills/cycle/publish-stack.sh*)",
       "Bash(bash .claude/skills/cycle/reap-clones.sh*)",
       "Bash(bash ~/.claude/skills/cycle/reap-clones.sh*)",
       "Bash(bash .claude/skills/cycle/run-suite.sh*)",
@@ -64,7 +66,7 @@
       "Bash(rm -rf *)"
     ]
   },
-  "_comment": "Sample hooks block \u2014 merge into your .claude/settings.json. Enables the per-agent event log at agent_states/events/<agent_id>.jsonl (consumed by run-report telemetry and stall salvage). gate-log.py on SubagentStop is what captures refused tool calls: PostToolUse never fires on a refusal, so a subagent denied a command leaves no trace anywhere else \u2014 fan-out 7 reported zero permission wait while three calls had been refused. Requires python3 on PATH.",
+  "_comment": "Sample hooks block \u2014 merge into your .claude/settings.json. Enables the per-agent event log at agent_states/events/<agent_id>.jsonl (consumed by run-report telemetry and stall salvage). gate-log.py is wired on all five events it handles \u2014 Stop and UserPromptSubmit measure gate wait, PermissionRequest and PostToolUse measure permission-dialog wait \u2014 and on SubagentStop it is what captures refused tool calls: PostToolUse never fires on a refusal, so a subagent denied a command leaves no trace anywhere else \u2014 fan-out 7 reported zero permission wait while three calls had been refused. Requires python3 on PATH.",
   "hooks": {
     "PreToolUse": [
       {
@@ -88,6 +90,32 @@
           {
             "type": "command",
             "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"
+          },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-log.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-log.py"
           }
         ]
       }
@@ -100,6 +128,28 @@
             "type": "command",
             "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"
           },
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-log.py"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-log.py"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
           {
             "type": "command",
             "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-log.py"

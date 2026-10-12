@@ -55,16 +55,30 @@ printf '%s\n' "$OUT" | tail -6
 # Checked here rather than in the skill because it is mechanical and this script
 # is already the orchestrator's first action, and because the skill sits at its
 # context ceiling: a paragraph there costs every cycle, a line here costs none.
+#
+# This script is the cycle's first action, so its clock is the cycle's start:
+# print it as the `--since` value both aggregators take.
 STALE=$(ls "$TARGET/agent_states/events" 2>/dev/null | wc -l | tr -d " ")
 if [ "${STALE:-0}" -gt 0 ]; then
-  echo "  STALE TELEMETRY: $STALE event file(s) from a cycle that never reached Finalize."
-  echo "  Clear them before Phase 3 (the Finalize monitor holds clear-agent-states.py),"
-  echo "  or report telemetry as not collected rather than quoting it."
+  NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "  EARLIER TELEMETRY: $STALE event file(s) already here; some may predate this cycle."
+  echo "  Scope the run report to this cycle — pass to aggregate-telemetry.py and gate-report.py:"
+  echo "    --since $NOW"
+  echo "  (after a dry-run or a resume, keep the timestamp from the cycle's FIRST preflight)"
 fi
+
+# Relay the repair command `check` named. It prints one `run:` line per class of
+# problem a command can fix; the rest carry their fix on the detail line.
+FIX="$(printf '%s\n' "$OUT" | sed -n 's/^  run: \(bash [^#]*\).*/\1/p' \
+        | sed 's/ *$//' | awk 'NR>1{printf "; "} {printf "%s", $0}')"
 
 case "$RC" in
   0) echo "PREFLIGHT: ok" ;;
-  *) echo "PREFLIGHT: problems — fix with: bash $FW/deploy.sh link $TARGET" ;;
+  *) if [ -n "$FIX" ]; then
+       echo "PREFLIGHT: problems — fix with: $FIX"
+     else
+       echo "PREFLIGHT: problems — each fix is named on its own line above"
+     fi ;;
 esac
 
 exit "$RC"

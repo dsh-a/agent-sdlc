@@ -66,6 +66,7 @@ Issue: <url>
 <if blocked: open spikes by name>
 
 Depth: <full | lean | hotfix>   (READY only; "board has no Depth field" if absent)
+Slices: <n>   (full only)
 
 Destructive changes to the issue body: <count>
 Signed off by user: <yes | n/a — verdict is not READY>

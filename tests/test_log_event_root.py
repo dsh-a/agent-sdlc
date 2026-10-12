@@ -64,6 +64,26 @@ def fire(cwd: pathlib.Path, agent_id: str = "a1") -> None:
                    text=True, capture_output=True, timeout=30)
 
 
+def fire_failure(cwd: pathlib.Path, agent_id: str, error: str,
+                 interrupt: bool = False) -> None:
+    """One PostToolUseFailure, in its documented shape: `error` at the top
+    level and no `tool_response`."""
+    payload = {
+        "hook_event_name": "PostToolUseFailure",
+        "session_id": "s",
+        "agent_id": agent_id,
+        "agent_type": "test",
+        "tool_name": "Bash",
+        "tool_input": {"command": "flutter test"},
+        "error": error,
+        "cwd": str(cwd),
+    }
+    if interrupt:
+        payload["is_interrupt"] = True
+    subprocess.run([sys.executable, str(HOOK)], cwd=cwd, input=json.dumps(payload),
+                   text=True, capture_output=True, timeout=30)
+
+
 def fire_stop(cwd: pathlib.Path, agent_id: str, agent_type: str) -> None:
     """One SubagentStop. `agent_type` is what separates one of our agents from
     the harness's own background."""
@@ -171,6 +191,29 @@ def main() -> int:
         p = subprocess.run([sys.executable, str(HOOK)], cwd=outside, input="not json",
                            text=True, capture_output=True, timeout=30)
         check("garbage payload outside a repo exits 0", p.returncode == 0, p.stderr)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # A failed call arrives as its own event and is logged with exit=error.
+        repo = origin_repo(pathlib.Path(tmp))
+        fire(repo, "test-1.0")
+        fire_failure(repo, "test-1.0", "Exit code 1\n" + "x" * 500)
+        fire_failure(repo, "test-1.0", "aborted", interrupt=True)
+        lines = [json.loads(l) for l in
+                 (repo / "agent_states" / "events" / "test-1.0.jsonl").read_text().splitlines()]
+        check("a failed tool call is logged as a tool event",
+              len(lines) == 3 and all(l["event"] == "tool" for l in lines), str(lines))
+        check("  ... with exit=error, where a success says ok",
+              [l["exit"] for l in lines] == ["ok", "error", "error"], str(lines))
+        check("  ... keeping the tool and command",
+              lines[1]["tool"] == "Bash" and lines[1]["command"] == "flutter test", str(lines[1]))
+        check("  ... and a bounded error text",
+              lines[1]["error"].startswith("Exit code 1") and len(lines[1]["error"]) == 200,
+              str(len(lines[1].get("error", ""))))
+        check("  ... an interrupt is marked as one", lines[2].get("interrupt") is True, str(lines[2]))
+        check("  ... and a success carries neither field",
+              "error" not in lines[0] and "interrupt" not in lines[0], str(lines[0]))
+        check("a failed call still counts toward the agent's counter",
+              (repo / "agent_states" / "counters" / "test-1.0").read_text() == "3")
 
     if FAILURES:
         print("\nFAILED:")

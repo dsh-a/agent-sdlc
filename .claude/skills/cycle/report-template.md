@@ -36,9 +36,9 @@ Silent substitutions and recoveries during the cycle (copied verbatim from cycle
 
 Aggregated from omp native session transcripts (`<id>.jsonl` artifacts + `history://<id>`) or the supplementary hook log (`agent_states/events/*.jsonl`). One row per `agent_id`. If no transcripts or event logs exist, write: *"Telemetry not collected."*
 
-| Agent ID | Type | Tool calls | Breakdown | Errors | Wallclock | Stop reason |
-|---|---|---|---|---|---|---|
-| — | — | — | — | — | — | — |
+| Agent ID | Type | Tool calls | Breakdown | Errors | Wallclock |
+|---|---|---|---|---|---|
+| — | — | — | — | — | — |
 
 ### Phase-3 totals
 | Metric | Value |
@@ -115,6 +115,13 @@ gate-throughput planning, so record it even when the cycle was otherwise unremar
 
 **Wallclock is not comparable across cycles without this.** A 4-hour cycle that spent 3 hours
 parked on a gate and a 4-hour cycle that spent 4 hours working are different failures.
+
+### Stack
+Omit for a single-PR cycle. Rows from `publish-stack.sh stat`.
+
+| Layer | Branch | PR | Non-test lines added | Test lines added |
+|---|---|---|---|---|
+| [1] | [branch] | [#n] | [n] | [n] |
 
 ## Context Sources
 

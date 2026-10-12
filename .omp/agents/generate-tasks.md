@@ -23,6 +23,8 @@ Read the specified PRD file. Extract:
 - Technical considerations.
 - Non-goals (scope boundaries).
 
+Read `local://slices.md` if it exists: the story's slices, one row each — ordinal, title, area, ACs.
+
 ## Step 2 — Assess the codebase
 
 Search the source tree for existing components relevant to this feature:
@@ -35,7 +37,7 @@ Use findings to calibrate task scope — don't create tasks for things that alre
 
 ## Step 3 — Generate parent tasks
 
-Create 4–6 parent tasks per `task-file-format` § Parent task structure. **Tag every parent task with a `[kind: ...]`** from the taxonomy in `task-file-format`. Pick the most specific kind; if a parent task spans kinds, split it. General code work that isn't a scaffold, UI story, or test task is `[kind: coding]` — reserve `[kind: general-purpose]` for the rare task no other kind fits.
+Create 4–6 parent tasks per `task-file-format` § Parent task structure. With slices, each parent task belongs to one slice and covers ACs from that slice. **Tag every parent task with a `[kind: ...]`** from the taxonomy in `task-file-format`. Pick the most specific kind; if a parent task spans kinds, split it. General code work that isn't a scaffold, UI story, or test task is `[kind: coding]` — reserve `[kind: general-purpose]` for the rare task no other kind fits.
 
 **When a parent task creates a new component, say in one line why the kind you chose is
 the smaller one.** Write it as the task's first sub-bullet, beginning `kind-rationale:`.

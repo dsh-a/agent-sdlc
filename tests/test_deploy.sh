@@ -511,5 +511,37 @@ JSON
 out="$(bash "$D" check "$P" 2>&1)"
 chk "  ... and go quiet once wired" "$(echo "$out" | grep -c 'HOOK')" 0
 
+# A hook must be wired on every event it dispatches on.
+cat > "$FW/.claude/hooks/gate-log.py" <<'PY'
+event = "x"
+if event == "Stop":
+    pass
+elif event in ("PermissionRequest", "PostToolUse"):
+    pass
+PY
+cat > "$P/.claude/settings.json" <<'JSON'
+{ "hooks": {
+  "Stop": [ { "matcher": "*", "hooks": [
+    { "type": "command", "command": "python3 .claude/hooks/gate-log.py" } ] } ],
+  "PreToolUse": [ { "matcher": "*", "hooks": [
+    { "type": "command", "command": "python3 .claude/hooks/guard-secrets.py" } ] } ] } }
+JSON
+out="$(bash "$D" check "$P" 2>&1)"; rc=$?
+chk "a hook missing from an event it handles is reported" \
+    "$(echo "$out" | grep -c 'HOOK      gate-log.py is wired, but not on: PermissionRequest PostToolUse')" 1
+chk "  ... once, and not for a hook with no event dispatch" "$(echo "$out" | grep -c 'HOOK')" 1
+chk "  ... failing the check" "$rc" 1
+chk "  ... as a hand edit, not something link fixes" \
+    "$(echo "$out" | grep -c "run: bash.*link $P")" 0
+cat > "$P/.claude/settings.json" <<'JSON'
+{ "hooks": {
+  "Stop": [ { "hooks": [ { "type": "command", "command": "python3 .claude/hooks/gate-log.py" } ] } ],
+  "PermissionRequest": [ { "hooks": [ { "type": "command", "command": "python3 .claude/hooks/gate-log.py" } ] } ],
+  "PostToolUse": [ { "hooks": [ { "type": "command", "command": "python3 .claude/hooks/gate-log.py" } ] } ],
+  "PreToolUse": [ { "hooks": [ { "type": "command", "command": "python3 .claude/hooks/guard-secrets.py" } ] } ] } }
+JSON
+out="$(bash "$D" check "$P" 2>&1)"
+chk "  ... and goes quiet once every handled event is wired" "$(echo "$out" | grep -c 'HOOK')" 0
+
 printf '\ndeploy: %s\n' "$([ $FAILED = 0 ] && echo 'all checks passed.' || echo 'FAILURES above.')"
 exit $FAILED

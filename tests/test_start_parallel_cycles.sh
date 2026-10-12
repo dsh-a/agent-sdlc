@@ -72,11 +72,11 @@ hooks = sorted(p.name for p in (fw / ".claude/hooks").glob("*.py"))
 grants = subprocess.run(["bash", str(fw / "deploy.sh"), "grants"],
                         capture_output=True, text=True).stdout
 allow = [m.group(1) for m in re.finditer(r'"(Bash\([^"]+\))",', grants)]
-print(json.dumps({
-    "permissions": {"allow": allow},
-    "hooks": {"PreToolUse": [{"matcher": "*", "hooks": [
-        {"type": "command", "command": f"python3 .claude/hooks/{h}"} for h in hooks]}]},
-}, indent=2))
+# ... and wired as the framework's sample wires them, on every handled event.
+wiring = json.loads((fw / ".claude/settings.json.sample").read_text())["hooks"]
+wiring.setdefault("PreToolUse", []).append({"matcher": "*", "hooks": [
+    {"type": "command", "command": f"python3 .claude/hooks/{h}"} for h in hooks]})
+print(json.dumps({"permissions": {"allow": allow}, "hooks": wiring}, indent=2))
 PY
 cp "$ROOT_DIR/.omp/agent-config.md" "$REPO/.omp/agent-config.md"
 git -C "$REPO" add -A; git -C "$REPO" commit -qm init

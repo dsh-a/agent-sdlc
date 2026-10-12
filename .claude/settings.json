@@ -16,6 +16,7 @@
       "Bash(bash .claude/skills/cycle/sync-gitignore.sh*)",
       "Bash(bash .claude/skills/cycle/run-suite.sh*)",
       "Bash(bash .claude/skills/cycle/publish-branch.sh*)",
+      "Bash(bash .claude/skills/cycle/publish-stack.sh*)",
       "Bash(bash .claude/skills/cycle/reap-clones.sh*)",
       "Bash(python3 .claude/skills/cycle/aggregate-telemetry.py*)",
       "Bash(python3 .claude/skills/cycle/gate-report.py*)",
@@ -57,6 +58,17 @@
       }
     ],
     "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
       {
         "matcher": "*",
         "hooks": [

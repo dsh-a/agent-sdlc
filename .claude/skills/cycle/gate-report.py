@@ -336,7 +336,15 @@ def main() -> int:
     ap.add_argument("--all", action="store_true",
                     help="include human intervals that matched no named gate. Wakeups stay excluded — they are never human wait")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
+    ap.add_argument("--since", metavar="UTC",
+                    help="count only rows raised at or after this timestamp "
+                         "(YYYY-MM-DDTHH:MM:SSZ) — the cycle's start")
     args = ap.parse_args()
+    if args.since:
+        try:
+            datetime.strptime(args.since, "%Y-%m-%dT%H:%M:%SZ")
+        except ValueError:
+            ap.error(f"--since {args.since!r} is not a UTC timestamp like 2026-10-10T18:53:00Z")
 
     root = repo_root()
     path = pathlib.Path(args.log) if args.log else root / "agent_states" / "gate-log.tsv"
@@ -360,6 +368,12 @@ def main() -> int:
         return 0
 
     rows = read_rows(path)
+    # Keep rows raised at or after --since; the log carries earlier cycles too.
+    earlier = 0
+    if args.since:
+        kept = [r for r in rows if (r.get("raised_at") or "") >= args.since]
+        earlier = len(rows) - len(kept)
+        rows = kept
     denials = [r for r in rows if is_denial(r)]
     rows = [r for r in rows if not is_denial(r)]
     perms = [r for r in rows if is_permission(r)]
@@ -385,6 +399,7 @@ def main() -> int:
     if args.json:
         print(json.dumps({
             "captured": True,
+            "since": args.since, "excluded_before_since": earlier,
             "denials": [{"reason": (r.get("answer") or ""), "actor": r.get("phase"),
                          "excerpt": r.get("excerpt"), "at": r.get("raised_at")}
                         for r in denials],
@@ -419,6 +434,9 @@ def main() -> int:
         return 0
 
     print(f"Gate wait — {path}")
+    if args.since:
+        print(f"  Scoped to rows raised at or after {args.since}; {earlier} earlier "
+              f"row(s) from other runs excluded.")
     if wakeups:
         print(f"  {len(wakeups)} of {len(rows)} interval(s) ended on an agent-completion wakeup, "
               f"not a person ({hms(sum(r['wait'] for r in wakeups))} total).")

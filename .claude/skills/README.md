@@ -8,12 +8,13 @@ only when referenced (by an agent's `skills:` frontmatter or by name) — not au
 | Skill | Purpose |
 |---|---|
 | `cycle` | The pipeline orchestrator (`/cycle`) |
+| └ `cycle/stack.md` · `cycle/publish-stack.sh` | A sliced story published as a PR stack: build order, slice marks, one PR per layer |
 | `setup` | Stack-detecting configuration wizard |
 | `setup-scaffold` | Discover project patterns → scaffold pattern files |
 | `create-prd`, `generate-tasks`, `process-tasks` | Planning entry points |
 | `scaffold`, `ui-story`, `test`, `verify`, `review` | Per-task entry points (shims over the agents) |
 | `feature-idea`, `refine`, `self-improve` | Idea capture, story refinement, pipeline tuning |
-| └ `refine/probes.py` · `refine/story.py` | Step 3's probe enumeration and the `gh` half; `rationale.md` holds the measurements, `templates.md` the output shapes |
+| └ `refine/probes.py` · `refine/story.py` | Step 3's probe enumeration and the `gh` half; `rationale.md` holds the measurements, `templates.md` the output shapes, `slicing.md` how a story is cut for a stack |
 
 ## Pack-provided / active skills
 

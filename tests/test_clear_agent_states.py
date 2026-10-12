@@ -171,6 +171,77 @@ def main() -> int:
               (st / ".fanout-clone").is_file())
 
     with tempfile.TemporaryDirectory() as tmp:
+        # The session outlives the clear, so hooks recreate events/ holding only
+        # what happened afterwards. A second archive appends it.
+        t = pathlib.Path(tmp)
+        run_root = t / "cycles"; run_root.mkdir()
+        repo = make_repo(t)
+        st = repo / "agent_states"
+        arch = run_root / "telemetry" / "c1"
+
+        def fill(orch: str, counter: str, gate: str) -> None:
+            (st / "events").mkdir(exist_ok=True)
+            (st / "events" / "orchestrator.jsonl").write_text(orch)
+            (st / "counters").mkdir(exist_ok=True)
+            (st / "counters" / "impl-2.0").write_text(counter)
+            (st / "gate-log.tsv").write_text(gate)
+
+        (st / ".fanout-clone").write_text(
+            f"issue=419\nclone=c1\ngate_log={run_root}/gate-log.tsv\n")
+        fill('{"n":1}\n{"n":2}\n', "40", "raised_at\tcycle\na\tc1\n")
+        run_real(repo, "--all")
+        fill('{"n":3}\n', "2", "raised_at\tcycle\nb\tc1\n")
+        run_real(repo, "--all")
+        orch = (arch / "events" / "orchestrator.jsonl").read_text()
+        check("a second clear appends to the archive instead of replacing it",
+              orch == '{"n":1}\n{"n":2}\n{"n":3}\n', orch)
+        gate = (arch / "gate-log.tsv").read_text()
+        check("  ... the gate log keeps both rows and one header",
+              gate == "raised_at\tcycle\na\tc1\nb\tc1\n", gate)
+        check("  ... and a counter keeps the cycle's count, not the tail's",
+              (arch / "counters" / "impl-2.0").read_text() == "40")
+
+        # --archive-only copies and deletes nothing; a clear straight after it
+        # archives the same lines once.
+        fill('{"n":4}\n', "1", "raised_at\tcycle\nc\tc1\n")
+        out = run_real(repo, "--archive-only")
+        check("--archive-only reports the archive", "archived telemetry" in out, out)
+        check("  ... and deletes nothing",
+              (st / "events" / "orchestrator.jsonl").is_file())
+        run_real(repo, "--archive-only")
+        run_real(repo, "--all")
+        orch = (arch / "events" / "orchestrator.jsonl").read_text()
+        check("  ... and re-archiving the same tail does not duplicate it",
+              orch == '{"n":1}\n{"n":2}\n{"n":3}\n{"n":4}\n', orch)
+
+        # A file that grew since the last archive contributes its new lines only.
+        fill('{"n":5}\n', "1", "raised_at\tcycle\nd\tc1\n")
+        run_real(repo, "--archive-only")
+        with open(st / "events" / "orchestrator.jsonl", "a") as f:
+            f.write('{"n":6}\n')
+        run_real(repo, "--archive-only")
+        orch = (arch / "events" / "orchestrator.jsonl").read_text()
+        check("a file that grew between two archives is not doubled",
+              orch.count('"n":5') == 1 and orch.endswith('{"n":6}\n'), orch)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        # Per-session bookkeeping is ephemeral; an unknown directory is kept.
+        repo = make_repo(pathlib.Path(tmp))
+        st = repo / "agent_states"
+        for d in ("denial-seen", "permission-open", "whispers", "keepme"):
+            (st / d).mkdir()
+            (st / d / "x").write_text("x")
+        out = run_real(repo, "--all")
+        check("denial-seen/, permission-open/ and whispers/ are cleared",
+              not any((st / d).exists()
+                      for d in ("denial-seen", "permission-open", "whispers")), out)
+        check("  ... while an unknown directory is still kept",
+              (st / "keepme").is_dir(), out)
+        out = run_real(repo, "--archive-only")
+        check("--archive-only outside a fan-out clone is a no-op, not an error",
+              "nothing to archive" in out, out)
+
+    with tempfile.TemporaryDirectory() as tmp:
         # A failed archive must not look like a solo cycle. It is the difference
         # between "nothing to keep" and "the run's only cross-clone evidence is
         # gone", and both printed the same thing before.

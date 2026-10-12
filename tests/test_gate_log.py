@@ -242,6 +242,33 @@ def main() -> int:
               data["gates"] == 2 and data["by_gate"]["gate-2"]["n"] == 2, out.stdout)
 
     with tempfile.TemporaryDirectory() as tmp:
+        # --since scopes the totals to one cycle in a log holding earlier ones.
+        t = pathlib.Path(tmp)
+        log = t / "gate-log.tsv"
+        cols = "raised_at\tanswered_at\twait_s\tcycle\tissue\tgate\tphase\texcerpt\tanswer"
+        log.write_text("\n".join([
+            cols,
+            "2026-09-01T09:00:00Z\t2026-09-01T10:00:00Z\t3600\t-\t-\tgate-2\t-\told\tgo",
+            "2026-09-06T10:00:00Z\t2026-09-06T10:01:00Z\t60\t-\t-\tgate-2\t-\tnew\tgo",
+        ]) + "\n")
+
+        def rep(*extra: str) -> subprocess.CompletedProcess:
+            return subprocess.run([sys.executable, str(REPORT), "--log", str(log), *extra],
+                                  cwd=t, capture_output=True, text=True, timeout=30)
+
+        data = json.loads(rep("--json").stdout)
+        check("unscoped, an earlier cycle's gate is in the total",
+              data["gates"] == 2 and data["wait_total_s"] == 3660, str(data.get("wait_total_s")))
+        data = json.loads(rep("--json", "--since", "2026-09-06T00:00:00Z").stdout)
+        check("--since counts only this cycle's gates",
+              data["gates"] == 1 and data["wait_total_s"] == 60, str(data))
+        check("  ... and reports what it excluded", data["excluded_before_since"] == 1, str(data))
+        check("  ... in the text report too",
+              "1 earlier row(s)" in rep("--since", "2026-09-06T00:00:00Z").stdout)
+        check("a --since that is not a UTC timestamp is refused",
+              rep("--since", "yesterday").returncode == 2)
+
+    with tempfile.TemporaryDirectory() as tmp:
         # No log is "not captured" — never a plausible-looking zero.
         t = pathlib.Path(tmp)
         repo = make_repo(t)

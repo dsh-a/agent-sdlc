@@ -16,7 +16,7 @@ discovers agents from `.omp/agents/` (native, priority 100).
   settings.json.sample # hooks template to merge into settings.json
   .mcp.json.sample     # template for connecting MCP servers (Context Sources)
   hooks/
-    log-event.py       # per-agent event log (PostToolUse + SubagentStop)
+    log-event.py       # per-agent event log (PostToolUse + PostToolUseFailure + SubagentStop)
   agents/              # the agent team (stack-neutral) — see agents/README.md
     scaffold/          # 26 language-neutral pattern shapes (23 GoF + interface/service/use-case)
       INDEX.md         # routing table — triggers + disambiguation; read this to pick a pattern

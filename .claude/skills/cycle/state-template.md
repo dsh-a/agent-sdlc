@@ -21,9 +21,9 @@ Status: [active | paused | finished]
 - [ ] Phase 4 — Completion
 
 ## Parent task status
-| Task | Status | Model | Notes |
-|---|---|---|---|
-| 1.0 | [pending/in-progress/complete/failed/blocked] | [model] | [commit hash, task branch, or blocker] |
+| Task | Slice | Status | Model | Notes |
+|---|---|---|---|---|
+| 1.0 | [n, or — when the story has no slices] | [pending/in-progress/complete/failed/blocked] | [model] | [commit hash, task branch, or blocker] |
 
 ## Blockers
 - [task-id]: [description] — status: [waiting/resolved]

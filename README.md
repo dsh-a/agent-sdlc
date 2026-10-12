@@ -420,7 +420,8 @@ changing exactly one line, so a half-write is unexpressible.
 
 `.claude/skills/refine/story.py` is the `gh` half — `load` (one invocation for the issue, its
 labels, its board fields, both dependency directions and a gate verdict), `dor` (the
-Definition-of-Ready table as a gate that exits 1 naming what is unmet), `set-depth`, and `split`.
+Definition-of-Ready table as a gate that exits 1 naming what is unmet), `slices` (the stack's
+slices, with every AC placed exactly once), `set-depth`, and `split`.
 It calls `gh` with list argv and never a shell, and every write is dry until `--apply`.
 
 The one probe that asks *who the story is for* reads a project-supplied customer-profile file
@@ -431,7 +432,9 @@ number nobody read, and an inert gate reads as a passing one.
 ### Gate wait (Claude Code)
 
 Time spent waiting on a human is usually the largest non-agent cost in a cycle, and wallclock
-alone hides it. `.claude/hooks/gate-log.py` — registered on `Stop` and `UserPromptSubmit` —
+alone hides it. `.claude/hooks/gate-log.py` — registered on `Stop` and `UserPromptSubmit` for
+gate wait, and on `PermissionRequest`, `PostToolUse` and `SubagentStop` for permission wait and
+refusals; `deploy.sh check` fails a project that wires it on fewer —
 records every interval between an assistant turn ending and the next prompt, labelling the ones
 that match a known gate (Gate 1, Gate 2, the 4B gate, `pr_body_gate`). Unlabelled intervals are
 still recorded, so a classification miss never looks like an absence of waiting.
@@ -504,6 +507,25 @@ at the `prd`, `tasks`, `implement`, `review`, and `verify` stages.
 | Empty | Checks for active cycles, or offers open `label:feature` issues |
 
 Resume a paused cycle: `/cycle --exe agent_states/cycle-state-[feature-name].md`.
+
+### Stacked pull requests
+
+A `full`-depth story ships as a stack: one pull request per slice, each based on the branch of the
+one below, linked as a GitHub stack and landed by merging the top PR.
+
+| Step | Where | What happens |
+|---|---|---|
+| Slice | `/refine` Step 7b, `refine/slicing.md` | The story body gains `## Slices`; `story.py slices` checks every AC sits in exactly one |
+| Plan | `generate-tasks` | Parent tasks carry `[slice: N]`, in slice order, tests with their slice |
+| Build | Phase 3, `cycle/stack.md` | Slices build in order; `publish-stack.sh mark <k>` records each boundary |
+| Audit | Phase 4A | Verify and review run once on the tip; their fixes become the top layer |
+| Publish | Phase 4B | `publish-stack.sh publish` pushes each layer, opens the PRs and links the stack |
+
+`lean` and `hotfix` cycles, and a story with no `## Slices`, ship one PR as before.
+
+A project picks up the script's permission with `deploy.sh grants <project>`. Every PR of a linked
+stack triggers the project's `pull_request` workflows for the bottom base; `cycle/stack.md` §
+Project CI has the guard that runs an expensive job on the top PR only.
 
 ### Opening a terminal window
 
