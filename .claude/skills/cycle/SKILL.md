@@ -403,7 +403,7 @@ Override with --mode full|lean|hotfix.
 
 If the user passed `--mode` explicitly, **suppress the suggestion entirely** — their declaration wins. Record the suggestion-vs-actual outcome in cycle state's `## References` as `Mode suggestion: <suggested> | accepted: true|false` so `self-improve` can later calibrate the heuristics from observed acceptance rates.
 
-Dry-run ends with: **"Ready to execute? `/cycle --exe` to begin, or adjust first."**
+Dry-run ends with: **"Ready to execute? Reply `go` to begin, or adjust first."** A `go` is this cycle continuing with `--exe`, not a second `/cycle` — typing the command again loads this skill twice. After a `/clear`, resume with `/cycle --exe agent_states/cycle-state-[feature].md`.
 
 ---
 
@@ -639,6 +639,9 @@ field, else the 5.6.4 heuristics, else ask (§ Depth is a property of the story)
 `Mode:` and `Mode source:` into cycle state's `## References` at this point. Resolving it later
 is too late: the mode decides whether Phase 1A spawns `create-prd` at all.
 
+**`full`, from a story:** run `python3 .claude/skills/refine/story.py slices <n>` and, on
+`verdict=ok`, save its rows to `local://slices.md`. Any other verdict: the cycle ships one PR.
+
 **Checkpoint recovery (omp).** Under omp, you can checkpoint your session before risky operations (escalation ladder L3 revert, mid-cycle scope changes, complex merges). If the operation fails, `rewind` to the checkpoint instead of restarting the cycle:
 ```
 checkpoint(action: "set", label: "pre-L3-revert-task-2.0")
@@ -694,7 +697,7 @@ Run **Context Sources retrieval** for stage `prd` (see § Context Sources retrie
 ```
 task(agent: "create-prd", context: "Create a PRD from the feature description.",
   tasks: [{ id: "create-prd", role: "PRD author",
-    assignment: "Feature: [description]. [Any roadmap story number or context]. Read local://ctx-sources.md if it exists for context-source data." }])
+    assignment: "Feature: [description]. [Any roadmap story number or context]. Read local://ctx-sources.md if it exists for context-source data. Read local://slices.md if it exists." }])
 ```
 
 Confirm the PRD file exists at the agent's `produces:` path. Missing = re-spawn or escalate.
@@ -939,6 +942,8 @@ Classify parent tasks: **independent** (start now) or **dependent** (wait for pr
 Classify sub-tasks by type → assign agent per the delegation table in 3.3.
 
 Present analysis in dry-run mode. In `--exe` mode, proceed.
+
+**With `local://slices.md`, the cycle ships a PR stack.** Read `.claude/skills/cycle/stack.md` now: it sets the build order here, the mark after each slice, and step 8's publish.
 
 ### 3.3 — Spawn agents
 
@@ -1585,6 +1590,8 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    tags. The skill owns the section order, the source map, and the honesty rules for gaps;
    do not improvise a body or paste the run report into it. If `pr_body_gate` (§ Cycle
    Options) is `true`, show the file and wait for the user before creating the PR.
+
+   **With slice marks, publish per `.claude/skills/cycle/stack.md` instead** — one PR per layer.
 8b. **Vault sync again** — if `vault_root` is non-empty, re-run **step 7b's sync verbatim**.
 
    The PR body is written *here*, in step 8, after 7b has already run. So a cycle never commits

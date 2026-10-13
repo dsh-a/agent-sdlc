@@ -71,6 +71,7 @@ Every parent task carries one `[kind: <name>]` tag. The orchestrator dispatches 
   - Presentation layer (controller / view-model + view)
   - Tests
   - Integration / wiring cleanup (if needed)
+- **With slices:** tag each parent task `[slice: N]` after its kind — `1.0 [kind: coding] [slice: 1] Title`. List tasks in slice order, and put a slice's tests in that slice. The layering above applies inside a slice.
 
 ---
 

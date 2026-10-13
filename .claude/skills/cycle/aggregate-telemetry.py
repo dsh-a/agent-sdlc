@@ -36,8 +36,8 @@ import sys
 NO_DATA = "Telemetry not collected — enable hooks per README."
 
 HEADER = (
-    "| Agent ID | Type | Tool calls | Breakdown | Errors | Wallclock | Stop reason |\n"
-    "|---|---|---|---|---|---|---|"
+    "| Agent ID | Type | Tool calls | Breakdown | Errors | Wallclock |\n"
+    "|---|---|---|---|---|---|"
 )
 
 # Tools listed individually in the breakdown before the rest are summed as "other".
@@ -66,11 +66,22 @@ def events_dir(explicit: str | None) -> pathlib.Path:
     return pathlib.Path("agent_states/events")
 
 
-def parse(d: pathlib.Path) -> tuple[dict, int, int, dict]:
-    """Return (per-agent rows, files read, malformed lines skipped)."""
+def since_arg(value: str) -> str:
+    """Accept the hook's timestamp shape, `YYYY-MM-DDTHH:MM:SSZ`."""
+    try:
+        datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"{value!r} is not a UTC timestamp like 2026-10-10T18:53:00Z")
+    return value
+
+
+def parse(d: pathlib.Path, since: str | None = None) -> tuple[dict, int, int, dict, int]:
+    """Return (per-agent rows, files read, malformed lines skipped, sessions,
+    events dropped for predating `since`)."""
     agents: dict[str, dict] = {}
     sessions: dict[str, dict] = {}
-    files = skipped = 0
+    files = skipped = before = 0
     for f in sorted(d.glob("*.jsonl")):
         files += 1
         try:
@@ -89,6 +100,12 @@ def parse(d: pathlib.Path) -> tuple[dict, int, int, dict]:
             if not isinstance(e, dict):
                 skipped += 1
                 continue
+            if since:
+                # Keep events stamped at or after `since`.
+                ts_ = e.get("ts")
+                if not isinstance(ts_, str) or ts_ < since:
+                    before += 1
+                    continue
             aid = str(e.get("agent_id") or "unknown")
             a = agents.setdefault(aid, {
                 "agent_type": e.get("agent_type") or "—",
@@ -126,7 +143,7 @@ def parse(d: pathlib.Path) -> tuple[dict, int, int, dict]:
             a["tools"][e.get("tool") or "—"] += 1
             if e.get("exit") == "error":
                 a["errors"] += 1
-    return agents, files, skipped, sessions
+    return agents, files, skipped, sessions, before
 
 
 def duration(first: str | None, last: str | None) -> str:
@@ -312,8 +329,7 @@ def span_warning(first: str | None, last: str | None) -> str | None:
     if hours > 24:
         return (f"**Events span {hours:.0f}h ({first[:10]} → {last[:10]}).** That is longer than a "
                 "cycle, so this directory holds more than one run — totals and wallclocks below "
-                "cover all of them. Clear it between cycles (clear-agent-states.py) for per-cycle "
-                "figures.")
+                "cover all of them. Pass --since <this cycle's start> for per-cycle figures.")
     return None
 
 
@@ -321,6 +337,9 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--format", choices=("markdown", "json"), default="markdown")
     ap.add_argument("--events", help="events directory (default: <git-root>/agent_states/events)")
+    ap.add_argument("--since", type=since_arg, metavar="UTC",
+                    help="count only events at or after this timestamp "
+                         "(YYYY-MM-DDTHH:MM:SSZ) — the cycle's start")
     args = ap.parse_args()
 
     d = events_dir(args.events)
@@ -329,10 +348,12 @@ def main() -> int:
               else json.dumps({"status": "no-data", "reason": f"{d} does not exist"}, indent=2))
         return 0
 
-    agents, files, skipped, sessions = parse(d)
+    agents, files, skipped, sessions, before = parse(d, args.since)
     if not agents:
         print(NO_DATA if args.format == "markdown"
-              else json.dumps({"status": "no-data", "reason": f"no parsable events in {d}",
+              else json.dumps({"status": "no-data",
+                               "reason": (f"no events at or after {args.since} in {d}"
+                                          if before else f"no parsable events in {d}"),
                                "files_read": files, "malformed_lines": skipped}, indent=2))
         return 0
 
@@ -382,6 +403,7 @@ def main() -> int:
         print(json.dumps({
             "status": "ok",
             "events_dir": str(d), "files_read": files, "malformed_lines": skipped,
+            "since": args.since, "excluded_before_since": before,
             "agents": [{
                 "agent_id": aid, "agent_type": a["agent_type"], "tool_calls": a["calls"],
                 "breakdown": dict(a["tools"]), "errors": a["errors"],
@@ -409,13 +431,17 @@ def main() -> int:
                 span_warning(min(firsts) if firsts else None,
                              max(lasts) if lasts else None), id_warning(agents)]
     warnings += [gap_warning(aid, a) for aid, a in ordered]
+    if args.since:
+        # State the scope and how many events it excluded.
+        print(f"*Scoped to events at or after {args.since}; {before} earlier event(s) "
+              "from other runs excluded.*\n")
     for warn in warnings:
         if warn:
             print(warn + "\n")
     print(HEADER)
     for aid, a in ordered:
         print(f"| `{aid}` | {a['agent_type']} | {a['calls']} | {breakdown(a['tools'])} "
-              f"| {a['errors']} | {duration(a['first'], a['last'])} | {a['stop']} |")
+              f"| {a['errors']} | {duration(a['first'], a['last'])} |")
     print()
     print("### Phase-3 totals")
     print("| Metric | Value |")

@@ -456,6 +456,16 @@ a known-good baseline for claims already verified this session; still ground any
 
 ---
 
+## Step 7b — Slice for the stack
+
+A `full` story ships as one PR per slice. Cut it per `slicing.md`, then check:
+
+```sh
+python3 .claude/skills/refine/story.py slices <n>
+```
+
+---
+
 ## Step 8 — Restate, take sign-off, set final status
 
 **Nothing here is written until the user has signed off.** Decide the verdict and the depth,
@@ -470,7 +480,7 @@ and that every CONTRADICTED grounding row was resolved rather than dropped.
 
 | Verdict | Condition | `Refinement` |
 |---|---|---|
-| **READY** | INVEST passes; no open spikes; no unresolved contradiction; every mechanism claim proven (Step 2b); `probes.py coverage` reports zero gaps; `Depth` set | `REFINED` |
+| **READY** | INVEST passes; no open spikes; no unresolved contradiction; every mechanism claim proven (Step 2b); `probes.py coverage` reports zero gaps; `Depth` set; `## Slices` if `full` | `REFINED` |
 | **NEEDS-SPLIT** | INVEST-S fails; user did not confirm the split | `REFINING` |
 | **BLOCKED** | One or more open spikes | `BLOCKED` |
 | **SPLIT** | Split this pass | — closed `not planned` + `superseded:split` |

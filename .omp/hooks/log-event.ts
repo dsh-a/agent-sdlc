@@ -92,7 +92,7 @@ export default function (pi: HookAPI): void {
  * linked worktree of the origin — under a parallel run that sent every clone's
  * events into one directory in the origin (see parallel-cycles-evidence-run1 E1).
  * Git topology cannot distinguish the two, so the launcher marks a clone and the
- * marker wins. Kept byte-for-byte in step with `.claude/hooks/log-event.py`.
+ * marker wins. Same rule as `cycle_root()` in `.claude/hooks/log-event.py`.
  */
 function resolveMainRoot(): string | null {
   const git = (args: string): string =>

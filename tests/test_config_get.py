@@ -210,6 +210,45 @@ def test_missing_and_default() -> None:
               f"rc={r.returncode} out={r.stdout.strip()!r}")
 
 
+def test_framework_default_and_aliases() -> None:
+    print("\nframework defaults and aliases")
+    with tempfile.TemporaryDirectory() as td:
+        repo = make_repo(td)
+        # The real template has a `pr_body_gate` row; the fixture has none.
+        r = run(repo, "pr_body_gate")
+        check("a row the project lacks takes the framework's value",
+              r.returncode == 0 and r.stdout.strip() == "true",
+              f"rc={r.returncode} out={r.stdout.strip()!r}")
+        check("  ... and says it is a default, on stderr",
+              "framework default" in r.stderr, r.stderr.strip())
+
+        own = repo / "own.md"
+        own.write_text("## Cycle Options\n\n| Option | Value |\n|---|---|\n"
+                       "| pr_body_gate | `false` |\n", encoding="utf-8")
+        r = run(repo, "pr_body_gate", "--config", str(own))
+        check("the project's own row wins over the default",
+              r.stdout.strip() == "false" and not r.stderr.strip(),
+              f"out={r.stdout.strip()!r} err={r.stderr.strip()!r}")
+
+        empty = repo / "empty.md"
+        empty.write_text("## Nothing\n", encoding="utf-8")
+        r = run(repo, "pr_body_gate", "--config", str(empty))
+        check("an explicit --config is taken at its word: no fallback",
+              r.returncode == 1, f"rc={r.returncode} out={r.stdout.strip()!r}")
+        r = run(repo, "pr_body_gate", "--config", str(empty), "--template", str(own))
+        check("  ... unless --template names one",
+              r.returncode == 0 and r.stdout.strip() == "false",
+              f"rc={r.returncode} out={r.stdout.strip()!r}")
+
+        cmds = repo / "cmds.md"
+        cmds.write_text("## Project Commands\n\n| Purpose | Command |\n|---|---|\n"
+                        "| CI workflow (dispatchable) | `ci.yml` |\n", encoding="utf-8")
+        r = run(repo, "ci_workflow", "--config", str(cmds))
+        check("ci_workflow resolves to the row the config calls 'CI workflow'",
+              r.returncode == 0 and r.stdout.strip() == "ci.yml",
+              f"rc={r.returncode} out={r.stdout.strip()!r}")
+
+
 def test_batch_and_formats() -> None:
     print("\nbatch and formats")
     with tempfile.TemporaryDirectory() as td:
@@ -264,6 +303,7 @@ def main() -> int:
     test_preset_resolution()
     test_ambiguity_is_an_error()
     test_missing_and_default()
+    test_framework_default_and_aliases()
     test_batch_and_formats()
     test_context_saving()
     test_unreadable_config()

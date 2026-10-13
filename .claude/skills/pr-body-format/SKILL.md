@@ -131,6 +131,45 @@ PR look cleaner. The table is the reviewer's basis for how hard to look.
 
 ---
 
+## Stacked bodies
+
+A stacked cycle (`cycle/stack.md`) writes one body per layer. The top layer's body is the full
+body above, covering the whole story. Every lower layer gets this short body, written to
+`cycle_reports/pr-body-[feature-name]-[YYYY-MM-DD]-s[k].md`:
+
+```markdown
+[One or two sentences: what this slice adds, for someone reading only this PR.]
+
+**Stack** — part of #[story issue]; merge the top PR to land all of it.
+
+| | PR | Slice |
+|---|---|---|
+| 1 | this PR | [slice title] |
+| 2 | next | [slice title] |
+
+## Acceptance criteria in this slice
+
+- [each AC the slice owns, verbatim]
+
+## Left to the next slice
+
+- [what this diff deliberately does not do yet, and which slice does it]
+
+## Read in this order
+
+1. `path/to/file` — [why first]
+```
+
+- Source each section from that slice's own range: `git log [base]..[branch]` and
+  `git diff --stat [base]...[branch]`, with both names from `publish-stack.sh layers`.
+- `Closes #n` goes in the top body only.
+- When the top layer holds only post-audit fixes, its `What changed` lists the fixes first and
+  then one line per slice with its PR.
+- After publishing, replace `this PR` / `next` with the PR numbers and
+  `gh pr edit [n] --body-file [path]`.
+
+---
+
 ## Mechanics
 
 1. Write the body to `cycle_reports/pr-body-[feature-name]-[YYYY-MM-DD].md`.

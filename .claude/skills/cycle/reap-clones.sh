@@ -44,6 +44,9 @@
 set -u
 
 PROG=reap-clones
+# Physical, so a symlinked deployment resolves to the framework checkout and the
+# sibling script is found there.
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)"
 APPLY=0
 ROOT=""
 
@@ -229,6 +232,13 @@ cmd_sweep() {
     OWNER="$(git -C "$WT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)"
     OWNER="$(dirname "${OWNER:-}")"
     if [ -n "$OWNER" ] && [ -d "$OWNER" ]; then
+      # The clone's telemetry leaves with it unless it is copied out first.
+      # Finalize normally archives when it clears, but a refused clear archives
+      # nothing, and events written after the clear are in no archive either.
+      # Best-effort: a sweep that refuses to remove a clone because a copy
+      # failed is worse than the loss, so it says so and carries on.
+      (cd "$WT" && python3 "$HERE/clear-agent-states.py" --archive-only >/dev/null 2>&1) \
+        || say "$c: telemetry could not be archived — its events go with the clone"
       git -C "$OWNER" worktree remove --force "$WT" 2>/dev/null \
         || { say "could not remove $c — remove it by hand."; continue; }
       git -C "$OWNER" worktree prune 2>/dev/null

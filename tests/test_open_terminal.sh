@@ -51,7 +51,19 @@ for s in open osascript pgrep wezterm kitty; do mkstub "$s"; done
 # ghostty-first check, so every Windows assertion saw an empty recording and the
 # suite tested the host instead of the script. Only the system directories, so
 # mktemp/sed/grep still resolve.
-export PATH="$BIN:/usr/bin:/bin:/usr/sbin:/sbin"
+#
+# Link the system tools into one directory and take out the programs this suite
+# is about, so the only copies on PATH are the stubs. A host may ship its own:
+# GitHub's Ubuntu image has `/usr/bin/pwsh`.
+SYS="$R/sys"; mkdir -p "$SYS"
+for d in /sbin /usr/sbin /bin /usr/bin; do
+  ln -sf "$d"/* "$SYS"/ 2>/dev/null || true
+done
+for x in pwsh pwsh.exe powershell powershell.exe wt.exe cmd.exe cygpath osascript open \
+         ghostty wezterm kitty gnome-terminal konsole alacritty xterm uname pgrep; do
+  rm -f "$SYS/$x"
+done
+export PATH="$BIN:$SYS"
 # A clean environment: no emulator hints, no remote/CI short-circuit.
 unset TERM_PROGRAM KITTY_WINDOW_ID SSH_CONNECTION SSH_TTY CI TERMINAL 2>/dev/null || true
 
@@ -106,6 +118,9 @@ has  "  ... naming what it looked for" "$(cat "$R/err")" "pwsh.exe or powershell
 #
 # No Ghostty: the fallback must run the command under zsh.
 set_uname 'Darwin'
+# The script uses /bin/zsh when it exists and bash otherwise, by absolute path,
+# so assert the shell this host should get.
+MAC_SH=bash; [ -x /bin/zsh ] && MAC_SH=zsh
 # Point the Ghostty check at a path that does not exist. On a machine that has
 # Ghostty installed, the no-Ghostty fallback — the branch the zsh default lives
 # in — is otherwise unreachable, and this assertion silently tested the
@@ -116,7 +131,7 @@ has  "macOS with no Ghostty falls back to Terminal.app" "$out" "open -a Terminal
 # The launcher is a temp file; read the one the stub was handed.
 LP="$(printf '%s' "$out" | sed -n 's/^open -a Terminal //p')"
 if [ -n "$LP" ] && [ -r "$LP" ]; then
-  has "  ... and the launcher runs zsh, not bash" "$(head -1 "$LP")" "/bin/zsh"
+  has "  ... and the launcher runs zsh, not bash" "$(head -1 "$LP")" "/bin/$MAC_SH"
   rm -f "$LP"
 else
   bad "  ... and the launcher runs zsh, not bash" "launcher not found: [$LP]"
@@ -125,8 +140,8 @@ fi
 # WezTerm takes the command as argv, so the shell is visible directly.
 export TERM_PROGRAM=WezTerm
 out="$(run --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
-has  "macOS WezTerm runs the command under zsh" "$out" "zsh -lc"
-hasnt "  ... not bash" "$out" "bash -lc"
+has  "macOS WezTerm runs the command under zsh" "$out" "$MAC_SH -lc"
+[ "$MAC_SH" = zsh ] && hasnt "  ... not bash" "$out" "bash -lc"
 unset TERM_PROGRAM
 
 # -------------------------------------------------------------------- linux ----

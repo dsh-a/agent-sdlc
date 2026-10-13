@@ -43,6 +43,16 @@ emphasis and no caller wants them.
 
 Exit 0 found, 1 not found (and no `--default`), 2 ambiguous, 3 unreadable config.
 
+**A row the project lacks takes the framework's value.** A project's config is
+a copy of the template from the day it was deployed, so rows added since are
+absent from it. The template's value is the documented default: a miss falls
+back to it and says so on stderr. The fallback applies to the default config;
+with an explicit `--config`, pass `--template` to name the fallback file.
+
+**Keys the skill uses are aliases for rows written for humans.** § Project
+Commands calls the row `CI workflow (dispatchable)`; the skill calls it
+`ci_workflow`, and that lookup missed 55 times in the same sessions.
+
 **Ambiguity is an error, not a coin flip.** A name can appear in two sections —
 `verify` is a row in both Optional Agents and Model Allocation — and picking one
 silently is how a caller ends up configured by the wrong table. Pass `--section`.
@@ -58,6 +68,16 @@ import subprocess
 import sys
 
 CONFIG_REL = pathlib.Path(".omp") / "agent-config.md"
+
+# skill key -> row name, both lowercase. See the module docstring.
+ALIASES = {"ci_workflow": "ci workflow (dispatchable)"}
+
+
+def framework_template() -> pathlib.Path:
+    """The template this script shipped with. `resolve()` follows the deployed
+    symlink back into the framework checkout; a copied skill directory lands in
+    the project instead and finds its own config, which the caller skips."""
+    return pathlib.Path(__file__).resolve().parents[3] / CONFIG_REL
 
 
 def repo_root() -> pathlib.Path:
@@ -151,9 +171,10 @@ def parse_config(text: str) -> tuple[list[Row], str | None]:
 
 def find(rows: list[Row], name: str, section: str | None) -> list[Row]:
     want = name.strip().lower()
+    wants = {want, ALIASES.get(want, want)}
     out = []
     for r in rows:
-        if r.name.strip().lower() != want:
+        if r.name.strip().lower() not in wants:
             continue
         if section and section.lower() not in r.section.lower():
             continue
@@ -192,6 +213,9 @@ def main() -> int:
     ap.add_argument("--list", action="store_true", help="list every row name")
     ap.add_argument("--format", choices=("plain", "env", "json"), default="plain")
     ap.add_argument("--config", help="path to the config file")
+    ap.add_argument("--template",
+                    help="config to fall back to for a row this one lacks "
+                         "(default: the framework's, unless --config is given)")
     args = ap.parse_args()
 
     root = repo_root()
@@ -205,6 +229,15 @@ def main() -> int:
         return 3
 
     rows, preset = parse_config(text)
+
+    template = (pathlib.Path(args.template) if args.template
+                else None if args.config else framework_template())
+    fallback_rows: list[Row] = []
+    try:
+        if template and template.is_file() and template.resolve() != path.resolve():
+            fallback_rows, _ = parse_config(template.read_text(encoding="utf-8"))
+    except OSError:
+        pass
 
     if args.list:
         for r in rows:
@@ -245,6 +278,11 @@ def main() -> int:
             print(f"config-get: '{n}' is ambiguous — appears in: {where}. "
                   f"Pass --section.", file=sys.stderr)
             return 2
+        if val is None and not hits and fallback_rows:
+            val, _ = lookup(fallback_rows, n, args.section, args.column)
+            if val is not None:
+                print(f"config-get: '{n}' is not in {path.name} here — using the "
+                      f"framework default from {template}", file=sys.stderr)
         if val is None:
             if args.default is not None:
                 val = args.default

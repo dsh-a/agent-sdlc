@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""log-event — Claude Code PostToolUse + SubagentStop hook.
+"""log-event — Claude Code PostToolUse + PostToolUseFailure + SubagentStop hook.
 
 Appends one JSONL line per event to ``<cycle-root>/agent_states/events/<agent_id>.jsonl``.
 
@@ -18,7 +18,15 @@ Git topology cannot tell the two apart: both are linked worktrees. So the launch
 marks a fan-out clone with ``agent_states/.fanout-clone`` and that marker wins.
 
 Pure logging — never fails the calling tool. Wired from ``.claude/settings.json``
-as a ``PostToolUse`` and ``SubagentStop`` hook.
+as a ``PostToolUse``, ``PostToolUseFailure`` and ``SubagentStop`` hook.
+
+``PostToolUse`` fires for a call that succeeded and ``PostToolUseFailure`` for one
+that failed. Both write a ``tool`` line; ``exit`` is ``"ok"`` or ``"error"``, and
+it feeds the run report's Errors column and the supervisor's error-spiral threshold.
+
+``SubagentStop`` carries ``agent_id``, ``agent_type``, ``agent_transcript_path``,
+``last_assistant_message`` and ``stop_hook_active``. ``stop_reason`` is copied
+through for a harness that supplies one.
 """
 
 import json
@@ -79,12 +87,15 @@ def main():
     event = payload.get("hook_event_name")
 
     line = None
-    if event == "PostToolUse":
+    is_tool = event in ("PostToolUse", "PostToolUseFailure")
+    if is_tool:
         r = payload.get("tool_response") or payload.get("tool_result") or {}
-        is_err = isinstance(r, dict) and (
-            r.get("is_error") or r.get("type") == "error"
+        is_err = event == "PostToolUseFailure" or (
+            isinstance(r, dict) and (r.get("is_error") or r.get("type") == "error")
         )
         inp = payload.get("tool_input") or {}
+        if not isinstance(inp, dict):
+            inp = {}
         line = {
             "ts": ts,
             "session_id": payload.get("session_id"),
@@ -96,6 +107,12 @@ def main():
             "command": inp.get("command"),
             "exit": "error" if is_err else "ok",
         }
+        # Bounded: the text is tool output and can be a whole test log.
+        err = payload.get("error")
+        if isinstance(err, str) and err:
+            line["error"] = err[:200]
+        if payload.get("is_interrupt"):
+            line["interrupt"] = True
     elif event == "SubagentStop":
         line = {
             "ts": ts,
@@ -130,10 +147,10 @@ def main():
         return
 
     # Supervisor cadence counter (item 5.5.4). Per-agent integer file at
-    # agent_states/counters/<agent_id>. Incremented on every PostToolUse event.
+    # agent_states/counters/<agent_id>. Incremented on every tool call, failed or not.
     # The orchestrator's watchdog reads + resets these when it decides to
     # spawn a supervisor check. Pure best-effort — never fails the caller.
-    if event == "PostToolUse" and agent_id != "orchestrator":
+    if is_tool and agent_id != "orchestrator":
         try:
             counters_dir = os.path.join(cycle_dir, "agent_states", "counters")
             os.makedirs(counters_dir, exist_ok=True)

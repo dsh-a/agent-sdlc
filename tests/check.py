@@ -120,10 +120,13 @@ def main() -> int:
     rc |= sh_suite("sync-gitignore", "test_sync_gitignore.sh")
     rc |= sh_suite("run-suite", "test_run_suite.sh")
     rc |= sh_suite("publish-branch", "test_publish_branch.sh")
+    rc |= sh_suite("publish-stack", "test_publish_stack.sh")
     rc |= sh_suite("reap-clones", "test_reap_clones.sh")
     rc |= sh_suite("start-parallel-cycles", "test_start_parallel_cycles.sh")
     rc |= sh_suite("deploy", "test_deploy.sh")
     rc |= sh_suite("install-workflows", "test_install_workflows.sh")
+    rc |= sh_suite("preflight-deploy", "test_preflight_deploy.sh")
+    rc |= sh_suite("open-terminal", "test_open_terminal.sh")
     # These three assert at import time, so they run as subprocesses. The first
     # two were not in this runner at all until 2026-09-14 — `check.py` is billed
     # as the one command an agent can rely on, and it was silently skipping the

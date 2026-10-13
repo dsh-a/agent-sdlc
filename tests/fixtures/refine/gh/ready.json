@@ -15,7 +15,7 @@
   "title": "A story",
   "state": "OPEN",
   "url": "https://github.com/dsh-a/example/issues/413",
-  "body": "Intro.\n\n## Acceptance Criteria\n\n- [ ] (+) it does the thing\n- [ ] (\u2212) it does not do the other thing\n\n## Open questions\n\n- [x] ~~(Risk) **Q-1** \u2014 settled?~~ \u2192 yes (resolved 2026-10-01)\n",
+  "body": "Intro.\n\n## Acceptance Criteria\n\n- [ ] (+) it does the thing\n- [ ] (\u2212) it does not do the other thing\n\n## Open questions\n\n- [x] ~~(Risk) **Q-1** \u2014 settled?~~ \u2192 yes (resolved 2026-10-01)\n\n## Slices\n\n1. Model \u2014 `lib/domain/` \u2014 AC 1\n2. Screen \u2014 `lib/ui/` \u2014 AC 2\n",
   "labels": {
    "nodes": [
     {

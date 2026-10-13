@@ -77,7 +77,7 @@ def main() -> int:
         check("empty dir → 'not collected', not an empty table",
               code == 0 and "Telemetry not collected" in out and "| Agent ID |" not in out)
 
-        # Counting, error tallying, stop reason, and malformed-line accounting.
+        # Counting, error tallying, and malformed-line accounting.
         good = t / "good"
         write(good, "test-1.0.jsonl", [
             ev("2026-09-06T10:00:00Z", "test-1.0"),
@@ -89,9 +89,36 @@ def main() -> int:
         code, out = run(good)
         check("counts tool calls, excludes subagent_stop", "| 2 |" in out, out)
         check("tallies errors", "| 1 |" in out)
-        check("reports stop reason", "end_turn" in out)
+        # The table has no stop-reason column; no harness supplies one.
+        check("no stop-reason column", "Stop reason" not in out and "end_turn" not in out, out)
         check("malformed line counted, not dropped", "1 malformed line" in out, out)
         check("wallclock computed", "1m00s" in out)
+
+        # --since scopes the table to one cycle in a directory holding earlier runs.
+        mixed = t / "mixed"
+        write(mixed, "test-1.0.jsonl", [
+            ev("2026-09-01T09:00:00Z", "test-1.0", session="sess-old00000"),
+            ev("2026-09-01T09:05:00Z", "test-1.0", session="sess-old00000", exit_="error"),
+            ev("2026-09-06T10:00:00Z", "test-1.0"),
+            ev("2026-09-06T10:02:00Z", "test-1.0"),
+            ev("2026-09-06T10:03:00Z", "test-1.0"),
+        ])
+        code, out = run(mixed)
+        check("unscoped, an earlier run is folded in", "| 5 |" in out, out)
+        code, out = run(mixed, "--since", "2026-09-06T00:00:00Z")
+        check("--since counts only this cycle's calls", "| 3 |" in out and "| 5 |" not in out, out)
+        check("  ... drops the earlier run's error with it", "| 3 | Read×3 | 0 |" in out, out)
+        check("  ... and its wallclock", "3m00s" in out, out)
+        check("  ... says how many it left out", "2 earlier event(s)" in out, out)
+        check("  ... and no longer warns about the span or a second session",
+              "Events span" not in out and "span 2 sessions" not in out, out)
+        code, out = run(mixed, "--since", "2026-10-01T00:00:00Z")
+        check("--since past every event is 'not collected', not an empty table",
+              code == 0 and "Telemetry not collected" in out, out)
+        p = subprocess.run([sys.executable, str(SCRIPT), "--events", str(mixed),
+                            "--since", "2026-09-06"], capture_output=True, text=True)
+        check("a date that is not the hook's timestamp shape is refused",
+              p.returncode == 2 and "not a UTC timestamp" in p.stderr, p.stderr[-120:])
 
         # A stop-only event must not be counted as a tool call.
         code, out = run(good, "--format", "json")

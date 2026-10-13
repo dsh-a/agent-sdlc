@@ -19,6 +19,7 @@ Stdlib only. Harness-agnostic — no Claude Code / omp assumptions.
     clear-agent-states.py                # stale files only; live cycle state kept
     clear-agent-states.py --all          # including in-flight cycle-state files
     clear-agent-states.py --dry-run      # print what would go, delete nothing
+    clear-agent-states.py --archive-only # fan-out clone: copy telemetry out, delete nothing
 
 Exit codes: 0 = cleaned (or nothing to do), 1 = refused, 2 = partial failure.
 """
@@ -33,7 +34,10 @@ import sys
 
 # Directories under agent_states/ that hold per-run telemetry. Always ephemeral:
 # Phase 4A has already aggregated them into the run report by finalize time.
-EPHEMERAL_DIRS = ("events", "counters", "digests", "supervisor", "suite")
+# `denial-seen`, `permission-open` and `whispers` are per-session bookkeeping for
+# the gate-log hook and the supervisor, read only by the cycle that wrote them.
+EPHEMERAL_DIRS = ("events", "counters", "digests", "supervisor", "suite",
+                  "denial-seen", "permission-open", "whispers")
 
 # A cycle-state file is the recovery point if the orchestrator crashes, so the
 # default is to keep it. Two signals may override that, and the asymmetry is
@@ -61,6 +65,59 @@ PRESERVED_FILES = (".fanout-clone",)
 # Telemetry a fan-out needs after every clone has finished, but which each clone
 # deletes when it finalizes. Copied to the run root first — see archive_fanout().
 ARCHIVE = ("events", "counters", "gate-log.tsv")
+
+
+def _merge_file(src: pathlib.Path, dst: pathlib.Path, header: bool = False) -> None:
+    """Append to `dst` whatever `src` holds that `dst` does not.
+
+    Hooks keep writing after a clear, so `src` may be a fresh file, a grown one,
+    or one already archived. Both files are append-only: find the longest tail
+    of `dst` that is also the head of `src`, and append the rest of `src`.
+
+      overlap          meaning                           appended
+      ---------------  --------------------------------  ----------------
+      all of dst       src only grew since last archive  src's new lines
+      all of src       src is already archived           nothing
+      part of each     archived, grew, never cleared     src's new lines
+      none             src was recreated after a clear   all of src
+
+    Whole lines are compared, so a half-written last line matches nothing.
+    """
+    if not dst.exists():
+        shutil.copy2(src, dst)
+        return
+    new = src.read_bytes().splitlines(keepends=True)
+    old_raw = dst.read_bytes()
+    old = old_raw.splitlines(keepends=True)
+    # A recreated TSV starts with its column row again; one is enough.
+    if header and new and old and new[0] == old[0]:
+        new = new[1:]
+    overlap = 0
+    if old and new:
+        last = old[-1]
+        for k in range(min(len(old), len(new)), 0, -1):
+            if new[k - 1] == last and old[-k:] == new[:k]:
+                overlap = k
+                break
+    rest = new[overlap:]
+    if not rest:
+        return
+    with open(dst, "ab") as f:
+        if old_raw and not old_raw.endswith(b"\n"):
+            f.write(b"\n")
+        f.writelines(rest)
+
+
+def _merge_counter(src: pathlib.Path, dst: pathlib.Path) -> None:
+    """A counter is one integer that restarts at zero after a clear. Keep the
+    larger, so a short post-clear tail does not replace the cycle's real count."""
+    def val(path: pathlib.Path) -> int:
+        try:
+            return int(path.read_text().strip() or "0")
+        except (OSError, ValueError):
+            return -1
+    if not dst.exists() or val(src) >= val(dst):
+        shutil.copy2(src, dst)
 
 
 def archive_fanout(target: pathlib.Path, preview: bool = False) -> str:
@@ -101,10 +158,18 @@ def archive_fanout(target: pathlib.Path, preview: bool = False) -> str:
         dest.mkdir(parents=True, exist_ok=True)
         for name in ARCHIVE:
             src = target / name
+            if src.is_symlink():
+                continue
             if src.is_dir():
-                shutil.copytree(src, dest / name, dirs_exist_ok=True)
+                merge = _merge_counter if name == "counters" else _merge_file
+                for f in sorted(src.rglob("*")):
+                    if f.is_symlink() or not f.is_file():
+                        continue
+                    out = dest / name / f.relative_to(src)
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                    merge(f, out)
             elif src.is_file():
-                shutil.copy2(src, dest / name)
+                _merge_file(src, dest / name, header=name.endswith(".tsv"))
     except OSError as exc:
         return f"!could not archive to {dest}: {exc}"
     return str(dest)
@@ -226,6 +291,8 @@ def main() -> int:
                     help="also delete cycle-state files for runs that are not marked finished")
     ap.add_argument("--dry-run", action="store_true",
                     help="list what would be deleted and exit without deleting")
+    ap.add_argument("--archive-only", action="store_true",
+                    help="copy a fan-out clone's telemetry to the run root and delete nothing")
     args = ap.parse_args()
 
     target = target_dir()
@@ -237,6 +304,18 @@ def main() -> int:
         refuse(f"{target} is a symlink")
     if not target.is_dir():
         print(f"clear-agent-states: nothing to do — {target} does not exist")
+        return 0
+
+    # Copy telemetry to the run root and delete nothing. `reap-clones.sh sweep`
+    # calls this before it removes a clone.
+    if args.archive_only:
+        archived = archive_fanout(target)
+        if archived.startswith("!"):
+            print(f"clear-agent-states: telemetry NOT archived — {archived[1:]}",
+                  file=sys.stderr)
+            return 2
+        print(f"clear-agent-states: archived telemetry → {archived}" if archived
+              else "clear-agent-states: not a fan-out clone — nothing to archive")
         return 0
 
     # A dry run performs no archive — copying is a side effect — but it should still

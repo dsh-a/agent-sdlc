@@ -28,7 +28,7 @@
 === coding (13 lines) ===
 -[frontmatter] label: "[CODING]"
 -[frontmatter] model: sonnet
--[frontmatter] tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), Bash(go build*), Bash(go test*), Bash(go vet*), Bash(go mod*), Bash(go run*), Bash(gofmt*), Bash(flutter pub run build_runner*), Bash(dart run*), Bash(dart format*), Bash(git*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), mcp__ide__getDiagnostics
+-[frontmatter] tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), Bash(go build*), Bash(go test*), Bash(go vet*), Bash(go mod*), Bash(go run*), Bash(gofmt*), Bash(flutter pub run build_runner*), Bash(dart run*), Bash(dart format*), Bash(git*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), Bash(python3 .claude/skills/cycle/discard-untracked.py*), mcp__ide__getDiagnostics
 -[frontmatter] skills: autonomous-agent, project-conventions, minimalism, whispers
 +[frontmatter] model: default
 +[frontmatter] thinkingLevel: high
@@ -119,7 +119,7 @@
 === review (12 lines) ===
 -[frontmatter] label: "[REVIEW]"
 -[frontmatter] model: sonnet
--[frontmatter] tools: Read, Grep, Glob, Write, Edit, Bash(git diff*), Bash(git log*), Bash(flutter analyze*), Bash(go build*), Bash(go test*), Bash(go vet*), Bash(go mod*), Bash(go run*), Bash(gofmt*), Bash(gh pr*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), mcp__ide__getDiagnostics, Bash(gh run*)
+-[frontmatter] tools: Read, Grep, Glob, Write, Edit, Bash(git diff*), Bash(git log*), Bash(flutter analyze*), Bash(go build*), Bash(go test*), Bash(go vet*), Bash(go mod*), Bash(go run*), Bash(gofmt*), Bash(gh pr*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), Bash(python3 .claude/skills/cycle/discard-untracked.py*), mcp__ide__getDiagnostics, Bash(gh run*)
 -[frontmatter] effort: high
 -[frontmatter] produces: agent_tasks/reports/review-<feature>-<date>.md
 -[frontmatter] skills: autonomous-agent, project-conventions, review-report-format, minimalism-review
@@ -133,7 +133,7 @@
 === scaffold (16 lines) ===
 -[frontmatter] label: "[SCAFFOLD]"
 -[frontmatter] model: sonnet
--[frontmatter] tools: Read, Grep, Glob, Edit, Write, Bash(flutter pub run build_runner*), Bash(dart run*), Bash(dart format*), Bash(flutter analyze*), Bash(flutter test*), Bash(git log*), Bash(git status*), Bash(git diff*), Bash(git rev-parse*), Bash(git add*), Bash(git commit*), Bash(git branch*), Bash(git checkout*), Bash(git restore*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), mcp__ide__getDiagnostics
+-[frontmatter] tools: Read, Grep, Glob, Edit, Write, Bash(flutter pub run build_runner*), Bash(dart run*), Bash(dart format*), Bash(flutter analyze*), Bash(flutter test*), Bash(git log*), Bash(git status*), Bash(git diff*), Bash(git rev-parse*), Bash(git add*), Bash(git commit*), Bash(git branch*), Bash(git checkout*), Bash(git restore*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), Bash(python3 .claude/skills/cycle/discard-untracked.py*), mcp__ide__getDiagnostics
 -[frontmatter] effort: medium
 -[frontmatter] skills: autonomous-agent, project-conventions, minimalism, whispers
 +[frontmatter] model: default
@@ -238,7 +238,7 @@
 === test (30 lines) ===
 -[frontmatter] label: "[TEST]"
 -[frontmatter] model: sonnet
--[frontmatter] tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(supabase test db*), Bash(supabase db lint*), Bash(supabase db reset --local*), Bash(flutter analyze*), Bash(go build*), Bash(go test*), Bash(go vet*), Bash(go mod*), Bash(go run*), Bash(gofmt*), Bash(flutter pub run build_runner*), Bash(dart run*), Bash(dart format*), Bash(git log*), Bash(git status*), Bash(git diff*), Bash(git rev-parse*), Bash(git add*), Bash(git commit*), Bash(git branch*), Bash(git checkout*), Bash(git restore*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), mcp__ide__getDiagnostics
+-[frontmatter] tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(supabase test db*), Bash(supabase db lint*), Bash(supabase db reset --local*), Bash(flutter analyze*), Bash(go build*), Bash(go test*), Bash(go vet*), Bash(go mod*), Bash(go run*), Bash(gofmt*), Bash(flutter pub run build_runner*), Bash(dart run*), Bash(dart format*), Bash(git log*), Bash(git status*), Bash(git diff*), Bash(git rev-parse*), Bash(git add*), Bash(git commit*), Bash(git branch*), Bash(git checkout*), Bash(git restore*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), Bash(python3 .claude/skills/cycle/discard-untracked.py*), mcp__ide__getDiagnostics
 -[frontmatter] effort: high
 -[frontmatter] skills: autonomous-agent, project-conventions, ui-test-patterns, test-rubric, contradiction-exit, pattern-divergence, whispers
 +[frontmatter] model: default
@@ -282,7 +282,7 @@
 === ui-story (9 lines) ===
 -[frontmatter] label: "[UI]"
 -[frontmatter] model: sonnet
--[frontmatter] tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), Bash(flutter pub run build_runner*), Bash(dart run*), Bash(dart format*), Bash(git*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), mcp__ide__getDiagnostics
+-[frontmatter] tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(flutter analyze*), Bash(flutter pub run build_runner*), Bash(dart run*), Bash(dart format*), Bash(git*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), Bash(python3 .claude/skills/cycle/discard-untracked.py*), mcp__ide__getDiagnostics
 -[frontmatter] skills: autonomous-agent, scaffold, project-conventions, ui-test-patterns, minimalism, whispers
 +[frontmatter] model: default
 +[frontmatter] thinkingLevel: high
@@ -293,7 +293,7 @@
 === verify (12 lines) ===
 -[frontmatter] label: "[VERIFY]"
 -[frontmatter] model: sonnet
--[frontmatter] tools: Read, Grep, Glob, Write, Edit, Bash(git diff*), Bash(git log*), Bash(flutter test*), Bash(flutter analyze*), Bash(go build*), Bash(go test*), Bash(go vet*), Bash(go mod*), Bash(go run*), Bash(gofmt*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), mcp__ide__getDiagnostics, Bash(gh run*)
+-[frontmatter] tools: Read, Grep, Glob, Write, Edit, Bash(git diff*), Bash(git log*), Bash(flutter test*), Bash(flutter analyze*), Bash(go build*), Bash(go test*), Bash(go vet*), Bash(go mod*), Bash(go run*), Bash(gofmt*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), Bash(python3 .claude/skills/cycle/discard-untracked.py*), mcp__ide__getDiagnostics, Bash(gh run*)
 -[frontmatter] effort: high
 -[frontmatter] produces: agent_tasks/reports/verify-<feature>-<date>.md
 -[frontmatter] skills: autonomous-agent, ac-audit-rubric, pattern-divergence

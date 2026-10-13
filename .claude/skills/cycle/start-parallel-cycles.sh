@@ -383,7 +383,7 @@ if [ "$HARNESS" = "claude" ]; then
   else
     printf '  ! gate-log hook not registered in %s — gate wait will NOT be captured.\n' \
       "$REPO/.claude/settings.json"
-    printf '    Add it under hooks.Stop and hooks.UserPromptSubmit, or accept an unmeasured run.\n'
+    printf '    Wire it as settings.json.sample does (five events), or accept an unmeasured run.\n'
   fi
 else
   say "gate capture: unavailable under $HARNESS (Claude Code hook only)"
