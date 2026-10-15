@@ -83,7 +83,7 @@ belongs in that subagent's body, and putting it in the cycle skill means the orc
 is told about behaviour it cannot perform.
 
 This is not a style preference. Measured across 79 findings in 13 run reports
-(2026-09-08 to 09-12, `docs/internal/deployment-and-ergonomics-plan.md` § 5):
+(2026-09-08 to 09-12):
 
 | | |
 |---|---|

@@ -84,8 +84,8 @@ artifact. Add the key as the `OPENROUTER_API_KEY` repo secret to enable it.
 ### Context budget
 
 Every agent costs tokens before it does anything: its body plus every skill it
-autoloads. `docs/internal/local-llm-refactor-plan.md` measured that load on
-2026-08-29; re-measured on 2026-09-20, `cycle/SKILL.md` had grown 74% and the
+autoloads. Between measurements on
+2026-08-29 and 2026-09-20, `cycle/SKILL.md` grew 74% and the
 orchestrator baseline 60% — **+13,117 tokens on every cycle**, from fifteen
 reasonable edits that nobody was in a position to see the sum of.
 

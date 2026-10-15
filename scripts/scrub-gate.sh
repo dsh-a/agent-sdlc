@@ -26,7 +26,7 @@ RANGE="${2:-}"
 #              keeps them out, since "we remember not to" is not a control.
 IDENTITY='bloomerang|dalton\.shultz@|dmoney'
 SECRETS='sk-or-v1-|sk-[A-Za-z0-9]{24}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|github_pat_|AKIA[0-9A-Z]{16}|xox[baprs]-|-----BEGIN [A-Z ]*PRIVATE KEY'
-PRIVATE='ocelot|career-braindump|resume-tailor|job-scout'
+PRIVATE='ocelot|career-braindump|resume-tailor|job-scout|engineering-meta'
 PATTERNS="$IDENTITY|$SECRETS|$PRIVATE"
 
 # Paths that must not exist in the public tree at all. The content patterns above

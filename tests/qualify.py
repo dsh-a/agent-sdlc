@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Layer 2b — the qualification matrix: which models can run which agents.
 
-`docs/internal/frontier-price-shock-preparedness.md` § Move 1 argues this is the
-highest-leverage artifact in the readiness programme. Today "can a 235B
+This is the highest-leverage artifact in model-migration readiness. Today "can a 235B
 open-weight model run the `review` agent?" has no answer, and that is the entire
 reason a migration would take a month rather than a config edit.
 

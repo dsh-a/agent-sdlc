@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """peak-context.py — the largest prompt each agent actually held.
 
-`docs/internal/agent-requirement-profiles.md` (Artifact B) profiles every agent
-with the context it needs, and had to estimate the field that decides the answer.
+Sizing an agent's model needs the context the agent holds, and without this
+script that field could only be estimated.
 Static load is measurable from the framework — body plus autoloaded skills — but
 what a long Phase-3 agent actually holds at its peak, across thirty tool calls, is
 not in the framework at all. That document says so plainly: "treat every

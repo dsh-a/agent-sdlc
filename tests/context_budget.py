@@ -1,8 +1,7 @@
 """Context budget — what every agent costs before it does anything.
 
-`docs/internal/local-llm-refactor-plan.md` measured the framework's static token
-load on 2026-08-29. Re-measured on 2026-09-20, `cycle/SKILL.md` had grown 74% and
-the orchestrator baseline 60% — +13,117 tokens paid on every cycle, before a word
+Between measurements of the framework's static token load on 2026-08-29 and
+2026-09-20, `cycle/SKILL.md` grew 74% and the orchestrator baseline 60% — +13,117 tokens paid on every cycle, before a word
 of conversation. Nothing had gone wrong; the growth was fifteen reasonable edits
 that nobody was in a position to see the sum of.
 

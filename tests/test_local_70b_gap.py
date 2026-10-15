@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """How far is the fleet from running on hardware you could buy?
 
-A 552B model is a provider you rent — engineering-meta `inference/deployment-plan.md` prices its serving
-floor at a 4-GPU tray, $16-42/hr, roughly an order of magnitude worse than
+A 552B model is a provider you rent — its serving floor is a 4-GPU tray, $16-42/hr, roughly an order of magnitude worse than
 paying per token. So the portability question that actually matters is: **which
 roles run at or under 70B**, where one card is $1.49-3.99/hr and mirroring the
 weights is an external SSD rather than half a terabyte.
 
 At that size exactly one model has cleared any probe — `openai/gpt-oss-20b`,
 which scored 100% on review, 100% on verify and 83% on test-preflight in
-`docs/internal/qualification-matrix.md`, beating every larger model tested. It
+the qualification matrix, beating every larger model tested. It
 holds 131,072 tokens.
 
 So the gap is not capability, it is context. This test pins which side of that
