@@ -201,9 +201,7 @@ Artifacts of that kind carry the **`remote`** class in `.omp/agent-config.md` §
 and are reached with live `gh` calls; nothing is mirrored locally, and a failed `gh` call is a
 stop-and-report rather than a write-a-file fallback.
 
-Point `tracker_repo` at your repo and the board path at your project number. The full
-operating contract — including why duplicated facts were removed — is
-[`contracts/github-trackers.md`](https://github.com/dsh-a/engineering-meta/blob/main/contracts/github-trackers.md) in **engineering-meta**.
+Point `tracker_repo` at your repo and the board path at your project number.
 
 ---
 
@@ -324,9 +322,6 @@ by regression over those 26 jumps, not a chars/4 estimate).
 So the p90 that defines the local-serving gap belongs entirely to the
 two-invocation group, and one cycle per session is worth −42,502 tokens on it
 for no code change. `/clear` between cycles, or use a new terminal.
-
-Details and the queries behind it:
-[`docs/internal/cycle-skill-decomposition-plan.md`](docs/internal/cycle-skill-decomposition-plan.md) § A.
 
 ### Known pitfalls
 

@@ -12,7 +12,7 @@ linked worktree want opposite answers:
   happens to be implemented as a linked worktree of the origin. ``--git-common-dir``
   points at the origin, so under a parallel run every clone appended into one
   directory in the origin repo while each clone had no ``agent_states/events/`` at
-  all — measured in fan-out 1, see docs/internal/parallel-cycles-evidence-run1.md E1.
+  all.
 
 Git topology cannot tell the two apart: both are linked worktrees. So the launcher
 marks a fan-out clone with ``agent_states/.fanout-clone`` and that marker wins.

@@ -147,8 +147,8 @@ the four roles over its 131k window; twelve of sixteen already fit, blocked by c
 than capability. Pinned by `tests/test_local_70b_gap.py`; rationale in that file's docstring.
 
 **`maas` is the preset that is meant to run.** `local-70b` is a self-hosting target and is
-expected to fail; `open-weight` rents frontier-scale models. `maas` is the 2026 decision
-recorded in [engineering-meta](https://github.com/dsh-a/engineering-meta), split by the only
+expected to fail; `open-weight` rents frontier-scale models. `maas` is the 2026 decision,
+split by the only
 thing that differs between roles — context window. `deepseek-v4.1-flash` (1,048,576) takes
 `orchestrator` and `review`, the two over 262k; `gemma-4-31b-it` (262,144, and the only model
 measuring 100/100/100 on review/test-preflight/verify) takes the other fourteen. **~$60/month**
@@ -169,7 +169,7 @@ orchestrator reads the `personal` column regardless of which preset is active, a
 its run report. This is a harness limit, not a preference.
 
 **Sizing is against measured peaks, not price.** Every id above is chosen so its context
-window clears that agent's p90 in `docs/internal/agent-requirement-profiles.md`. The obvious
+window clears that agent's measured p90 context. The obvious
 cheap choice fails this: `gpt-oss-20b` won the qualification matrix outright but holds 131k,
 where `verify` peaks at 251k and `review` at 286k — so it takes the small-context rows only.
 `tests/model_allocation.py` enforces this against § Model Provenance, and would have caught
@@ -197,7 +197,7 @@ should be mirrored, and a mirror is worth nothing without the revision it was qu
 
 | Provider id | Weights | Params (total / active) | Context | KV/token | Mirrored |
 |---|---|---|---|---|---|---|
-| `openrouter/qwen/qwen3.8-2.4t-a95b` | Qwen/Qwen3.8-2.4T-A95B | 2.4T / ~95B | 1,048,576 | GQA — see engineering-meta hardware/server-requirements.md | **no — not self-hostable** |
+| `openrouter/qwen/qwen3.8-2.4t-a95b` | Qwen/Qwen3.8-2.4T-A95B | 2.4T / ~95B | 1,048,576 | GQA | **no — not self-hostable** |
 | `openrouter/qwen/qwen3.8-flash` | Qwen/Qwen3.8-Flash | — | 1,000,000 | GQA | no |
 | `openrouter/qwen/qwen3.8-27b` | Qwen/Qwen3.8-27B | 27B dense | 262,144 ⚠ | 64 KB | no |
 | `openrouter/deepseek/deepseek-v4.1-flash` | deepseek-ai/DeepSeek-V4-Pro | — | 1,048,576 | 890 B | no |
@@ -207,7 +207,7 @@ should be mirrored, and a mirror is worth nothing without the revision it was qu
 | `openrouter/openai/gpt-oss-120b` | openai/gpt-oss-120b | 120B | 131,072 | 36 KB | no — candidate |
 | `openrouter/google/gemma-4-31b-it` | google/gemma-4-31b-it | 31B dense | 262,144 | 192 KB | no — **maas bulk tier** |
 
-**KV/token is measured**, read from each model's `config.json` on 2026-09-25. Derivations, and a disputed context window for `qwen3.8-27b`, are in [`hardware/server-requirements.md`](https://github.com/dsh-a/engineering-meta/blob/main/hardware/server-requirements.md) § Measured KV per token, in **engineering-meta**.
+**KV/token is measured**, read from each model's `config.json` on 2026-09-25.
 
 **Fill `Mirrored` with the revision hash actually downloaded, not `yes`.** A model updated
 underneath you is the failure this column exists to make visible, and the qualification matrix

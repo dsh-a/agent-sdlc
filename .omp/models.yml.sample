@@ -37,8 +37,7 @@
 #   omp models openrouter          # what is actually available right now
 #   omp models find <pattern>      # search the live catalogue
 #
-# Size the role against the measured peaks in
-# docs/internal/agent-requirement-profiles.md, not against price: `slow` carries
+# Size the role against each agent's measured peak context, not against price: `slow` carries
 # the orchestrator at 375k p90, so it needs a genuinely large window.
 #
 # The blocks below are kept as a reference for the rarer case where a canonical
