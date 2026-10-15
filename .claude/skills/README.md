@@ -1,7 +1,13 @@
 # `.claude/skills/` — skill catalog
 
-Skills are Markdown + YAML frontmatter. `disable-model-invocation: true` means a skill loads
-only when referenced (by an agent's `skills:` frontmatter or by name) — not auto-invoked.
+Skills are Markdown + YAML frontmatter. Every skill carries `disable-model-invocation: true`: an
+entry-point skill runs when the user types `/<name>`, and a reference skill is a file an agent
+reads.
+
+Agents read reference skills only when a project sets `agent_skills` to `true` in
+`.omp/agent-config.md` § Cycle Options. It is `false` by default: agents work from their own
+instructions and the project's conventions. Turning it on adds each named skill's text to that
+agent's context for the whole run. The `test` agent reads `test-rubric` either way.
 
 ## Entry-point skills (user-invocable)
 
@@ -9,6 +15,8 @@ only when referenced (by an agent's `skills:` frontmatter or by name) — not au
 |---|---|
 | `cycle` | The pipeline orchestrator (`/cycle`) |
 | └ `cycle/stack.md` · `cycle/publish-stack.sh` | A sliced story published as a PR stack: build order, slice marks, one PR per layer |
+| └ `cycle/start-parallel-cycles.sh` · `cycle/reap-clones.sh` | `/cycle --parallel`: one cycle per issue in a reused pool of `parallel_slots` worktrees; `sweep` gives finished slots' disk back |
+| └ `cycle/sparse-set.py` | Opt-in partial checkout for pool slots (`sparse_clones`): the set from a story's `## Slices`, and which tracked paths lie outside it |
 | `setup` | Stack-detecting configuration wizard |
 | `setup-scaffold` | Discover project patterns → scaffold pattern files |
 | `create-prd`, `generate-tasks`, `process-tasks` | Planning entry points |
@@ -22,8 +30,6 @@ These hold **stack-specific** content, populated from the active pack:
 
 | Skill | Source |
 |---|---|
-| `project-conventions` | `packs/<lang>/conventions.md` — layer boundaries, naming, logging, member order |
-| `ui-test-patterns` | `packs/<lang>/ui-test-patterns.md` — presentation-layer test patterns |
 
 Switching packs repopulates these (see [`../packs/README.md`](../packs/README.md)).
 
@@ -58,5 +64,5 @@ Not part of the deployed pipeline — workflows for maintaining this repo. **Nev
 ## Authoring notes
 
 - Keep stack-specific content **in a pack**, not in a core skill. Core skills should read
-  commands/paths from `.omp/agent-config.md` and defer conventions to `project-conventions`.
+  commands/paths from `.omp/agent-config.md` and defer conventions to the project's instruction file.
 - The `flutter` pack (`../packs/flutter/`) is a complete worked example of pack content.

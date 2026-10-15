@@ -24,7 +24,6 @@ naming a branch here sent agents looking for one they were not on.) The `.omp/` 
 .claude/
   skills/         # skills (discovered by omp via claude provider, priority 80)
     cycle/        # the orchestrator (/cycle)
-    project-conventions/  # ACTIVE stack conventions
     context-sources/      # MCP/RAG plug-in contract
   packs/          # swappable language packs (flutter, dotnet)
   agents/         # source-of-truth agent bodies (Claude Code path)

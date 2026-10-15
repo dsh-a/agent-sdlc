@@ -7,9 +7,9 @@ This file is the central configuration for the agent-sdlc pipeline. Agents and s
 ## Active Pack
 
 The language/framework pack this project uses. A pack supplies the conventions, test
-patterns, anti-patterns, and code idioms for one stack (`.claude/packs/<pack>/`). This field
-is informational + used by `/setup`; the *active* conventions are loaded deterministically
-from the `project-conventions` skill (see `.claude/packs/README.md` for the swap procedure).
+patterns, anti-patterns, and code idioms for one stack (`.claude/packs/<pack>/`). `/setup` seeds
+Project Commands and the project's instruction file from it, and the cycle scripts read it to
+pick the pack's patterns (see `.claude/packs/README.md`).
 
 | Field | Value |
 |---|---|
@@ -81,10 +81,9 @@ than writing them. With `vault_root` empty they stay local, like every other vau
 
 **The changelog is a directory, not a file.** One fragment per cycle, named for the cycle's
 feature. A single changelog file has one insertion point — the top of `## [Unreleased]` — and
-every cycle writes to it, so any two cycles running at once conflict by construction. Measured
-in myapp: 95 of 878 commits over 60 days touched `CHANGELOG.md`, and it is the most frequent
-source of merge conflicts in the repository. Fragments cannot collide, because two cycles never
-share a filename.
+every cycle writes to it, so any two cycles running at once conflict by construction, and
+a shared changelog is touched by a large share of commits. Fragments cannot collide, because
+two cycles never share a filename.
 
 Set **Changelog (assembled)** only if the project wants a single narrative file; a project that
 reads its changelog as developer history can leave the fragments as the changelog and never
@@ -395,7 +394,7 @@ Agents run these commands to test, lint, and generate code. This table is the **
 
 ## Architecture Review Rules
 
-These sections are **project-specific overrides** layered on top of the active pack's `project-conventions` — the canonical source for the stack's layer boundaries, patterns, naming, line-length, logging, comments, and error-handling (see `.claude/packs/<active-pack>/conventions.md`). The `review` (Step 2) and `verify` agents read the pack for the stack's rules and consult these sections for any per-project overrides. **Leave a section empty to use the pack's rules unchanged.**
+These sections are **project-specific overrides** layered on top of the project's conventions — the canonical source for the stack's layer boundaries, patterns, naming, line-length, logging, comments, and error-handling (see `.claude/packs/<active-pack>/conventions.md`). The `review` (Step 2) and `verify` agents read the pack for the stack's rules and consult these sections for any per-project overrides. **Leave a section empty to use the pack's rules unchanged.**
 
 ### Layer Boundaries
 
@@ -452,7 +451,11 @@ pre-digest). See `.claude/skills/context-sources/SKILL.md` for the full contract
 | auto_review | `true` | Spawn review agent during Phase 4A |
 | feature_idea_on_empty | `true` | When /cycle has no args and no active state, offer open feature issues: `gh issue list --label feature --state open` |
 | pr_body_gate | `true` | At Phase 4B step 8, show the generated `cycle_reports/pr-body-<feature>-<date>.md` and wait for confirmation before running `gh pr create`. Set `false` to open the PR without a pause. |
+| agent_skills | `false` | Whether agents read the skills their instructions name. `false` (default): agents work from their own instructions and the project's conventions. `true`: every spawn prompt tells the agent to read those skill files first, which adds each skill's text to that agent's context for the whole run. |
 | agent_messaging | `false` | Whether the orchestrator delegates state persistence to a background monitor. `false` (default): the orchestrator writes cycle state inline and only spawns the monitor at Finalize. `true`: a background monitor receives state-update verbs via irc (`irc(op: "wait")`) and maintains the state file. Under omp, irc is always available to subagents, so `true` is viable. Leave `false` for the leanest orchestrator context. |
+| parallel_slots | `3` | Worktrees in the `/cycle --parallel` pool, `<clones-root>/<repo>-slot-1` … `-slot-N`, one per concurrent cycle. A slot is reset in place between runs and keeps its ignored build output, so checkout and cold build are paid once per slot and disk use stays at N × (checkout + build output). A run with more issues than slots stops before changing anything. Lower it on a machine short of disk; `--fresh` recreates the slots. |
+| sparse_clones | `false` | `true`: each `/cycle --parallel` slot checks out only its story's `## Slices` areas plus `always_checkout` (no slices: a full checkout). Git worktrees only. `/setup` offers it with its risks. Sets `extensions.worktreeConfig`, which stays when off and older libgit2 tools refuse; once no slot is sparse, `git config --unset extensions.worktreeConfig`. |
+| always_checkout | `none` | Directories every partial slot holds, comma-separated: solution, build props, shared libraries, CI. |
 
 
 ## Branch Configuration

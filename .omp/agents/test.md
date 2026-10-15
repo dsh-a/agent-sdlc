@@ -5,7 +5,7 @@ model: default
 thinkingLevel: high
 tools: [read, grep, glob, ast_grep, ast_edit, edit, write, bash, lsp, irc, eval, debug]
 spawns: ""
-autoloadSkills: [autonomous-agent, project-conventions, ui-test-patterns, test-rubric, contradiction-exit, pattern-divergence, whispers]
+autoloadSkills: [autonomous-agent, test-rubric, contradiction-exit, pattern-divergence, whispers]
 ---
 
 <!-- omp-native adapter. Body sourced from .claude/agents/test.md (single source of truth for behavior). -->
@@ -41,7 +41,7 @@ After AC coverage: error paths, edge cases, state transitions, property-based te
 
 ## Step 5 — Write the tests
 
-Follow `project-conventions` for layer rules and `ui-test-patterns` for the view / view-model coverage matrix, snapshot, property-based, and integration patterns. Both skills are loaded — do not duplicate their content here.
+Follow the project's conventions for layer rules and the project's UI test patterns for the view / view-model coverage matrix, snapshot, property-based, and integration patterns. Both are in your context — do not duplicate them here.
 
 ## Step 6 — Run and verify
 

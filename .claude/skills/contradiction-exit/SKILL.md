@@ -1,6 +1,6 @@
 ---
 name: contradiction-exit
-description: Structured halt-and-report signal an agent emits when it encounters incompatible sources of truth and cannot make further progress without human judgment. Generalized from synthesis item 5.4.4; consumed today only by the test agent but designed as a primitive any agent can adopt.
+description: Halt-and-report signal an agent emits on incompatible sources of truth.
 disable-model-invocation: true
 ---
 

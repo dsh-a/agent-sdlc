@@ -1,6 +1,6 @@
 ---
 name: ac-authoring
-description: How to write testable acceptance criteria — structure, anti-faking guidance, minimum coverage categories. The contract between PRDs and the implementation/test agents. Loaded by create-prd and refine.
+description: How to write testable acceptance criteria. Used by create-prd and refine.
 disable-model-invocation: true
 ---
 

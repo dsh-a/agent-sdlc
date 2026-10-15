@@ -1,6 +1,6 @@
 ---
 name: setup
-description: Interactive configuration wizard for the agent-sdlc pipeline. Detects the project stack, selects a language pack, generates .omp/agent-config.md (Project Commands, Architecture Rules, Context Sources, model preset), and populates the project-conventions skill from the chosen pack.
+description: Interactive configuration wizard for the agent-sdlc pipeline. Detects the project stack, selects a language pack, generates .omp/agent-config.md (Project Commands, Architecture Rules, Context Sources, model preset), seeds the project's instruction file with the pack's conventions, and sets up its permissions.
 disable-model-invocation: true
 ---
 
@@ -33,15 +33,8 @@ exists, offer to scaffold one by copying `.claude/packs/dotnet/` and filling it 
 
 ## Step 2 — Verify project commands
 
-Confirm the build/test/analyze commands for the stack. Defaults for `flutter`:
-
-| Purpose | Command |
-|---|---|
-| Run all tests | `flutter test` |
-| Run specific test file | `flutter test <path>` |
-| Analyze / lint | `flutter analyze` |
-| Code generation | `flutter pub run build_runner build --delete-conflicting-outputs` |
-| Test path glob | `test/**` |
+Confirm the build/test/analyze commands for the stack. Take the defaults from
+`.claude/packs/<active_pack>/commands.md` and show them as a table.
 
 Ask the user to confirm or correct each, plus the **Test path glob** and **Test
 anti-patterns** file (defaults to the active pack's). Wait for confirmation before continuing.
@@ -73,6 +66,39 @@ Ask the user to choose; they can override individual agent models later.
 Ask: **"Should `/cycle` automatically run code review and verification after implementation?"**
 Default both enabled. Explain that when disabled, the cycle recommends running them manually.
 
+Leave `agent_skills` in § Cycle Options `false` unless the user asks for it. Mention it in the
+summary: `true` makes each agent read the skills its instructions name, at the cost of that text in
+its context for the whole run.
+
+### Partial checkout for parallel cycles
+
+`sparse_clones` in § Cycle Options makes each `/cycle --parallel` slot check out only the
+directories its story's `## Slices` name. It is off by default. Before offering it, show the
+repository's tracked file count and size:
+
+```sh
+git ls-files | wc -l
+git ls-tree -r -l HEAD | awk '{s += $4} END {printf "%.1f MB\n", s / 1048576}'
+```
+
+Then read out its risks:
+
+- A build or test that needs a file outside the slot's set fails, and in .NET the error can look
+  unrelated to the missing file. `run-suite.sh` names the directory to add.
+- Cross-cutting changes the story did not predict are not visible to the agents.
+- IDE tooling opened on a slot sees part of the solution.
+- New slots are made with `git worktree add`, so omp's whole-tree copy (warm caches, `.env`) is
+  not used.
+- Turning it on sets `extensions.worktreeConfig` in the repository's git config, where it stays
+  after the option is turned off. Older libgit2-based tools (some IDE git integrations and GUI
+  clients) may refuse such a repository. Once no slot is sparse,
+  `git config --unset extensions.worktreeConfig` in the primary checkout removes it.
+
+Ask: **"Enable partial checkout for parallel cycles? [y/N]"** The default answer is no. Set
+`sparse_clones` to `true` only on an explicit yes; any other answer leaves it `false`. On yes, ask
+for `always_checkout`: the directories every slot needs whatever its story names (solution and
+build-props directories, shared libraries, CI files), comma-separated, or `none`.
+
 ## Step 6 — Configure Context Sources (MCP / RAG plug-in points)
 
 Ask whether the team has external knowledge sources to wire in (a documentation MCP, a
@@ -89,14 +115,20 @@ servers in `.omp/mcp.json` (template `.omp/mcp.json.sample`). Under omp, MCP too
 auto-discovered — no permission allowlist needed. See `.claude/skills/context-sources/SKILL.md`
 and `docs/CONTEXT-SOURCES.md`.
 
-## Step 7 — Generate config + activate the pack
+## Step 7 — Generate config, conventions and permissions
 
 1. Generate `.omp/agent-config.md` from all answers, following the existing template's structure
    (Active Pack, Project Commands, Architecture Review Rules, Context Sources, model preset,
    optional agents). If a config exists, show a diff and confirm before overwriting.
-2. **Activate the pack:** copy `.claude/packs/<active_pack>/conventions.md` body into
-   `.claude/skills/project-conventions/SKILL.md` (preserve its frontmatter), and the pack's
-   `ui-test-patterns.md` into `.claude/skills/ui-test-patterns/SKILL.md` if present.
+2. **Conventions:** offer `.claude/packs/<active_pack>/conventions.md` and the pack's
+   test-patterns file as sections of the project's instruction file (`CLAUDE.md` under Claude
+   Code, `AGENTS.md` under omp). Show what will be added, take a confirmation, and write it to
+   the project. Skip a section the file already covers. Write nothing into the framework.
+3. **Permissions (Claude Code):** run `bash <framework>/deploy.sh grants <project>` and show the
+   lines. It names any Project Commands row it gives no rule; offer to put such a row in a
+   project script. It also names the hook wiring the project lacks. On confirmation run
+   `bash <framework>/deploy.sh grants --apply <project>`, which writes both.
+   Skip this under omp.
 
 ## Step 8 — Confirm omp settings
 
@@ -153,6 +185,7 @@ Configuration complete:
   Architecture:    [layers summary]
   Auto verify:     [enabled | disabled]
   Auto review:     [enabled | disabled]
+  Partial checkout: [off | on — always_checkout: ...]
   Context sources: [N configured — M enabled]
   Scaffold:        [N pattern files created | using pack defaults]
   Workflows:       [N installed | offered, not installed]

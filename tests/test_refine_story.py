@@ -50,6 +50,14 @@ _spec.loader.exec_module(st)
 failures: list[str] = []
 
 
+def tmpfile(suffix: str) -> str:
+    """A temp file's path, with mkstemp's descriptor closed. Left open, it is a
+    handle Windows will not let anyone delete the file past (WinError 32)."""
+    fd, path = tempfile.mkstemp(suffix=suffix)
+    os.close(fd)
+    return path
+
+
 def check(label: str, cond: bool, detail: str = "") -> None:
     if cond:
         print(f"  ok   {label}")
@@ -149,7 +157,7 @@ def check_a_failed_gh_call_is_undetermined() -> None:
 
 def check_dor_is_a_gate_not_a_sentence() -> None:
     print("\ndor")
-    cov = pathlib.Path(tempfile.mkstemp(suffix=".txt")[1])
+    cov = pathlib.Path(tmpfile(".txt"))
     try:
         cov.write_text("COVERAGE probes=7 gaps=0 carried=0 unknown=0\n",
                        encoding="utf-8")
@@ -178,8 +186,8 @@ def check_dor_is_a_gate_not_a_sentence() -> None:
               p.returncode == st.UNDETERMINED, str(p.returncode))
 
         p = run("ready.json", "dor", "413")
-        check("no --coverage at all is UNDETERMINED, never READY — this is the "
-              "condition the lenses used to self-report",
+        check("no --coverage at all is UNDETERMINED, never READY — a lens's own "
+              "report is not coverage",
               p.returncode == st.UNDETERMINED
               and "verdict=UNDETERMINED" in p.stdout,
               p.stdout.splitlines()[0])
@@ -265,7 +273,7 @@ def check_slices_place_every_ac_once() -> None:
 
 def check_writes_are_dry_by_default() -> None:
     print("\nwrites are dry")
-    log = tempfile.mkstemp(suffix=".log")[1]
+    log = tmpfile(".log")
     try:
         p = run("ready.json", "set-depth", "413", "lean", log=log)
         check("set-depth without --apply is a dry run",
@@ -300,9 +308,9 @@ def check_writes_are_dry_by_default() -> None:
 
 def check_split_refuses_and_orders() -> None:
     print("\nsplit")
-    plan = pathlib.Path(tempfile.mkstemp(suffix=".json")[1])
-    child = pathlib.Path(tempfile.mkstemp(suffix=".md")[1])
-    log = tempfile.mkstemp(suffix=".log")[1]
+    plan = pathlib.Path(tmpfile(".json"))
+    child = pathlib.Path(tmpfile(".md"))
+    log = tmpfile(".log")
     try:
         child.write_text("- [ ] (+) a child AC\n", encoding="utf-8")
         plan.write_text(json.dumps({"children": [

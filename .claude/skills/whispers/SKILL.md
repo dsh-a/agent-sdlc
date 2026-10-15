@@ -1,6 +1,6 @@
 ---
 name: whispers
-description: Whisper channel spec — the Phase-3 supervisor advises implementation agents, and how agents respond. Transport is omp irc; file path is the Claude Code fallback. Synthesis item 5.5.2.
+description: Channel spec for the Phase-3 supervisor's advisories to implementation agents.
 disable-model-invocation: true
 ---
 

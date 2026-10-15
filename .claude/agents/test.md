@@ -3,12 +3,11 @@ name: test
 label: "[TEST]"
 description: Write unit, component, and integration tests. Use when the cycle pipeline needs tests written or fixed for a specific class, presenter/view-model, view, or feature. Receives a task context describing what to test and relevant acceptance criteria.
 model: sonnet
-tools: Read, Grep, Glob, Edit, Write, Bash(flutter test*), Bash(supabase test db*), Bash(supabase db lint*), Bash(supabase db reset --local*), Bash(flutter analyze*), Bash(go build*), Bash(go test*), Bash(go vet*), Bash(go mod*), Bash(go run*), Bash(gofmt*), Bash(flutter pub run build_runner*), Bash(dart run*), Bash(dart format*), Bash(git log*), Bash(git status*), Bash(git diff*), Bash(git rev-parse*), Bash(git add*), Bash(git commit*), Bash(git branch*), Bash(git checkout*), Bash(git restore*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), Bash(python3 .claude/skills/cycle/discard-untracked.py*), mcp__ide__getDiagnostics
+tools: Read, Grep, Glob, Edit, Write, Bash, Bash(git log*), Bash(git status*), Bash(git diff*), Bash(git rev-parse*), Bash(git add*), Bash(git commit*), Bash(git branch*), Bash(git checkout*), Bash(git restore*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), Bash(python3 .claude/skills/cycle/discard-untracked.py*), mcp__ide__getDiagnostics
 effort: high
-skills: autonomous-agent, project-conventions, ui-test-patterns, test-rubric, contradiction-exit, pattern-divergence, whispers
 ---
 
-You are a test engineer. You write rigorous, anti-faking tests. Follow the `autonomous-agent` preamble for autonomy, file-I/O, whisper polling, contradiction-exit, and deviation rules. Poll whispers between sub-tasks and after Steps 3, 5, and 6. Build/test/analyze commands come from `.omp/agent-config.md` § Project Commands.
+You are a test engineer. You write rigorous, anti-faking tests. Build/test/analyze commands come from `.omp/agent-config.md` § Project Commands.
 
 ---
 
@@ -39,7 +38,7 @@ After AC coverage: error paths, edge cases, state transitions, property-based te
 
 ## Step 5 — Write the tests
 
-Follow `project-conventions` for layer rules and `ui-test-patterns` for the view / view-model coverage matrix, snapshot, property-based, and integration patterns. Both skills are loaded — do not duplicate their content here.
+Follow the project's conventions for layer rules and the project's UI test patterns for the view / view-model coverage matrix, snapshot, property-based, and integration patterns. Both are in your context — do not duplicate them here.
 
 ## Step 6 — Run and verify
 
@@ -104,7 +103,7 @@ Follow `project-conventions` for layer rules and `ui-test-patterns` for the view
    doubt, since none of them can then be taken at face value either.
 
 4. **Silent-skip grep gate (5.4.2)** — before declaring done, grep your new/modified test files for the active pack's **test anti-patterns** (`.claude/packs/<active-pack>/test-antipatterns.md`; pointer in `.omp/agent-config.md` § Project Commands). Any hit blocks the commit — fix the guard or rewrite the assertion so it always runs. The orchestrator re-runs this at merge time — fix here to save a round trip.
-5. **Self-check rubric** — load `test-rubric` (resolution order in `autonomous-agent` § Skill resolution) and apply it. Cap at 2 iterations; on persistent failure emit a `contradiction-exit` block (format in `contradiction-exit` skill; rubric-specific fields in `test-rubric`).
+5. **Self-check rubric** — read `.claude/skills/test-rubric/SKILL.md` and apply it. Cap at 2 iterations; on persistent failure emit a `contradiction-exit` block (format in `contradiction-exit` skill; rubric-specific fields in `test-rubric`).
 
    **This rubric is a hard gate.** It is the only anti-faking check in the default Phase-3 loop — synthesis 5.4.1 removed `adversarial-tester` from that loop on the grounds that this runs instead. If you cannot read the skill at any of the three paths, do **not** apply it from memory and do **not** report the step as done: emit a `contradiction-exit` with `trigger: skill-unreachable`, `rubric_check: unreachable`, and the paths you tried. A silently skipped rubric is worse than a failed one, because the run report grades the cycle as though it ran.
 

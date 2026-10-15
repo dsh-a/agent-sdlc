@@ -1,13 +1,19 @@
 #!/usr/bin/env bash
-# start-parallel-cycles.sh — set up and launch N parallel /cycle runs, one clone each.
+# start-parallel-cycles.sh — set up and launch N parallel /cycle runs, one pool slot each.
 #
 # The entry point behind `/cycle --parallel <issue> <issue> ...`. Parallelism that
 # needs nine hand-typed commands is not a feature; this is the one command.
 #
 # What it does, in order:
 #   1. Preflight — refuses unless the tree is genuinely quiet (see CONTRACT below)
-#   2. One detached clone per issue, via `omp worktree add` (preserves origin so gh works)
-#   3. Clears each clone's inherited agent_states/
+#   2. One pool slot per issue (<clones-root>/<repo>-slot-K, K up to parallel_slots in
+#      .omp/agent-config.md § Cycle Options). An existing slot is reset to the base in
+#      place, keeping its ignored build output; a missing one is created detached, via
+#      `omp worktree add` (preserves origin so gh works), or `git worktree add` +
+#      deploy.sh link where omp is not installed or --cloner git. With sparse_clones
+#      on, a slot checks out only the directories sparse-set.py derives from its
+#      story's ## Slices, new slots come from git, and a slot without slices is full
+#   3. Clears each slot's agent_states/
 #   4. Claims each issue by assignment
 #   5. Records framework SHA + disk baseline, initialises the gate log
 #   6. Opens a terminal per clone running the cycle
@@ -25,8 +31,12 @@
 #   start-parallel-cycles.sh --dry-run 419 404 378
 #   start-parallel-cycles.sh --no-launch 419 404 378     # set up, print commands, don't open windows
 #   start-parallel-cycles.sh --harness omp 419 404
+#   start-parallel-cycles.sh --cloner git 419 404         # plain git worktrees, omp or not
+#   start-parallel-cycles.sh --fresh 419 404              # recreate every slot from scratch
 #
 # Flags: --repo DIR --base BRANCH --clones-root DIR --harness claude|omp
+#        --cloner git|omp  clone mechanism (default: omp when installed, else git)
+#        --fresh        remove every pool slot and create the ones this run uses
 #        --mode full|lean|hotfix   override every story's Depth (normally omitted)
 #        --max-agents N --windows
 #        --awake H      inhibit system sleep for H hours (default 8; 0 = off)
@@ -34,17 +44,21 @@
 #        --stop-awake   end a running sleep inhibitor and exit
 #        --no-reap --no-sync --dry-run --no-launch --no-claim
 #
-# Reaping the previous run's clones and fast-forwarding the base are ON by
-# default, because both are things this script would otherwise simply refuse over
-# — a leftover clone or a stale branch stops the run, and making the operator fix
-# by hand what the script can verify and fix itself is the "remembered ritual"
-# failure this project keeps rediscovering.
+# Reusing the pool, reaping clones under the root that are not pool slots, and
+# fast-forwarding the base are ON by default, because each is something this
+# script would otherwise simply refuse over, and making the operator fix by hand
+# what the script can verify and fix itself is the "remembered ritual" failure.
 #
-# Safety is unchanged: neither improvises. --reap checks every clone before
-# removing any and refuses on uncommitted work or an attached session; --sync
-# refuses a dirty tree and takes only a fast-forward. Opt out with --no-reap /
-# --no-sync when you want the previous run's clones or base left exactly as they
-# are.
+# None of them improvises. Every slot this run resets or removes, and every clone
+# it reaps, is checked before any is touched; uncommitted work (untracked files
+# included), an unfinished merge/rebase/cherry-pick, commits only a detached HEAD
+# reaches, or an attached session stops the run with nothing changed. A slot's
+# feature branch lives in the repo and is never deleted. --sync refuses a dirty
+# tree and takes only a fast-forward. --no-reap leaves clones outside the pool in
+# place (the run then refuses over them); --no-sync leaves the base as it is.
+#
+# More issues than parallel_slots stops before any change. Disk use is fixed at
+# the pool: N × (checkout + build output); the launch prints it.
 #
 # --mode is OPTIONAL and overrides every story's own depth. Leave it off: each
 # issue carries a `Depth` board field (full|lean|hotfix) set by /refine, so a
@@ -59,17 +73,17 @@
 # observe.
 #
 # Cycles open as tabs in the current window where the terminal supports it
-# (Ghostty today); --windows forces separate windows.
+# (Ghostty); --windows forces separate windows.
 #
 # --max-agents is advisory only — it prints an instruction for you to pass on, and
 # nothing under Claude Code enforces it. Omit it to run uncapped (the default).
 set -uo pipefail
 
 # MAX_AGENTS is deliberately EMPTY by default: uncapped is what fan-out actually
-# runs, and a default cap would silently contaminate the uncapped baseline the plan
-# needs before a cap can be evaluated at all (plan §18.1, Q-D1).
+# runs, and a default cap would silently contaminate the uncapped baseline a cap
+# is evaluated against.
 REPO="" BASE="" ROOT="$HOME/dev/cycles" HARNESS="claude" MAX_AGENTS="" MODE="" TABS=1
-REAP=1 SYNC=1 AWAKE_HOURS=8 STOP_AWAKE=0
+REAP=1 SYNC=1 AWAKE_HOURS=8 STOP_AWAKE=0 CLONER="" FRESH=0
 DRY=0 LAUNCH=1 CLAIM=1 ISSUES=()
 
 while [ $# -gt 0 ]; do
@@ -78,6 +92,7 @@ while [ $# -gt 0 ]; do
     --base) BASE="${2:-}"; shift 2 ;;
     --clones-root) ROOT="${2:-}"; shift 2 ;;
     --harness) HARNESS="${2:-}"; shift 2 ;;
+    --cloner) CLONER="${2:-}"; shift 2 ;;
     --mode) MODE="${2:-}"; shift 2 ;;
     --windows) TABS=0; shift ;;
     --awake) AWAKE_HOURS="${2:-8}"; shift 2 ;;
@@ -86,12 +101,13 @@ while [ $# -gt 0 ]; do
     --reap) REAP=1; shift ;;          # accepted for explicitness; already the default
     --sync) SYNC=1; shift ;;
     --no-reap) REAP=0; shift ;;
+    --fresh) FRESH=1; shift ;;
     --no-sync) SYNC=0; shift ;;
     --max-agents) MAX_AGENTS="${2:-}"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
     --no-launch) LAUNCH=0; shift ;;
     --no-claim) CLAIM=0; shift ;;
-    -h|--help) sed -n '2,30p' "$0"; exit 0 ;;
+    -h|--help) awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0"; exit 0 ;;
     -*) echo "start-parallel-cycles: unknown flag '$1'" >&2; exit 2 ;;
     *) ISSUES+=("$1"); shift ;;
   esac
@@ -102,26 +118,48 @@ done
 die() { printf 'start-parallel-cycles: REFUSING — %s\n' "$*" >&2; exit 1; }
 say() { printf '  %s\n' "$*"; }
 step() { printf '\n▸ %s\n' "$*"; }
+# A word for a printed command, quoted so it pastes into bash or zsh as one
+# argument: a path with a space or a quote is single-quoted, a plain one is not.
+q() {
+  local sq="'\\''"
+  case "$1" in
+    ''|*[!A-Za-z0-9_./:@%+=,-]*) printf "'%s'" "${1//\'/$sq}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+# A command's output as bash reads it: LF lines. See deploy.sh's strip_cr.
+strip_cr() { "$@" | tr -d '\r'; return "${PIPESTATUS[0]}"; }
+# The captured output of a failed step, indented to sit under a die message. Its
+# last lines carry the error; CR is dropped so a Windows tool's lines print whole.
+failed_output() { strip_cr printf '%s\n' "${1:-(no output)}" | tail -n 20 | sed 's/^/    /'; }
+
+# The git operation a clone is in the middle of: merge, rebase, cherry-pick, or
+# nothing. `.git` in a linked worktree is a *file* pointing at the real git dir,
+# so `$wt/.git/MERGE_HEAD` finds nothing; ask git where its dir is.
+# --absolute-git-dir, not a "starts with /" test: Git for Windows prints `C:/...`.
+clone_op() {
+  local gd
+  gd="$(git -C "$1" rev-parse --absolute-git-dir 2>/dev/null)" || return 0
+  if   [ -e "$gd/MERGE_HEAD" ];       then echo merge
+  elif [ -d "$gd/rebase-merge" ] || [ -d "$gd/rebase-apply" ]; then echo rebase
+  elif [ -e "$gd/CHERRY_PICK_HEAD" ]; then echo cherry-pick
+  fi
+}
 
 # Why a leftover clone is dirty, in enough detail to act on.
 #
-# This refusal used to read "<path> has uncommitted changes. Commit or discard
-# them, then re-run." — true, and reliably misread. The word "uncommitted" sends
-# the operator to their own repo, which is clean, because that is the tree they
-# were just working in; the path is a clones root they have no reason to be
-# thinking about. Measured once for real: a month-old clone from an unrelated
-# open PR, holding an abandoned `git merge` stopped on a conflict, refused three
-# launches in a row while the operator re-checked a primary tree that was never
-# the problem.
+# "Uncommitted changes" alone sends the operator to their own repo, which is
+# clean, because that is the tree they were just working in; the path is a clones
+# root they have no reason to be thinking about.
 #
-# So the report says three things the old one did not: that this is a *clone* and
-# not the repo, whose branch it is and how old, and — when git is mid-operation —
-# the exact command that ends it. An interrupted merge, rebase or cherry-pick is
+# So the report says three things: that this is a *clone* and not the repo, whose
+# branch it is and how old, and — when git is mid-operation — the exact command
+# that ends it. An interrupted merge, rebase or cherry-pick is
 # the common case here, because that is what a cycle that died mid-Phase-4 leaves
 # behind, and `--abort` is both the right answer and not the one that comes to
 # mind when the message says "commit or discard".
 dirty_clone_report() {
-  local wt="$1" gd branch when n out op=""
+  local wt="$1" branch when n out op
   # A fan-out clone is created detached, so `--abbrev-ref HEAD` says "HEAD" for
   # the common case and names nothing. Report the sha then, which at least
   # identifies it; a named branch means a cycle got as far as creating one.
@@ -133,40 +171,30 @@ dirty_clone_report() {
   fi
   when="$(git -C "$wt" log -1 --format=%cs 2>/dev/null)" || when="?"
   n="$(git -C "$wt" status --porcelain -- ':!agent_states' 2>/dev/null | wc -l | tr -d ' ')"
+  op="$(clone_op "$wt")"
 
-  # `.git` in a linked worktree is a *file* pointing at the real git dir, so
-  # testing `$wt/.git/MERGE_HEAD` finds nothing and the interrupted merge this
-  # function exists to name goes unreported. Ask git where its dir is.
-  gd="$(git -C "$wt" rev-parse --git-dir 2>/dev/null)"
-  case "$gd" in /*) ;; *) gd="$wt/$gd" ;; esac
-  if   [ -e "$gd/MERGE_HEAD" ];       then op="merge"
-  elif [ -d "$gd/rebase-merge" ] || [ -d "$gd/rebase-apply" ]; then op="rebase"
-  elif [ -e "$gd/CHERRY_PICK_HEAD" ]; then op="cherry-pick"
-  fi
-
-  out="$wt has $n uncommitted change(s). Nothing was removed.
+  out="$wt has $n uncommitted change(s). Nothing was removed or reset.
              This is a fan-out CLONE under $ROOT, not your repo — $REPO is
              not what this is about, and is probably clean.
              Clone is $branch, last commit $when."
   if [ -n "$op" ]; then
     out="$out
              A $op is in progress here and was never finished. End it with:
-               git -C $wt $op --abort
+               git -C $(q "$wt") $op --abort
              That returns the branch to its last commit and touches no remote,
              so anything already pushed — and any PR on it — is unaffected."
   else
     out="$out
              Commit or discard them, then re-run:
-               git -C $wt status"
+               git -C $(q "$wt") status"
   fi
   printf '%s\n' "$out"
 }
 
-# `--stop-awake` is the teardown half. Round 11 finished in an hour with
-# `--awake 10`, leaving nine hours of inhibitor behind holding a laptop awake for
-# a round that no longer existed. The bound is a ceiling, not a lifetime, and
-# nothing in the pipeline knows a round has ended — so until something does, this
-# is the explicit way to say so.
+# `--stop-awake` is the teardown half. The --awake bound is a ceiling, not a
+# lifetime: a run that finishes early leaves the inhibitor holding the machine
+# awake, and nothing in the pipeline knows a run has ended, so this is the
+# explicit way to say so.
 if [ "$STOP_AWAKE" = 1 ]; then
   STOPPED=0
   P="$(cat "$ROOT/awake.pid" 2>/dev/null || true)"
@@ -174,9 +202,9 @@ if [ "$STOP_AWAKE" = 1 ]; then
     kill "$P" 2>/dev/null && { say "stopped the sleep inhibitor (pid $P)"; STOPPED=1; }
   fi
   # The pid file can be gone while the process is not — a crash between the two,
-  # or a hand-edited clones root. Reporting "none running" in that state is the
-  # M16 failure exactly: mistaking a missing record for a missing process. Fall
-  # back to matching our own flag signature, and say which route found it.
+  # or a hand-edited clones root. Reporting "none running" then mistakes a
+  # missing record for a missing process. Fall back to matching our own flag
+  # signature, and say which route found it.
   if [ "$STOPPED" = 0 ]; then
     for Q in $(pgrep -f 'caffeinate -dimsu -t' 2>/dev/null || true); do
       kill "$Q" 2>/dev/null && { say "stopped an inhibitor with no pid file (pid $Q)"; STOPPED=1; }
@@ -195,11 +223,45 @@ case "$MODE" in
   ''|full|lean|hotfix) ;;
   *) die "--mode must be full, lean or hotfix (got '$MODE')" ;;
 esac
+case "$CLONER" in
+  ''|git|omp) ;;
+  *) die "--cloner must be git or omp (got '$CLONER')
+             Usage: start-parallel-cycles.sh [--cloner git|omp] 419 404 378" ;;
+esac
 
 [ -n "$REPO" ] || REPO="$(git rev-parse --show-toplevel 2>/dev/null)" || die "not in a git repo (pass --repo)"
 command -v git >/dev/null 2>&1 || die "git not found"
-command -v omp >/dev/null 2>&1 || die "omp not found — clone creation uses 'omp worktree add', which is
-             the only mechanism verified to preserve origin so gh resolves inside a clone"
+# Clone mechanism. `omp worktree add` copies the whole working tree — framework
+# links, settings, vault links, warm build caches — copy-on-write on APFS
+# (sd-wire § 5c), so it stays first choice wherever omp is installed. Without
+# omp (Claude Code alone, and Windows, where NTFS has no cheap whole-tree copy)
+# a plain `git worktree add` keeps origin just as well — a worktree shares the
+# repo's config, which is what a `git clone --local` gets wrong — and the
+# untracked half is rebuilt: framework links by deploy.sh, per-project config
+# copied, vault links by each cycle's own vault link guard. --cloner picks
+# one outright, so an operator with omp can still ask for plain worktrees.
+#
+# Partial checkout (sparse_clones) is git only: omp copies the whole working
+# tree, which is the opposite of a partial one. With it on, new slots use git,
+# and an explicit --cloner omp refuses.
+SPARSE="$(awk -F'|' '/^\| *sparse_clones *\|/{gsub(/[ \t`]/,"",$3); print $3; exit}' \
+          "$REPO/.omp/agent-config.md" 2>/dev/null)"
+[ -n "$SPARSE" ] || SPARSE=false
+case "$SPARSE" in
+  true|false) ;;
+  *) die "sparse_clones must be true or false (got '$SPARSE').
+             Set it in $REPO/.omp/agent-config.md § Cycle Options." ;;
+esac
+if [ -z "$CLONER" ]; then
+  if [ "$SPARSE" = true ]; then CLONER=git
+  elif command -v omp >/dev/null 2>&1; then CLONER=omp; else CLONER=git; fi
+elif [ "$CLONER" = omp ]; then
+  [ "$SPARSE" = false ] || die "--cloner omp, but sparse_clones is true. omp worktree add copies the whole
+             working tree, so it cannot make a partial checkout. Nothing was changed.
+             Drop --cloner omp (or pass --cloner git), or set sparse_clones to false in
+             $REPO/.omp/agent-config.md § Cycle Options."
+  command -v omp >/dev/null 2>&1 || die "--cloner omp, but omp is not installed (pass --cloner git)"
+fi
 [ "$CLAIM" = 0 ] || command -v gh >/dev/null 2>&1 || die "gh not found (or pass --no-claim)"
 
 # base_branch from the deployment's config, unless overridden
@@ -208,6 +270,20 @@ if [ -z "$BASE" ]; then
           "$REPO/.omp/agent-config.md" 2>/dev/null)"
   [ -n "$BASE" ] || BASE="main"
 fi
+
+# Pool size, from the deployment's config. A project config without the row
+# takes the framework default.
+SLOTS="$(awk -F'|' '/^\| *parallel_slots *\|/{gsub(/[ \t`]/,"",$3); print $3; exit}' \
+          "$REPO/.omp/agent-config.md" 2>/dev/null)"
+[ -n "$SLOTS" ] || SLOTS=3
+case "$SLOTS" in
+  ''|*[!0-9]*|0*) die "parallel_slots must be a positive whole number (got '$SLOTS').
+             Set it in $REPO/.omp/agent-config.md § Cycle Options." ;;
+esac
+[ "${#ISSUES[@]}" -le "$SLOTS" ] || die "${#ISSUES[@]} issues, but the pool has $SLOTS slot(s). Nothing was changed.
+             Run at most $SLOTS at once, or raise parallel_slots in
+             $REPO/.omp/agent-config.md § Cycle Options (each slot costs a checkout plus its build output)."
+SLOT_PREFIX="$(basename "$REPO")-slot-"
 
 # ---------------------------------------------------------------- preflight
 step "Preflight ($REPO)"
@@ -220,7 +296,7 @@ step "Preflight ($REPO)"
 WOULD_REAP=0
 if [ "$DRY" = 1 ]; then
   [ "$SYNC" = 0 ] || say "would sync $BASE (skipped: --dry-run)"
-  [ "$REAP" = 0 ] || { say "would reap clones under $ROOT (skipped: --dry-run)"; WOULD_REAP=1; }
+  [ "$REAP" = 0 ] || { say "would reap clones outside the pool under $ROOT (skipped: --dry-run)"; WOULD_REAP=1; }
   SYNC=0 REAP=0
 fi
 
@@ -234,76 +310,147 @@ if [ "$SYNC" = 1 ]; then
   say "synced $BASE to $(git -C "$REPO" rev-parse --short HEAD)"
 fi
 
-# --reap next: the worktree check below refuses on any leftover clone.
-if [ "$REAP" = 1 ]; then
-  reaped=0
-  # Compare resolved paths: `git worktree list` reports the physical path, so on
-  # macOS a clones-root under /var arrives as /private/var and a plain prefix test
-  # silently matches nothing — reaping quietly becomes a no-op.
-  ROOT_P="$(cd "$ROOT" 2>/dev/null && pwd -P)" || ROOT_P="$ROOT"
-  # Two passes. Checking everything before removing anything means a refusal
-  # leaves the previous run exactly as it was, rather than half-reaped — the
-  # operator can then fix the one dirty clone and re-run the same command.
-  CANDIDATES=()
-  while read -r _ wt; do
-    [ -n "$wt" ] || continue
-    wt_p="$(cd "$wt" 2>/dev/null && pwd -P)" || wt_p="$wt"
-    case "$wt_p" in "$ROOT_P"/*) ;; *) continue ;; esac
-    # A clone is a linked worktree, so its feature branch lives in $REPO and
-    # survives removal. Only uncommitted work is actually at risk — refuse on it
-    # rather than deciding for the operator what is disposable.
-    # agent_states/ is excluded: it is framework scratch the cycle owns and clears,
-    # and this script writes the .fanout-clone marker into it itself. A deployment
-    # that has not run the gitignore block regenerator would otherwise see every
-    # clone as dirty and never be able to reap one.
-    if [ -d "$wt" ] && [ -n "$(git -C "$wt" status --porcelain -- ':!agent_states' 2>/dev/null)" ]; then
+# ------------------------------------------------------------------- pool
+#
+# Cycles run in a fixed pool of worktrees, <root>/<repo>-slot-1 … -slot-N, and
+# a slot is reset in place rather than recreated: checkout and cold build are
+# paid once per slot, ignored build output stays warm, and disk use stays at N
+# slots. The repo name in the slot name keeps two projects that share a clones
+# root out of each other's slots.
+#
+# Every slot this run touches, and every clone it removes, passes check_clone
+# first; all checks run before any change, so a refusal leaves the previous run
+# exactly as it was and the operator can fix the one slot and re-run.
+ROOT_P="$(cd "$ROOT" 2>/dev/null && pwd -P)" || ROOT_P="$ROOT"
+# Compare resolved paths: `git worktree list` reports the physical path, so on
+# macOS a clones root under /var arrives as /private/var.
+phys() { (cd "$1" 2>/dev/null && pwd -P) || printf '%s' "$1"; }
+slot_index() {  # physical path -> K, when it is this pool's slot K directly under the root
+  local name k
+  [ "$(dirname "$1")" = "$ROOT_P" ] || return 1
+  name="$(basename "$1")"
+  case "$name" in "$SLOT_PREFIX"*) k="${name#"$SLOT_PREFIX"}" ;; *) return 1 ;; esac
+  case "$k" in ''|*[!0-9]*|0*) return 1 ;; esac
+  printf '%s' "$k"
+}
+worktrees() { git -C "$REPO" worktree list --porcelain | sed -n 's/^worktree //p' | tail -n +2; }
+
+# Refuses, and exits, when removing or resetting a clone could lose work. A clone
+# is a linked worktree, so its branches live in $REPO and survive either; what is
+# at risk is uncommitted work, an unfinished git operation, commits that only a
+# detached HEAD reaches, and a session still running inside it.
+# agent_states/ is excluded from the dirty test: it is framework scratch the
+# cycle owns and clears, and this script writes the .fanout-clone marker into it.
+check_clone() {
+  local wt="$1" wt_p holders h kids head
+  wt_p="$(phys "$wt")"
+  if [ -d "$wt" ]; then
+    if [ -n "$(git -C "$wt" status --porcelain -- ':!agent_states' 2>/dev/null)" ] \
+       || [ -n "$(clone_op "$wt")" ]; then
       die "$(dirty_clone_report "$wt")"
     fi
-    # Full path, not basename: a short name like "myapp-c1" matches far too much.
-    # Report what matched — "something is running" is not an actionable refusal,
-    # and the thing holding a clone is often not a session at all. Measured: a
-    # flutter_tester from the previous run was still alive a day later, inside a
-    # Phase-3 worktree the janitor had already deleted.
-    # Match on the clone path, then follow children. The path appears in the
-    # terminal's argv but NOT in the session's own — `claude "/cycle 442"` carries
-    # no directory — so matching alone reports three lines of terminal plumbing and
-    # hides the one process that matters. An operator reading that reasonably
-    # concludes the window is stale chrome and kills it, when a live cycle is
-    # parked inside.
-    HOLDERS="$(pgrep -f "$wt_p" 2>/dev/null || true)"
-    for h in $HOLDERS; do
-      kids="$(pgrep -P "$h" 2>/dev/null || true)"
-      [ -n "$kids" ] && HOLDERS="$HOLDERS
-$kids"
-    done
-    HOLDERS="$(printf '%s\n' "$HOLDERS" | grep -v '^$' | sort -u || true)"
-    if [ -n "$HOLDERS" ]; then
-      printf 'start-parallel-cycles: REFUSING — %s still has processes attached:\n' "$wt_p" >&2
-      # shellcheck disable=SC2086
-      ps -o pid=,etime=,command= -p $(echo "$HOLDERS" | tr '\n' ' ') 2>/dev/null \
-        | cut -c1-160 | sed 's/^/    /' >&2
-      printf '    Close the session, or kill the leftovers:  kill %s\n' "$(echo "$HOLDERS" | tr '\n' ' ')" >&2
-      printf '    Nothing was removed.\n' >&2
-      exit 1
+    if ! git -C "$wt" symbolic-ref -q HEAD >/dev/null 2>&1; then
+      head="$(git -C "$wt" rev-parse HEAD 2>/dev/null)"
+      if [ -n "$head" ] && [ -z "$(git -C "$wt" for-each-ref --count=1 --contains "$head" \
+                                     refs/heads refs/remotes refs/tags 2>/dev/null)" ]; then
+        die "$wt is on a detached HEAD whose commits no branch holds. Nothing was removed or reset.
+             Keep them on a branch, then re-run:
+               git -C $(q "$wt") branch <name>"
+      fi
     fi
-    CANDIDATES+=("$wt")
-  done < <(git -C "$REPO" worktree list --porcelain | awk '/^worktree /{print $1, $2}')
-
-  for wt in ${CANDIDATES[@]+"${CANDIDATES[@]}"}; do
-    git -C "$REPO" worktree remove --force "$wt" 2>/dev/null \
-      || die "could not remove $wt — remove it by hand."
-    reaped=$((reaped+1))
+  fi
+  # Match on the clone path, then follow children: the path appears in a
+  # terminal's argv but not in the session's own — `claude "/cycle 442"` carries
+  # no directory — so matching alone hides the live session inside it.
+  holders="$(pgrep -f "$wt_p" 2>/dev/null || true)"
+  for h in $holders; do
+    kids="$(pgrep -P "$h" 2>/dev/null || true)"
+    [ -n "$kids" ] && holders="$holders
+$kids"
   done
-  git -C "$REPO" worktree prune 2>/dev/null
-  [ "$reaped" = 0 ] || say "reaped $reaped clone(s) from $ROOT"
+  holders="$(printf '%s\n' "$holders" | grep -v '^$' | sort -u || true)"
+  if [ -n "$holders" ]; then
+    printf 'start-parallel-cycles: REFUSING — %s still has processes attached:\n' "$wt_p" >&2
+    # shellcheck disable=SC2086
+    ps -o pid=,etime=,command= -p $(echo "$holders" | tr '\n' ' ') 2>/dev/null \
+      | cut -c1-160 | sed 's/^/    /' >&2
+    printf '    Close the session, or kill the leftovers:  kill %s\n' "$(echo "$holders" | tr '\n' ' ')" >&2
+    printf '    Nothing was removed or reset.\n' >&2
+    exit 1
+  fi
+}
 
-  # Rotation used to live here, conditioned on `reaped > 0`. It has moved to just
-  # before the clones are created — see § run artifacts. Reaping is not the event
-  # that starts a new run, and tying the two together meant a run whose clones had
-  # already been removed by hand (`reap-clones.sh sweep`) rotated nothing and
-  # appended to its predecessor's log. Measured in fan-out 5 (J2): two runs
-  # commingled, and the first gate report attributed fan-out 4's 18h28m of
-  # permission asks to fan-out 5.
+remove_clone() {
+  git -C "$REPO" worktree remove --force "$1" 2>/dev/null \
+    || die "could not remove $1 — remove it by hand."
+  rm -f "$ROOT/.reapable/$(basename "$1").json"
+}
+
+# Disk held by the pool's slots, in KB. `du` counts every block a slot names, so
+# on APFS a copy-on-write omp slot reads larger than the space it really takes.
+pool_kb() {
+  local k kb=0 s
+  for ((k = 1; k <= SLOTS; k++)); do
+    [ -d "$ROOT/$SLOT_PREFIX$k" ] || continue
+    s="$(du -sk "$ROOT/$SLOT_PREFIX$k" 2>/dev/null | awk '{print $1}')"
+    kb=$((kb + ${s:-0}))
+  done
+  echo "$kb"
+}
+pool_footprint() {  # [kb] -> "<MB> MB across <n> of <N> slot(s) under <root>"
+  local kb="${1:-$(pool_kb)}" k have=0
+  for ((k = 1; k <= SLOTS; k++)); do [ -d "$ROOT/$SLOT_PREFIX$k" ] && have=$((have+1)); done
+  echo "$((kb / 1024)) MB across $have of $SLOTS slot(s) under $ROOT"
+}
+
+# Classify what exists under the root: pool slots (1..N), and everything else —
+# per-issue clones from before the pool, or slots beyond a lowered parallel_slots.
+SLOT_HAS=() EXTRA=()
+while IFS= read -r wt; do
+  [ -n "$wt" ] || continue
+  wt_p="$(phys "$wt")"
+  case "$wt_p" in "$ROOT_P"/*) ;; *) continue ;; esac
+  if k="$(slot_index "$wt_p")" && [ "$k" -le "$SLOTS" ]; then
+    [ -d "$wt" ] && SLOT_HAS[$k]=1
+  else
+    EXTRA+=("$wt")
+  fi
+done < <(worktrees)
+
+# Per slot: reuse | create | recreate (--fresh) | drop (--fresh, unused this run) | untouched.
+SLOT_ACT=()
+for ((k = 1; k <= SLOTS; k++)); do
+  C="$ROOT/$SLOT_PREFIX$k"
+  if [ "$k" -le "${#ISSUES[@]}" ]; then
+    if [ "${SLOT_HAS[$k]:-}" = 1 ]; then
+      if [ "$FRESH" = 1 ]; then SLOT_ACT[$k]=recreate; else SLOT_ACT[$k]=reuse; fi
+    else
+      [ -e "$C" ] && die "$C exists but is not a worktree of $REPO. Nothing was changed.
+             Move it aside, or pass --clones-root."
+      SLOT_ACT[$k]=create
+    fi
+  elif [ "$FRESH" = 1 ] && [ "${SLOT_HAS[$k]:-}" = 1 ]; then
+    SLOT_ACT[$k]=drop
+  fi
+done
+
+for ((k = 1; k <= SLOTS; k++)); do
+  case "${SLOT_ACT[$k]:-}" in reuse|recreate|drop) check_clone "$ROOT/$SLOT_PREFIX$k" ;; esac
+done
+if [ "$REAP" = 1 ] || [ "$WOULD_REAP" = 1 ]; then
+  for wt in ${EXTRA[@]+"${EXTRA[@]}"}; do check_clone "$wt"; done
+fi
+
+if [ "$DRY" = 0 ]; then
+  for ((k = 1; k <= SLOTS; k++)); do
+    case "${SLOT_ACT[$k]:-}" in recreate|drop) remove_clone "$ROOT/$SLOT_PREFIX$k" ;; esac
+  done
+  reaped=0
+  if [ "$REAP" = 1 ]; then
+    for wt in ${EXTRA[@]+"${EXTRA[@]}"}; do remove_clone "$wt"; reaped=$((reaped+1)); done
+  fi
+  git -C "$REPO" worktree prune 2>/dev/null
+  [ "$reaped" = 0 ] || say "reaped $reaped clone(s) outside the pool from $ROOT"
 fi
 
 CUR="$(git -C "$REPO" branch --show-current 2>/dev/null)"
@@ -322,32 +469,42 @@ STATES="$(ls "$REPO"/agent_states/cycle-state-*.md 2>/dev/null | wc -l | tr -d '
 [ "$STATES" = "0" ] || die "$STATES cycle-state file(s) present — a cycle may be live, and clones
              inherit agent_states/. Run clear-agent-states.py, or wait."
 
-WT="$(git -C "$REPO" worktree list | tail -n +2 | wc -l | tr -d ' ')"
+# Worktrees outside the pool. Pool slots are expected; anything else may be a
+# running agent's.
+WT=0
+while IFS= read -r wt; do
+  [ -n "$wt" ] || continue
+  if k="$(slot_index "$(phys "$wt")")" && [ "$k" -le "$SLOTS" ]; then continue; fi
+  WT=$((WT+1))
+done < <(worktrees)
 if [ "$WT" != "0" ]; then
-  # Under --dry-run the reap that would have cleared these was skipped, so
-  # refusing over them would report a blocker the real run does not have.
-  [ "$WOULD_REAP" = 1 ] \
-    && say "$WT existing worktree(s) — the real run would reap them first" \
-    || die "$WT existing worktree(s). Agents may be running; finish or prune them first."
+  # Under --dry-run the reap that would have cleared the clones under the root
+  # was skipped, so refusing over them would report a blocker the real run does
+  # not have.
+  if [ "$WOULD_REAP" = 1 ] && [ "$WT" -le "${#EXTRA[@]}" ]; then
+    say "$WT existing worktree(s) outside the pool — the real run would reap them first"
+  else
+    die "$WT existing worktree(s) outside the pool. Agents may be running; finish or prune them first."
+  fi
 fi
 
 AVAIL_KB="$(df -k "$REPO" | tail -1 | awk '{print $4}')"
 [ "$AVAIL_KB" -gt 5242880 ] || die "only $((AVAIL_KB/1024)) MB free — under the 5 GB floor."
 
-say "branch $BASE, clean, no live state, no worktrees"
+say "branch $BASE, clean, no live state, no worktrees outside the pool"
 say "mode ${MODE:-per-story — from each issue Depth field}"
 say "$((AVAIL_KB/1024/1024)) GB free"
 
 # -P: resolve symlinks. Skills are deployed by symlinking a central framework
 # checkout into the project, so the logical path walks back up into the *project*
-# and records it as the framework — which is what run-provenance.txt said after
-# fan-out 1 (evidence-run1 E6). The framework SHA is the point of this record.
+# and would record it as the framework. The framework SHA is the point of this
+# record.
 FW_ROOT="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../../.." 2>/dev/null && pwd -P)"
 FW_SHA="$(git -C "$FW_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 FW_DIRTY="$(git -C "$FW_ROOT" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
 say "framework $FW_ROOT @ $FW_SHA${FW_DIRTY:+ (${FW_DIRTY} uncommitted)}"
 [ "${FW_DIRTY:-0}" = "0" ] || printf '  ! framework has uncommitted changes — deployments resolve to
-    the working tree, so every cycle will run against them (plan §3.7).\n'
+    the working tree, so every cycle will run against them.\n'
 
 # Deployment integrity. A refusal, not a warning, unlike the gate-capture check
 # below — and the difference is worth stating. An *unregistered* hook is a project
@@ -359,24 +516,22 @@ say "framework $FW_ROOT @ $FW_SHA${FW_DIRTY:+ (${FW_DIRTY} uncommitted)}"
 # dangling hook fails open — the harness treats a hook error as non-fatal — so
 # telemetry, gate capture and the credential guard stop with nothing said. That
 # is how a fan-out comes back unmeasured while every preflight line reads green.
-#
-# Measured 2026-09-11: one deployment was missing 19 of 27 scaffold patterns and
-# nothing had ever reported it.
 if [ -x "$FW_ROOT/deploy.sh" ]; then
   if DEP_OUT="$(bash "$FW_ROOT/deploy.sh" check "$REPO" 2>&1)"; then
     say "deployment    $(printf '%s' "$DEP_OUT" | sed -n 's/^  \([0-9]*\/[0-9]* correct\).*/\1/p')"
   else
     printf '%s\n' "$DEP_OUT" | sed 's/^/  /' >&2
     die "deployment is incomplete — fix it before measuring a run:
-             bash $FW_ROOT/deploy.sh link $REPO"
+             bash $(q "$FW_ROOT/deploy.sh") link $(q "$REPO")"
   fi
 else
   say "deployment    not checked (no deploy.sh in $FW_ROOT)"
 fi
 
-# Gate capture is what fan-out 1 lost by relying on discipline (evidence-run1 E7).
-# A warning, not a refusal: the hook is Claude Code only, and a run without it is
-# valid — just unmeasured. Say which, before the run rather than after.
+# Gate capture is automatic only when the hook is registered; gates logged by
+# hand depend on discipline. A warning, not a refusal: the hook is Claude Code
+# only, and a run without it is valid — just unmeasured. Say which, before the
+# run rather than after.
 if [ "$HARNESS" = "claude" ]; then
   if grep -q 'gate-log.py' "$REPO/.claude/settings.json" 2>/dev/null; then
     say "gate capture wired"
@@ -398,8 +553,8 @@ fi
 # on a question at Phase 1A, which is the failure this check exists to prevent.
 #
 # It refuses only when the board HAS the field and an issue lacks a value. A board
-# without the field is an older deployment, not an error: those cycles fall back to
-# /cycle's own heuristics, which is the previous behaviour.
+# without the field is not an error: those cycles fall back to /cycle's own
+# heuristics.
 if [ -n "$MODE" ]; then
   [ "$MODE" != hotfix ] || [ ${#ISSUES[@]} -le 1 ] || \
     die "--mode hotfix with ${#ISSUES[@]} issues. hotfix skips Gate 1, Gate 2 and review and forces
@@ -424,7 +579,7 @@ else
       say "depth         board $BOARD has no Depth field — each cycle will ask"
     else
       MISSING="$(gh project item-list "$B_NUM" --owner "$B_OWNER" --format json --limit 1000 2>/dev/null \
-        | python3 -c '
+        | strip_cr python3 -c '
 import json,sys
 want=set(sys.argv[1:])
 have={}
@@ -446,25 +601,20 @@ fi
 
 # ------------------------------------------------------------ file overlap
 #
-# Two cycles editing one file is not hypothetical and it is not always bad. In
-# fan-out 7 two clones appended tests to `program_detail_view_test.dart` and git
-# merged them without a conflict. In fan-out 8 one clone deleted the region
-# another added to, in `settings_view.dart`, and the second PR is still open and
-# conflicted — nothing in the pipeline owns a rebase after a cycle ends, so it
-# simply stopped.
+# Two cycles editing one file is not always bad: two clones appending tests to
+# one file merge without a conflict. One deleting a region the other added to
+# leaves the second PR conflicted, and nothing in the pipeline owns a rebase
+# after a cycle ends.
 #
 # The launcher is the only place that knows every issue before any work starts.
 # It says so here rather than deciding: refuse, sequence, or start knowingly is
 # the operator's call, and a pair that looks overlapping may not conflict at all.
 #
 # Read the signal as "these two issues work in the same area", NOT as "these two
-# will collide in this file". Round 11 is the worked example: this check named
-# #206 and #207 over `supabase/tests/rls_sweep_s2_test.sql`, the pair did
-# conflict — and that file auto-merged cleanly. The conflict was in
-# `supabase/tests/README.md`, which neither issue mentions and both cycles
-# documented their new test in. The pairing was right; the named file was not the
-# reason. Anything that later sequences on this output must sequence the *pair*,
-# because sequencing only the named file would have let this pair run.
+# will collide in this file": a flagged pair can auto-merge the named file and
+# conflict in one neither issue mentions, such as a README both cycles document
+# in. Anything that later sequences on this output must sequence the *pair*, not
+# the named file.
 # Recorded in run-provenance.txt so a later evidence pass can tell "we knew" from
 # "we found out".
 #
@@ -474,11 +624,13 @@ fi
 # hand-written lists.
 OVERLAP_DIR="$(mktemp -d)"
 OVERLAP_FOUND=0
+# Each body is kept in $OVERLAP_DIR/body-<issue>; partial checkout reads its
+# `## Slices` from there.
 if command -v gh >/dev/null 2>&1; then
   for i in "${ISSUES[@]}"; do
     gh issue view "$i" --repo "$(cd "$REPO" && gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)" \
-       --json body,title -q '.title + "\n" + .body' 2>/dev/null \
-      | grep -oE '[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+\.[A-Za-z0-9]+' \
+       --json body,title -q '.title + "\n" + .body' 2>/dev/null > "$OVERLAP_DIR/body-$i"
+    grep -oE '[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+\.[A-Za-z0-9]+' "$OVERLAP_DIR/body-$i" \
       | sort -u \
       | while read -r f; do
           git -C "$REPO" ls-files --error-unmatch -- "$f" >/dev/null 2>&1 && printf '%s\n' "$f"
@@ -504,7 +656,42 @@ if command -v gh >/dev/null 2>&1; then
     done
   done
   [ "$OVERLAP_FOUND" = 1 ] && \
-    say "not a refusal — fan-out 7's overlap merged clean. Sequence them, drop one, or start knowing."
+    say "not a refusal — an overlap can merge clean. Sequence them, drop one, or start knowing."
+fi
+
+# --------------------------------------------------------- partial checkout
+#
+# With sparse_clones on, each slot checks out the directories sparse-set.py
+# derives from its story; $OVERLAP_DIR/sparse-<slot> holds them, one per line.
+# A story with no usable set gets a full checkout, and the launch says why.
+SPARSE_PY="$FW_ROOT/.claude/skills/cycle/sparse-set.py"
+SPARSE_LOG=""
+if [ "$SPARSE" = true ]; then
+  step "Partial checkout (sparse_clones)"
+  say "new slots via git worktree add: omp worktree add copies the whole working tree"
+  n=0
+  for i in "${ISSUES[@]}"; do
+    n=$((n+1)); pf="$OVERLAP_DIR/plan-$n"
+    if [ ! -s "$OVERLAP_DIR/body-$i" ]; then
+      printf 'full\tissue #%s could not be read with gh\n' "$i" > "$pf"
+    elif ! strip_cr python3 "$SPARSE_PY" plan --repo "$REPO" --base "$BASE" \
+              --body "$OVERLAP_DIR/body-$i" > "$pf" 2>"$pf.err"; then
+      printf 'full\tsparse-set.py failed: %s\n' "$(tail -n 1 "$pf.err")" > "$pf"
+    fi
+    if grep -q '^full' "$pf"; then
+      why="$(awk -F'\t' '$1 == "full" { print $2; exit }' "$pf")"
+      say "#$i → $SLOT_PREFIX$n  full checkout: $why"
+      SPARSE_LOG="$SPARSE_LOG# sparse $SLOT_PREFIX$n full: $why
+"
+    else
+      awk -F'\t' '$1 == "dir" { print $2 }' "$pf" > "$OVERLAP_DIR/sparse-$n"
+      dirs="$(tr '\n' ' ' < "$OVERLAP_DIR/sparse-$n" | sed 's/ $//')"
+      say "#$i → $SLOT_PREFIX$n  sparse: $dirs"
+      awk -F'\t' '$1 == "note" { print "    " $2 }' "$pf"
+      SPARSE_LOG="$SPARSE_LOG# sparse $SLOT_PREFIX$n $dirs
+"
+    fi
+  done
 fi
 
 if [ "$DRY" = 1 ]; then
@@ -516,34 +703,147 @@ if [ "$DRY" = 1 ]; then
   else
     say "! would NOT inhibit system sleep — no caffeinate on this host"
   fi
-  step "Dry run — would create ${#ISSUES[@]} clone(s) under $ROOT"
-  n=0; for i in "${ISSUES[@]}"; do n=$((n+1)); say "c$n → $ROOT/$(basename "$REPO")-c$n  (issue #$i)"; done
+  step "Dry run — would use ${#ISSUES[@]} of $SLOTS slot(s) under $ROOT via $CLONER worktree add"
+  n=0
+  for i in "${ISSUES[@]}"; do
+    n=$((n+1))
+    case "${SLOT_ACT[$n]}" in
+      reuse)    how="reuse — reset to $BASE, ignored build output kept" ;;
+      recreate) how="recreate — --fresh" ;;
+      *)        how="create" ;;
+    esac
+    say "#$i → $SLOT_PREFIX$n  $how  ($ROOT/$SLOT_PREFIX$n)"
+  done
+  for ((k = 1; k <= SLOTS; k++)); do
+    [ "${SLOT_ACT[$k]:-}" = drop ] && say "would remove $ROOT/$SLOT_PREFIX$k (--fresh; created again when a run needs it)"
+  done
+  if [ "$WOULD_REAP" = 1 ]; then
+    for wt in ${EXTRA[@]+"${EXTRA[@]}"}; do say "would remove $wt (outside the pool)"; done
+  fi
+  say "pool disk footprint now $(pool_footprint)"
   exit 0
 fi
 
 mkdir -p "$ROOT" || die "cannot create clones root $ROOT"
 
-# ---------------------------------------------------- clones (local, reversible)
-step "Creating clones"
-CLONES=() ; n=0
-for i in "${ISSUES[@]}"; do
-  n=$((n+1)); C="$ROOT/$(basename "$REPO")-c$n"
-  [ -e "$C" ] && die "$C already exists. Remove it (git worktree remove) or use --clones-root."
+# ----------------------------------------------------- slots (local, reversible)
+# The per-project files a cycle needs that a project may keep untracked.
+CONFIG_FILES=".claude/settings.json .claude/settings.local.json .omp/agent-config.md"
+
+link_framework() {
+  out="$(bash "$FW_ROOT/deploy.sh" link "$1" 2>&1)" \
+    || die "deploy.sh link failed for $1 — run: bash $(q "$FW_ROOT/deploy.sh") check $(q "$1")
+$(failed_output "$out")"
+}
+
+# Clears agent_states/ in the slot's own tree (the script finds it from the cwd),
+# archiving a fan-out slot's telemetry to the run root first.
+clear_states() {
+  (cd "$1" && python3 "$FW_ROOT/.claude/skills/cycle/clear-agent-states.py" --all) >/dev/null 2>&1 || true
+}
+
+# Narrows, replaces or widens a slot's checkout once it is at the base. With a
+# planned set, cone mode holds exactly those directories, replacing any earlier
+# set. Without one, a slot that was sparse returns to a full checkout, and a full
+# slot is left alone: a project that never turns sparse_clones on runs no
+# sparse-checkout command and keeps its git config as it was.
+apply_sparse() {
+  local C="$1" k="$2" list="$OVERLAP_DIR/sparse-$2"
+  if [ "$SPARSE" = true ] && [ -s "$list" ]; then
+    out="$(git -C "$C" sparse-checkout set --cone --stdin < "$list" 2>&1)" \
+      || die "could not set the sparse checkout of $C. Slots so far: ${CLONES[*]:-none}
+$(failed_output "$out")"
+  elif [ "$(git -C "$C" config --get core.sparseCheckout 2>/dev/null)" = true ]; then
+    out="$(git -C "$C" sparse-checkout disable 2>&1)" \
+      || die "could not return $C to a full checkout. Slots so far: ${CLONES[*]:-none}
+$(failed_output "$out")"
+    say "$SLOT_PREFIX$k returned to a full checkout"
+  fi
+}
+
+create_slot() {
+  local C="$1" k="$2" f
   # --detach and NO -b: /cycle creates the feature branch itself at Phase 2B, and the
-  # clone cannot be on $BASE because the primary has it checked out.
-  omp worktree add --detach --cwd "$REPO" "$C" "$BASE" >/dev/null 2>&1 \
-    || die "omp worktree add failed for $C. Clones so far: ${CLONES[*]:-none}"
-  python3 "$C/.claude/skills/cycle/clear-agent-states.py" --all >/dev/null 2>&1 || true
-  # A clone is a linked worktree of $REPO, so the telemetry hook's `--git-common-dir`
-  # resolution points at $REPO and every clone commingles its events there
-  # (evidence-run1 E1). This marker tells the hook the clone owns its own telemetry.
+  # slot cannot be on $BASE because the primary has it checked out.
+  if [ "$CLONER" = omp ]; then
+    out="$(omp worktree add --detach --cwd "$REPO" "$C" "$BASE" 2>&1)" \
+      || die "omp worktree add failed for $C. Slots so far: ${CLONES[*]:-none}
+$(failed_output "$out")"
+  else
+    # A partial slot is created empty, given its set, then checked out, so files
+    # outside the set are never written.
+    if [ "$SPARSE" = true ] && [ -s "$OVERLAP_DIR/sparse-$k" ]; then
+      out="$( { git -C "$REPO" worktree add -q --no-checkout --detach "$C" "$BASE" \
+                && git -C "$C" sparse-checkout set --cone --stdin < "$OVERLAP_DIR/sparse-$k" \
+                && git -C "$C" checkout -q --detach "$BASE"; } 2>&1)"
+    else
+      out="$(git -C "$REPO" worktree add -q --detach "$C" "$BASE" 2>&1)"
+    fi \
+      || die "git worktree add failed for $C. Slots so far: ${CLONES[*]:-none}
+$(failed_output "$out")"
+    # A worktree carries tracked files only; copy the untracked config when absent.
+    for f in $CONFIG_FILES; do
+      if [ -f "$REPO/$f" ] && [ ! -e "$C/$f" ]; then
+        mkdir -p "$(dirname "$C/$f")" && cp "$REPO/$f" "$C/$f"
+      fi
+    done
+    link_framework "$C"
+  fi
+  clear_states "$C"
+}
+
+# Reset an existing slot to the base without recreating it. `clean -fd` without
+# -x removes untracked files and keeps ignored ones, so build output stays warm.
+# The same for both cloners: omp has no refresh of its own, and what it copied at
+# creation besides config and framework links (.env, caches) is kept as it was;
+# --fresh copies it again.
+reset_slot() {
+  local C="$1" k="$2" f
+  # Checked again immediately before the reset, so nothing written since the
+  # check pass is discarded.
+  check_clone "$C"
+  clear_states "$C"
+  out="$( { git -C "$C" checkout -q --detach "$BASE" \
+            && git -C "$C" reset -q --hard \
+            && git -C "$C" clean -q -fd; } 2>&1)" \
+    || die "could not reset $C to $BASE. Slots so far: ${CLONES[*]:-none}
+$(failed_output "$out")"
+  apply_sparse "$C" "$k"
+  # Untracked config follows the primary, which holds the current copy.
+  for f in $CONFIG_FILES; do
+    if [ -f "$REPO/$f" ] && ! git -C "$REPO" ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+      mkdir -p "$(dirname "$C/$f")" && cp "$REPO/$f" "$C/$f"
+    fi
+  done
+  [ -f "$FW_ROOT/deploy.sh" ] && link_framework "$C"
+  return 0
+}
+
+step "Preparing slots (via $CLONER worktree add for new slots)"
+[ "$CLONER" = git ] && say "git worktree: new slots get tracked files, framework links and per-project config;
+             build caches start cold, and other untracked files (.env, ...) are not copied"
+CLONES=() SLOT_LOG="" ; n=0
+for i in "${ISSUES[@]}"; do
+  n=$((n+1)); C="$ROOT/$SLOT_PREFIX$n"
+  if [ "${SLOT_ACT[$n]}" = reuse ]; then reset_slot "$C" "$n"; how=reused
+  else create_slot "$C" "$n"; how=created
+  fi
+  rm -f "$ROOT/.reapable/$SLOT_PREFIX$n.json"
+  # A slot is a linked worktree of $REPO, so the telemetry hook's `--git-common-dir`
+  # resolution points at $REPO and every slot would commingle its events there.
+  # This marker tells the hook the slot owns its own telemetry.
   # Written after the clear, and clear-agent-states.py preserves it thereafter.
   # gate_log: the Stop/UserPromptSubmit hook appends every gate wait here as well
-  # as to the clone's own log, so one file holds the whole run (evidence-run1 E7).
-  mkdir -p "$C/agent_states" && printf 'issue=%s\nclone=c%s\norigin=%s\ngate_log=%s\ncreated=%s\n' \
-    "$i" "$n" "$REPO" "$ROOT/gate-log.tsv" "$(date -u +%FT%TZ)" > "$C/agent_states/.fanout-clone"
-  CLONES+=("$C"); say "c$n  #$i  $C"
+  # as to the slot's own log, so one file holds the whole run.
+  # slot: tells reap-clones.sh finish to keep the build output warm.
+  mkdir -p "$C/agent_states" && printf 'issue=%s\nclone=%s\nslot=%s\norigin=%s\ngate_log=%s\ncreated=%s\n' \
+    "$i" "$SLOT_PREFIX$n" "$n" "$REPO" "$ROOT/gate-log.tsv" "$(date -u +%FT%TZ)" > "$C/agent_states/.fanout-clone"
+  CLONES+=("$C"); say "#$i → $SLOT_PREFIX$n  $how  $C"
+  SLOT_LOG="$SLOT_LOG# slot $SLOT_PREFIX$n issue $i $how $C
+"
 done
+POOL_KB="$(pool_kb)"
+say "pool disk footprint $(pool_footprint "$POOL_KB")"
 
 # ---------------------------------------------- claim (remote, after local work)
 if [ "$CLAIM" = 1 ]; then
@@ -570,7 +870,7 @@ fi
 # Rotate here, not in the reap block. This is the first point at which the run is
 # certain to happen: preflight has passed, the clones exist, the issues are
 # claimed. Rotating earlier would scatter the previous run's evidence on a run
-# that then refuses; rotating on reaping missed every run whose clones were
+# that then refuses; rotating on reaping would miss every run whose clones are
 # already gone.
 #
 # Unconditional on the files existing, not on anything else. A log that spans two
@@ -585,15 +885,13 @@ for f in "$GATELOG" "$ROOT/run-provenance.txt"; do
     && say "archived $(basename "$f") → $(basename "${f%.*}-$ts.${f##*.}")"
 done
 
-# The telemetry archive rotates for the same reason and did not, which is J2 in a
-# second directory. Finalize copies each clone's events into
-# $ROOT/telemetry/<clone>/, the clone names repeat every run, and nothing cleared
-# it — so one directory accumulated four sessions and 989 events across four days
-# while claiming to be one clone's telemetry. The aggregator's session warning
-# does fire, so no report was misled; but pointing `--events` at it silently
-# compares one round against the sum of every round, which is exactly the trap
-# that made a cache figure three rounds wide earlier in this project.
-if [ -d "$ROOT/telemetry" ] && [ -n "$(ls -A "$ROOT/telemetry" 2>/dev/null)" ]; then
+# The telemetry archive rotates for the same reason. Finalize copies each clone's
+# events into $ROOT/telemetry/<clone>/ and the clone names repeat every run, so
+# unrotated, one directory accumulates every run while claiming to be one
+# clone's, and `--events` pointed at it compares one run against the sum of all.
+# Only when it holds a file: resetting a slot archives into it, and an archive
+# of nothing is not a run's telemetry.
+if [ -n "$(find "$ROOT/telemetry" -type f 2>/dev/null | head -n 1)" ]; then
   mv "$ROOT/telemetry" "$ROOT/telemetry-$ts" \
     && say "archived telemetry/ → telemetry-$ts/" \
     || say "! could not rotate telemetry/ — this run's events will commingle with the last"
@@ -603,6 +901,8 @@ fi
   printf '# framework %s @ %s\n' "$FW_ROOT" "$FW_SHA"
   printf '# base %s @ %s\n' "$BASE" "$(git -C "$REPO" rev-parse --short HEAD)"
   printf '# disk_avail_kb_before %s\n' "$AVAIL_KB"
+  printf '# pool_slots %s\n# pool_kb %s\n' "$SLOTS" "$POOL_KB"
+  printf '%s' "$SLOT_LOG" "$SPARSE_LOG"
   if [ -s "$OVERLAP_DIR/.provenance" ]; then
     sed 's/^ *//' "$OVERLAP_DIR/.provenance" | sed 's/^/# /'
   else
@@ -618,22 +918,20 @@ CMD_FOR() {  # $1 = clone dir, $2 = issue. The cd is for the printed by-hand for
              # open-terminal.sh also cds, and doing it twice is harmless.
   local m="" ; [ -z "$MODE" ] || m=" --mode $MODE"
   case "$HARNESS" in
-    omp) printf 'cd %q && omp "/cycle %s%s"' "$1" "$2" "$m" ;;
-    *)   printf 'cd %q && claude "/cycle %s%s"' "$1" "$2" "$m" ;;
+    omp) printf 'cd %s && omp "/cycle %s%s"' "$(q "$1")" "$2" "$m" ;;
+    *)   printf 'cd %s && claude "/cycle %s%s"' "$(q "$1")" "$2" "$m" ;;
   esac
 }
 
 # ------------------------------------------------------------------- awake
 #
-# Round 9 lost three of five cycles to the machine they ran on. c2 and c3 died
-# with "API Error: Your computer went to sleep mid-response"; c5 died reporting a
-# 120-second tool timeout 15m46s after issuing the command, then "Not logged in ·
-# Please run /login" — a wake artefact, not a separate fault. Two cycles finished
-# and three were killed, and nothing here guarded against it.
+# A machine that sleeps mid-run kills its cycles: the session dies with "Your
+# computer went to sleep mid-response", or on wake with a tool timeout and "Not
+# logged in".
 #
-# This is bounded on purpose. An unbounded caffeinate outlives the run, keeps a
-# laptop awake for days and is exactly the kind of stale state M16 is about, so
-# it self-terminates and leaves a pid file that a later run reaps.
+# This is bounded on purpose. An unbounded caffeinate outlives the run and keeps
+# a laptop awake for days, so it self-terminates and leaves a pid file that a
+# later run reaps.
 #
 # Honest limits, because a guard that is trusted further than it works is worse
 # than none: `caffeinate` cannot keep a Mac awake with the lid closed on battery,
@@ -641,10 +939,8 @@ CMD_FOR() {  # $1 = clone dir, $2 = issue. The cd is for the printed by-hand for
 # rather than left to assume otherwise.
 # Only when cycles are actually being launched. `--no-launch` sets things up and
 # prints commands; there is no run to protect, and the test suite exercises the
-# launcher that way. Without this guard every `tests/check.py` spawned a real
-# 8-hour sleep inhibitor on the developer's machine — three had accumulated as
-# orphans before the first real run, which is the M16 stale-state failure
-# arriving inside the fix for a different one.
+# launcher that way, so without this guard every `tests/check.py` would leave a
+# real 8-hour sleep inhibitor orphaned on the developer's machine.
 AWAKE_PID_FILE="$ROOT/awake.pid"
 if [ "$AWAKE_HOURS" != "0" ] && [ "$LAUNCH" = 1 ] && [ -z "${CYCLE_NO_AWAKE:-}" ]; then
   if command -v caffeinate >/dev/null 2>&1; then
@@ -661,7 +957,7 @@ if [ "$AWAKE_HOURS" != "0" ] && [ "$LAUNCH" = 1 ] && [ -z "${CYCLE_NO_AWAKE:-}" 
     say "  note: this does not hold with the lid closed on battery."
   else
     say "! no caffeinate on this host — system sleep is NOT inhibited."
-    say "  Round 9 lost 3 of 5 cycles to the machine sleeping mid-run."
+    say "  A machine that sleeps mid-run kills its cycles."
   fi
 elif [ "$LAUNCH" != 1 ]; then
   say "--no-launch: nothing to keep awake; system sleep is NOT inhibited."
@@ -675,9 +971,7 @@ if [ "$LAUNCH" = 0 ]; then
   n=0; for i in "${ISSUES[@]}"; do n=$((n+1)); printf '    %s\n' "$(CMD_FOR "${CLONES[$((n-1))]}" "$i")"; done
 else
   # Window opening is open-terminal.sh's job — one copy of the OS and emulator
-  # detection, shared with whatever else needs a window. This used to be a second,
-  # worse copy inlined here: no iTerm path, and every Linux emulator invoked the
-  # same way whether or not that was right.
+  # detection, shared with whatever else needs a window.
   OPENER="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/open-terminal.sh"
   opened=0; n=0
   for i in "${ISSUES[@]}"; do
@@ -704,11 +998,11 @@ fi
 
 if [ -n "$MAX_AGENTS" ]; then
   AGENT_CAP_NOTE="  · Cap each orchestrator's Phase-3 wave at $MAX_AGENTS agents. Nothing enforces this
-    under Claude Code, so whether it holds is itself the measurement (plan §18.1, Q-D2).
+    under Claude Code, so whether it holds is itself the measurement.
     NOTE: this makes the run a CAPPED trial — it cannot serve as the uncapped baseline."
 else
   AGENT_CAP_NOTE="  · No agent cap — uncapped is the default and the realistic case. Peak concurrent
-    agents is the measurement (plan §18.1, Q-D1); do not instruct a cap mid-run, since a
+    agents is the measurement; do not instruct a cap mid-run, since a
     half-remembered one contaminates the baseline a capped comparison later needs."
 fi
 
@@ -716,16 +1010,18 @@ cat <<EOF
 
 ▸ During the run
   · Phase-3 agents run in the clone directly — NO nested worktree isolation. Under
-    Claude Code it provisions at the default branch and under the primary repo, not the clone
-    (plan §3.9, evidence-run1 E2). The clone is already the isolation.
+    Claude Code it provisions at the default branch and under the primary repo, not the
+    clone. The clone is already the isolation.
 $AGENT_CAP_NOTE
   · Gate waits record themselves — nothing to log by hand. Read them any time with
-    python3 .claude/skills/cycle/gate-report.py --log $GATELOG
+    python3 .claude/skills/cycle/gate-report.py --log $(q "$GATELOG")
   · Is anything dead? A killed cycle logs the same row as a thinking one, so ask:
-    python3 .claude/skills/cycle/cycle-health.py --root $ROOT
-  · Sample \`df -k $REPO | tail -1\` MID-WAVE, while agents run. At rest a clone is ~4 MB.
-  · Do not edit $FW_ROOT while cycles are live (plan §3.7).
+    python3 .claude/skills/cycle/cycle-health.py --root $(q "$ROOT")
+  · Sample \`df -k $(q "$REPO") | tail -1\` MID-WAVE, while agents run.
+  · Do not edit $FW_ROOT while cycles are live.
 
-▸ Teardown, per clone, once its PR is open and pushed
-  git -C $REPO worktree remove <clone>
+▸ Afterwards
+  Slots stay for the next run, which resets them in place and keeps their build output.
+  To give the disk back, remove finished slots (the next run recreates them cold):
+    bash .claude/skills/cycle/reap-clones.sh sweep --root $(q "$ROOT") --apply
 EOF

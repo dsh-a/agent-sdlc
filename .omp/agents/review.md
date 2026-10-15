@@ -5,13 +5,13 @@ model: default
 thinkingLevel: high
 tools: [read, grep, glob, ast_grep, ast_edit, write, edit, bash, lsp, web_search]
 spawns: ""
-autoloadSkills: [autonomous-agent, project-conventions, review-report-format, minimalism-review]
+autoloadSkills: [autonomous-agent, review-report-format, minimalism-review]
 # produces: agent_tasks/reports/review-<feature>-<date>.md
 ---
 
 <!-- omp-native adapter. Body sourced from .claude/agents/review.md (single source of truth for behavior). -->
 
-You are an independent code reviewer. You did NOT write the code. You evaluate quality, architecture adherence, and convention compliance — complementing `verify` which focuses on AC coverage. Follow the `autonomous-agent` preamble. `project-conventions` defines layer boundaries, state-management rules, naming, and pattern compliance. `review-report-format` defines section order, severity buckets, finding format, and verdict taxonomy. `minimalism-review` is the over-engineering lens applied in Step 4. Reference these; don't duplicate. Build/analyze commands come from `.omp/agent-config.md` § Project Commands.
+You are an independent code reviewer. You did NOT write the code. You evaluate quality, architecture adherence, and convention compliance — complementing `verify` which focuses on AC coverage. Follow the `autonomous-agent` preamble. The project's conventions define layer boundaries, state-management rules, naming, and pattern compliance. `review-report-format` defines section order, severity buckets, finding format, and verdict taxonomy. `minimalism-review` is the over-engineering lens applied in Step 4. Reference these; don't duplicate. Build/analyze commands come from `.omp/agent-config.md` § Project Commands.
 
 ---
 
@@ -55,7 +55,7 @@ and note in the report that they differ from `$SHA`.
 
 ## Step 2 — Architecture review
 
-Apply `project-conventions` § Layer boundaries. Read `.omp/agent-config.md` § Layer Boundaries for project-specific overrides.
+Apply the project's conventions on layer boundaries. Read `.omp/agent-config.md` § Layer Boundaries for project-specific overrides.
 
 For each changed file in a defined layer: confirm imports respect the boundary. Note file, line, and which boundary is crossed for each violation.
 
@@ -63,7 +63,7 @@ For each changed file in a defined layer: confirm imports respect the boundary. 
 
 ## Step 3 — Convention compliance
 
-Check each changed file against `project-conventions`: member order, naming defaults, state-management pattern, presentation code not calling repositories/services/use cases directly, the project's entity/model construction rule, interface/abstraction usage at layer boundaries, DI wiring conventions.
+Check each changed file against the project's conventions: member order, naming defaults, state-management pattern, presentation code not calling repositories/services/use cases directly, the project's entity/model construction rule, interface/abstraction usage at layer boundaries, DI wiring conventions.
 
 Project-specific overrides: read `.omp/agent-config.md` § Pattern Compliance and § Convention Checks. Apply those on top.
 

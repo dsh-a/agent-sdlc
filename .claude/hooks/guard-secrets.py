@@ -8,11 +8,11 @@ defeats it, and so do `$HOME`, a relative path from a `cd`, and a symlink. The
 same reasoning that puts `rm` behind clear-agent-states.py rather than behind a
 narrower glob puts this behind a hook that can resolve a path.
 
-MyApp granted `Bash(cat *)`, `head`, `tail` and `ls` unrestricted, alongside a
-curl grant. That pair is read-anything plus send-anywhere. Narrowing the globs
-was not available — agents read project files constantly and any expressible
-narrowing either breaks that or is bypassed by an absolute path — so the grants
-stay and this decides.
+A project that grants `Bash(cat *)`, `head`, `tail` and `ls` unrestricted
+alongside a curl grant holds read-anything plus send-anywhere. Narrowing the
+globs is not available — agents read project files constantly and any
+expressible narrowing either breaks that or is bypassed by an absolute path — so
+the grants stay and this decides.
 
 Scope is deliberately small: well-known credential locations, plus private-key
 and credential filenames wherever they sit. It does NOT try to be a general
@@ -24,13 +24,20 @@ fires spuriously beats a broad one that does.
 handles them in source, and blocking it would fire on ordinary work.
 
 Wired as a `PreToolUse` hook on `Bash|Read|Edit|Write`. Exit 2 blocks the call
-and shows stderr to the model; every other path exits 0.
+and shows stderr to the model; every other path exits 0, except an unimportable
+`lib/guard_match.py`, which exits 1 and the harness shows without blocking.
 """
 
 import json
 import os
 import re
 import sys
+
+# The matching shared with guard-framework.py, from `lib/` beside this file's
+# real path: a project runs this hook through a link into the framework.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "lib"))
+from guard_match import TOKEN, command_name, native  # noqa: E402
+from guard_match import TOKEN_REDIRECT as REDIRECT  # noqa: E402
 
 # Directories whose contents are credentials, as path segments. Matched after
 # the path is resolved, so `~`, `$HOME`, `..` and a relative path all land here
@@ -55,7 +62,8 @@ HOME = os.path.expanduser("~")
 def resolve(p, cwd):
     """Absolute, symlink-free, with ~ and $HOME expanded. Never raises."""
     try:
-        p = os.path.expandvars(os.path.expanduser(p.strip().strip("'\"")))
+        p = native(os.path.expandvars(os.path.expanduser(p.strip().strip("'\""))))
+        cwd = native(cwd) if cwd else cwd
         if not os.path.isabs(p):
             p = os.path.join(cwd or os.getcwd(), p)
         return os.path.realpath(p)
@@ -83,11 +91,6 @@ def is_secret(path):
     return None
 
 
-# Path-shaped tokens in a shell command. Deliberately crude: this is a filter to
-# decide what to resolve, not a shell parser. Anything it misses is a read the
-# permission layer already allowed — this hook narrows, it is not the boundary.
-TOKEN = re.compile(r"[~$/\w][\w./~$-]*")
-
 # Commands that can actually read a file or send its contents somewhere, plus
 # the interpreters that can do either. A path only matters if something in the
 # segment can act on it.
@@ -104,13 +107,12 @@ READERS = frozenset((
     "install", "ln", "dd", "tar", "zip", "gzip", "openssl", "gpg", "ssh-keygen",
     "curl", "wget", "nc", "ncat", "socat", "ftp", "sftp",
     "python", "python3", "ruby", "perl", "node", "php", "osascript",
-    "sh", "bash", "zsh", "awk", "sed", "grep", "rg", "source", ".",
+    "sh", "bash", "zsh", "awk", "sed", "grep", "rg", "source", ".", "pwsh", "cmd",
 ))
 
 # Splitting on shell operators, so `ls; cat ~/.ssh/id_rsa` is two segments and
 # the second one is what gets scanned.
 SEGMENT = re.compile(r"[;&|]{1,2}|\n")
-REDIRECT = re.compile(r"[<>]{1,2}\s*([~$/\w][\w./~$-]*)")
 
 
 def bash_paths(cmd):
@@ -123,9 +125,9 @@ def bash_paths(cmd):
         words = seg.split()
         if not words:
             continue
-        head = os.path.basename(words[0].strip("'\"()"))
+        head = command_name(words[0])
         if head == "sudo" and len(words) > 1:
-            head = os.path.basename(words[1])
+            head = command_name(words[1])
         if head not in READERS:
             continue
         for tok in TOKEN.findall(seg):

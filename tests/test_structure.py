@@ -100,6 +100,19 @@ def test_pack_has_a_test_patterns_file(pack):
     ), f"pack '{pack}' has no (ui-)test-patterns file"
 
 
+COMMAND_ROWS = ("Run all tests", "Run specific test file", "Run single test by name",
+                "Analyze / lint", "Format", "Code generation")
+
+
+@pytest.mark.parametrize("pack", _packs())
+def test_pack_seeds_project_commands(pack):
+    path = f".claude/packs/{pack}/commands.md"
+    assert exists(path), f"pack '{pack}' has no commands.md to seed § Project Commands"
+    rows = re.findall(r"^\| ([^|]+?) \|", (ROOT / path).read_text(), re.M)
+    for row in COMMAND_ROWS:
+        assert row in rows, f"{path}: no '{row}' row"
+
+
 # --------------------------------------- C. frontmatter skill references ----
 @pytest.mark.parametrize("agent", sorted((ROOT / ".omp/agents").glob("*.md")))
 def test_agent_autoload_skills_resolve(agent):
@@ -112,6 +125,46 @@ def test_agent_autoload_skills_resolve(agent):
             named += [s.strip().strip("\"'") for s in m.group(1).split(",") if s.strip()]
     for s in named:
         assert s in known, f"{agent.name}: frontmatter references unknown skill '{s}'"
+
+
+CLAUDE_AGENTS = sorted(p for p in (ROOT / ".claude/agents").glob("*.md") if p.name != "README.md")
+
+
+@pytest.mark.parametrize("agent", CLAUDE_AGENTS)
+def test_claude_agent_declares_no_skills(agent):
+    assert not re.search(r"^skills:", frontmatter(agent.read_text()), re.M), (
+        f"{agent.name}: agents read skills when the project sets agent_skills, "
+        f"never through frontmatter"
+    )
+
+
+@pytest.mark.parametrize("skill", sorted(_skill_names() - {"sd-wire"}))
+def test_skill_stays_out_of_the_model_skill_list(skill):
+    fm = frontmatter((ROOT / f".claude/skills/{skill}/SKILL.md").read_text())
+    assert "disable-model-invocation: true" in fm, f"{skill}: no disable-model-invocation flag"
+
+
+def test_agent_skills_is_off_by_default_and_wired():
+    row = re.search(r"^\| agent_skills \| `(\w+)` \|", (ROOT / ".omp/agent-config.md").read_text(), re.M)
+    assert row and row.group(1) == "false"
+    assert "`agent_skills`" in (ROOT / ".claude/skills/cycle/SKILL.md").read_text()
+
+
+def test_sparse_clones_is_off_by_default_and_setup_offers_it_with_its_risks():
+    cfg = (ROOT / ".omp/agent-config.md").read_text()
+    row = re.search(r"^\| sparse_clones \| `(\w+)` \|", cfg, re.M)
+    assert row and row.group(1) == "false"
+    assert re.search(r"^\| always_checkout \| `none` \|", cfg, re.M)
+    setup = (ROOT / ".claude/skills/setup/SKILL.md").read_text()
+    start = setup.index("### Partial checkout for parallel cycles")
+    sec = setup[start:setup.index("\n## ", start)]
+    ask = sec.index("Enable partial checkout")
+    # Size first, then the risks, then the question.
+    assert sec.index("git ls-files | wc -l") < ask and sec.index("git ls-tree -r -l") < ask
+    for risk in ("outside the slot's set", "Cross-cutting changes", "IDE tooling"):
+        assert sec.index(risk) < ask, risk
+    assert "[y/N]" in sec and "default answer is no" in sec
+    assert "only on an explicit yes" in sec and "leaves it `false`" in sec
 
 
 # ------------------------------------------ D. harness-hygiene tripwires ----

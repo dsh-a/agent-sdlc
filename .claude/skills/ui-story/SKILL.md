@@ -37,5 +37,5 @@ spawn agent: ui-story
 
 ## What this shim does NOT do
 
-- Re-implement Step 1–8. The agent owns the workflow with `project-conventions`, `ui-test-patterns`, `whispers`, and `scaffold` skills loaded.
-- Decide presentation-layer conventions. The agent reads `project-conventions` and project overrides in `.omp/agent-config.md` automatically.
+- Re-implement Step 1–8. The agent owns the workflow, working from the project's conventions and UI test patterns and the `whispers` and `scaffold` skills.
+- Decide presentation-layer conventions. The agent reads the project's conventions and project overrides in `.omp/agent-config.md` automatically.

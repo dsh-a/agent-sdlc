@@ -76,8 +76,9 @@ consultation is auditable in the run report.
 
 ## Adding a source
 
-1. **Connect the server.** Add it to `.omp/mcp.json` (template `.omp/mcp.json.sample`).
-   Gitignore `.omp/mcp.json` if it carries credentials.
+1. **Connect the server.** Add it to `.omp/mcp.json` (template `.omp/mcp.json.sample`); on
+   Claude Code, to `.mcp.json` at the project root (template `.claude/.mcp.json.sample`).
+   Gitignore the file if it carries credentials.
 2. **Register it.** Add a row to `.omp/agent-config.md` § Context Sources.
 3. That's it — omp auto-discovers MCP tools; the orchestrator reads the registry; no agent
    code changes.

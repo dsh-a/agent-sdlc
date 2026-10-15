@@ -1,6 +1,6 @@
 ---
 name: test-rubric
-description: Self-check rubric the test agent runs against its own output before declaring done. Absorbs the adversarial-tester checklist (off-by-one, null propagation, silent shortcuts, boundary violations) into an in-process pass. Invoked from the test agent's Step 6.3 (or skill Step 7.3); not auto-invoked.
+description: Self-check rubric the test agent runs on its own tests before reporting.
 disable-model-invocation: true
 ---
 

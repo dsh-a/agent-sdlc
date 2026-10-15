@@ -1,6 +1,6 @@
 ---
 name: escalations
-description: Escalation channel spec — the Phase-3 supervisor signals the orchestrator. Transport is omp irc; JSONL file is the Claude Code fallback. Synthesis item 5.5.2.
+description: Channel spec for the Phase-3 supervisor's signals to the orchestrator.
 disable-model-invocation: true
 ---
 

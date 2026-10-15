@@ -10,7 +10,7 @@ You are the orchestrator. You run at the opus tier (under omp, `modelRoles.slow`
 
 Feature or PRD: **$ARGUMENTS**
 
-**One cycle per session.** If a `/cycle` already ran in this session, stop and tell the user to `/clear` (or open a new terminal) before starting another. Invoking `/cycle` twice leaves **two copies of this skill resident** — measured at 43,598 tokens each — and it is what puts sessions over the context window: sessions with one invocation peak at a median 235,217 and exceed 262,144 in 8 of 27; with two, 278,415 and 17 of 26. You already hold this skill; do not read `SKILL.md` back.
+**One cycle per session.** If a `/cycle` already ran in this session, stop and tell the user to `/clear` (or open a new terminal) before starting another. Invoking `/cycle` twice leaves **two copies of this skill resident**, and that second copy is what pushes a session over the context window. You already hold this skill; do not read `SKILL.md` back.
 
 ## Configuration
 
@@ -22,7 +22,7 @@ python3 .claude/skills/cycle/config-get.py model verify        # via the active 
 python3 .claude/skills/cycle/config-get.py --keys vault_root app_slug
 ```
 
-Exit 0 found, 1 not found (`--default X` supplies one), 2 **ambiguous** — a name in two sections, so pass `--section`; never guess which table won. 3 means no config: fall back to sonnet for implementation agents, haiku for pre-digest and monitor, opus for orchestrator. Reading spans of this file cost v0 run 2 ~4,600 tokens and still left the model resolving a spawn by hand.
+Exit 0 found, 1 not found (`--default X` supplies one), 2 **ambiguous** — a name in two sections, so pass `--section`; never guess which table won. 3 means no config: fall back to sonnet for implementation agents, haiku for pre-digest and monitor, opus for orchestrator. Reading spans of the file costs far more context than a query and still leaves the spawn to resolve by hand.
 
 When passing `model:` to a spawn, take the label from **Model Allocation** — then resolve it **per harness**:
 
@@ -48,31 +48,30 @@ with the command it prints, then re-run. `unreachable` — see below.
 This is a refusal rather than a warning because the failures it catches are invisible from inside a
 cycle. A hook whose path no longer resolves fails *open* — the harness treats a hook error as
 non-fatal — so telemetry, gate capture and the credential guard stop with nothing said, and the run
-report comes back saying gate wait was "not captured" as though nobody had waited. Measured: one
-deployment was missing 19 of 27 scaffold patterns, and the `scaffold` agent had been running without
-them for as long as they had existed.
+report comes back saying gate wait was "not captured" as though nobody had waited. Scaffold patterns go missing the same
+way, and the `scaffold` agent then runs without them with nothing said.
 
 Two results are **not** failures and do not block: `override` (a real file where a scaffold pattern
 belongs — a project-specific pattern, which is allowed) and a `USER … different framework` note
 (`~/.claude/skills` is shared by every project on the machine, so it is reported and never
-re-pointed). A `COPY` line *is* a failure: a copied hook goes stale invisibly, which is the bug that
-made a whole fan-out log every row unclassified while looking healthy.
+re-pointed). A `COPY` line *is* a failure: a copied hook goes stale invisibly and keeps writing, so its
+log looks healthy while every row in it is wrong.
 
 If the shim reports `unreachable`, say so in the run report's Harness findings rather than proceeding
 silently — an unverifiable deployment is a different claim from a verified one. The same applies if
 the harness refuses to run it at all.
 
-This is a body step and not a `!`...`` substitution on purpose. In fan-out 6 the auto-mode classifier
-refused to expand the substituted form in **one session out of five** — same string, same settings,
-same minute, reason `[Code from External]` — and a denied `!`...`` aborts the *entire* slash command,
-so that cycle received no skill body and sat idle until a human noticed. A refused body step is a
+This is a body step and not a `!`...`` substitution on purpose. The auto-mode classifier can refuse
+to expand the substituted form in some sessions and not others — same string, same settings, reason
+`[Code from External]` — and a denied `!`...`` aborts the *entire* slash command, so the cycle
+receives no skill body and sits idle until a human notices. A refused body step is a
 finding you can report; a refused expansion is a run that never starts.
 
 **Call every scoped script by its project-relative path**, never an absolute one, here and
 everywhere below. Grants are string matches: `python3 .claude/skills/cycle/clear-agent-states.py`
 matches, and `python3 /Users/you/dev/cycles/c5/.claude/skills/cycle/clear-agent-states.py` matches
-nothing and falls through to the classifier, which refused exactly that at Finalize in fan-out 6
-(`[Irreversible Local Destruction]`). Every one of these scripts runs from the project root, so the
+nothing and falls through to the classifier, which refuses it as
+`[Irreversible Local Destruction]`. Every one of these scripts runs from the project root, so the
 relative form always resolves.
 
 **Janitor check**: for each state file listed above, check whether a matching cycle report already exists in `cycle_reports/` (match by feature name substring). If a match exists, the cycle completed without sending `FINALIZE` — delete the state file now and do not offer to resume it.
@@ -98,10 +97,9 @@ cycle is still active.
 
 **Gitignore guard** — ensure runtime artifacts are never committed to the project repo.
 
-The guard **regenerates** the managed block rather than appending it. The previous version
-grepped for `agent-sdlc (managed)` but wrote `agent-sdlc (managed — do not edit)`; the literal
-never matched, so it appended on every run and the block accumulated. Strip-then-write is
-idempotent by construction and also repairs repos that already collected duplicates:
+The guard **regenerates** the managed block rather than appending it. Strip-then-write is
+idempotent by construction, so the block never accumulates, and it also repairs repos that
+already collected duplicates:
 
 !`bash .claude/skills/cycle/sync-gitignore.sh 2>&1 || true`
 
@@ -110,14 +108,12 @@ vault paths when it is set. It has to: this runs at prompt expansion, before the
 anything, so a base block written now and corrected by the vault guard later leaves the working
 tree wrong in between — and wrong for good if the cycle short-circuits before the guard runs.
 
-**It never strips on uncertainty**, and this is the part that took two incidents to get right.
-The script edits a *tracked* file, and removing the vault lines turns `cycle_reports`,
+**It never strips on uncertainty.** The script edits a *tracked* file, and removing the vault lines turns `cycle_reports`,
 `agent_tasks/reports` and `agent_tasks/prds` into untracked symlinks: the tree goes dirty, and
 committing that pulls vault-class artifacts back into the app repo — precisely what the vault
-exists to prevent. The inlined version could not tell *"no vault configured"* from *"could not
-read the config"* and stripped for both. It did that twice in a deployment whose `vault_root`
-was set the whole time. So now an unreadable config **keeps whatever vault lines are already
-present** and says so on stderr; only a config that was read, and genuinely has no `vault_root`,
+exists to prevent. *"No vault configured"* and *"could not read the config"* are different
+facts: an unreadable config **keeps whatever vault lines are already present** and says so on
+stderr; only a config that was read, and genuinely has no `vault_root`,
 removes them.
 
 Paths resolve from the git root rather than the working directory, so a cycle started from a
@@ -127,7 +123,7 @@ subdirectory cannot read no config, conclude no vault, and strip.
 including that reverting to strip-on-unknown fails the suite.
 
 Call this recipe the **block regenerator**. The vault guard below re-runs it; because it strips
-first and derives the same content from the same config, the re-run is now a no-op confirmation
+first and derives the same content from the same config, the re-run is a no-op confirmation
 rather than a repair.
 
 What is ignored, and why:
@@ -171,12 +167,19 @@ agents reported, not a shared scratchpad.**
    it is linked but gets **no** `Edit` grant from `deploy.sh grants`.
 
    For each: if the repo path is already the correct symlink, skip; if it is a real directory,
-   move its contents into the vault target then `rm -rf` it; finally `ln -s` the vault target to
-   the repo path. Moving before linking is what makes this safe to run on a repo that already
-   has local PRDs — they migrate into the vault rather than being orphaned.
+   move its contents into the vault target then `rm -rf` it; finally link the vault target to
+   the repo path with `MSYS=winsymlinks:nativestrict ln -s <vault target> <repo path>`, and
+   confirm `test -L <repo path>`. Moving before linking is what makes this safe to run on a repo
+   that already has local PRDs — they migrate into the vault rather than being orphaned.
+
+   The `MSYS=` prefix is for Git Bash on Windows, whose plain `ln -s` silently *copies*: reports
+   would then land in a copy the vault never sees, and the next run would migrate and re-copy
+   it. With the prefix a refused link fails instead; everywhere else the variable is ignored. If
+   `test -L` fails, stop and report it — on Windows that is Developer Mode being off
+   (`deploy.sh doctor` names it) — rather than continuing with a copy.
 
 4. **Hand over the grant this creates.** Every report write now leaves the repo, so each one
-   prompts — ~14 minutes of one cycle's 35-minute permission total, recurring every cycle.
+   prompts, every cycle, until this grant is in place.
    `bash <framework>/deploy.sh grants <project>` emits the `Edit(...)`/`Read(...)` lines; paste
    them into the project's `.claude/settings.json` `allow`, and the directory line it prints
    under its own heading into `permissions.additionalDirectories`.
@@ -186,11 +189,10 @@ agents reported, not a shared scratchpad.**
    warned about at startup — and an absolute path needs a `//` prefix, because a single leading
    `/` anchors at the settings source rather than the filesystem root. Without the
    `additionalDirectories` entry the allow rules do nothing either: a path outside the working
-   set is refused before any allow rule is read. This grant was spelled `Write(/abs/path/**)`
-   until 2026-10-05 and was inert on both counts, so the 14 minutes it was written to reclaim
-   were still being paid.
+   set is refused before any allow rule is read. A `Write(/abs/path/**)` grant is inert on both
+   counts, and every report write keeps prompting.
 
-4. Re-run the **block regenerator**. With `vault_root` set it emits `agent_states/`,
+5. Re-run the **block regenerator**. With `vault_root` set it emits `agent_states/`,
    `agent_tasks/tasks-*.md`, `cycle_reports`, `agent_tasks/reports`, `agent_tasks/prds` (no
    trailing slash — git treats a symlink as a file, so `dir/` would not match). The injected
    pass at startup already wrote exactly this, so the re-run should be a no-op; it exists to
@@ -241,7 +243,7 @@ Pass `--manual` to use manual mode: `/cycle --manual agent_tasks/tasks-prd-featu
 **You are a launcher here, not an orchestrator.** Run the setup script, report what it printed, and
 stop. Do not create a PRD, do not spawn agents, do not manage the resulting cycles — each clone
 gets its own orchestrator session, and one session steering several features is the
-god-orchestrator the framework rejects (`docs/internal/parallel-cycles-plan.md` §0).
+god-orchestrator the framework rejects.
 
 **Do not pass `--mode` unless the user asked for it.** Each issue carries its own `Depth`
 (5.6.7), so the bundle can mix `full` and `lean` and every clone gets the depth its story was
@@ -252,16 +254,21 @@ a deliberately uniform measured run and nothing else. Pass nothing else unless a
 bash .claude/skills/cycle/start-parallel-cycles.sh [--mode lean] [--dry-run] [--no-launch] <issue> <issue> ...
 ```
 
-**A repeat run needs no extra flags.** The script reaps the previous run's clones and
-fast-forwards the base itself, because it would otherwise just refuse over both. Neither step
-improvises: reaping checks every clone before removing any and refuses on uncommitted work or an
-attached session, and the sync refuses a dirty tree and takes only a fast-forward. Reaping archives
-the previous run's gate log and provenance under a timestamp, so two runs never share one log.
-`--no-reap` / `--no-sync` opt out.
+**Cycles run in a fixed pool of worktrees**, `<clones-root>/<repo>-slot-1` … `-slot-N`, N from
+`parallel_slots` in `.omp/agent-config.md` § Cycle Options. More issues than slots stops before any
+change. A repeat run needs no extra flags: each slot is reset in place (detach to the base,
+`reset --hard`, `clean -fd` without `-x`, so ignored build output stays warm), a missing slot is
+created, other clones under the root are reaped, and the base is fast-forwarded. None of it
+improvises: every slot and clone is checked before any is touched, and uncommitted work, an
+unfinished merge, commits only a detached HEAD holds, or an attached session stops the run with
+nothing changed. Branches are never deleted. `--fresh` recreates the slots; `--no-reap` /
+`--no-sync` opt out. The launch prints which issue runs in which slot and the pool's disk footprint.
 
-**Between runs, sweep instead of waiting for the next launch.** Each cycle's Finalize now deletes its
-clone's build output and marks the clone reapable, so what is left behind is a ~30M husk rather than a
-1.8G one. To remove the husks:
+**Partial checkout** (`sparse_clones`, off by default): a slot holds only its story's `## Slices`
+areas plus `always_checkout`. The launch prints each slot's set, or why it took a full checkout.
+
+**To give disk back, sweep.** Finalize marks a slot reapable and keeps its build output for the next
+launch. To remove finished slots (the next launch recreates them cold):
 
 ```sh
 bash .claude/skills/cycle/reap-clones.sh sweep --root <clones-root>          # list
@@ -273,9 +280,7 @@ are clean and have no process attached. It is not merge-aware by design: whether
 about the PR, not the clone — branches can stay open a long time or forever, and the branch survives
 removal regardless, since a clone is a linked worktree whose branch lives in the origin's `.git`.
 
-This does **not** replace the launcher's reap above, which removes *every* clone under the root. A
-cycle that crashed before Finalize leaves an unmarked clone that `sweep` will not touch and the next
-launch must.
+This does **not** replace the launcher, which resets slots a crashed cycle left unmarked.
 
 `--mode` is forwarded to every cycle and **overrides every story's `Depth`** — which is why the
 launcher refuses it alongside more than one issue for `hotfix`: that mode skips Gate 1, Gate 2 and
@@ -284,9 +289,13 @@ falsification re-run — a fan-out in hotfix mode exercises almost none of the m
 usually run to observe. Cycles open as tabs where the terminal supports it; `--windows` forces
 separate windows.
 
-The script preflights the tree, creates one detached clone per issue via `omp worktree add`, clears
-each clone's inherited `agent_states/`, claims the issues, records the framework SHA and disk
-baseline, and opens a terminal per clone.
+The script preflights the tree, readies one slot per issue, clears each slot's `agent_states/`,
+claims the issues, records the framework SHA, disk baseline and issue → slot map, and opens a
+terminal per slot. A new slot comes from `omp worktree add` where omp is installed, otherwise (or
+with `--cloner git`, or `sparse_clones` on) from `git worktree add` plus `deploy.sh link` and a
+copy of the per-project settings and config. A git slot has no `.env` or other untracked files and
+builds cold the first time; tell the user so when they ask why a first build is slow or a secret
+is missing.
 
 **It refuses rather than degrades.** A failed precondition exits
 non-zero and does nothing: a clone copies the working tree, so a dirty or wrongly-branched primary
@@ -296,15 +305,14 @@ verbatim and stop — do not work around it, and do not re-run with flags that s
 One thing to pass on to the user, because nothing enforces it:
 
 - **There is no per-cycle agent cap under Claude Code** (`maxConcurrency` is omp-only), and the
-  script does not instruct one. That is deliberate: what a fan-out reaches uncapped is the
-  measurement (plan §18.1, Q-D1). `--max-agents N` prints a cap to pass on, and says that doing so
+  script does not instruct one. That is deliberate: the uncapped run is the baseline a fan-out
+  measures. `--max-agents N` prints a cap to pass on, and says that doing so
   makes the run a capped trial rather than the uncapped baseline.
 
 Gate raise and answer times need no discipline — the `gate-log.py` hook records every one, and the
 script says at preflight whether capture is active. Read them with `gate-report.py`.
 
-Fan-out is experimental. Read `docs/internal/parallel-cycles-plan.md` and its runbook before the
-first one.
+Fan-out is experimental. Read README § Parallel cycles before the first one.
 
 ### Cycle modes (5.6.1, 5.6.3)
 
@@ -351,8 +359,8 @@ Read it once, at Step 1, with the project resolved from `.omp/agent-config.md` �
 (`Roadmap | project:<owner>/<number>`):
 
 ```sh
-gh project item-list <number> --owner <owner> --format json \
-  | jq -r --argjson n <issue> '.items[] | select(.content.number==$n) | .depth // ""'
+gh project item-list <number> --owner <owner> --format json --limit 1000 \
+  --jq '.items[] | select(.content.number==<issue>) | .depth // ""'
 ```
 
 A board with **no `Depth` field at all** is not an error — an older deployment simply has not
@@ -377,10 +385,10 @@ silently** — the user always confirms or overrides.
 `412`), a legacy `BUG-NNN` token, or a URL, with no descriptive prose. Read the issue's `Depth`
 field; if it is unset, ask for the mode instead.
 
-A tracker ID carries **no blast-radius signal**: `/cycle BUG-088` matched every `hotfix`
-condition below, but the work changed a ViewModel's lifetime across every entry path into a
-screen and touched two layers. The heuristics read the argument string; the argument string
-described nothing. This is the defect `Depth` exists to remove — refinement reads the *body*,
+A tracker ID carries **no blast-radius signal**: `/cycle BUG-088` matches every `hotfix`
+condition below, while the work behind it can change a ViewModel's lifetime across every entry
+path into a screen and touch two layers. The heuristics read the argument string, and a tracker
+ID describes nothing. This is the defect `Depth` exists to remove — refinement reads the *body*,
 with grounding, and records what it found.
 
 **Suggest `hotfix`** when ALL of:
@@ -412,8 +420,7 @@ Dry-run ends with: **"Ready to execute? Reply `go` to begin, or adjust first."**
 ### Phase-3 isolation
 
 Isolation works differently under each harness. **Read the subsection for the harness you are
-running in** — assuming the omp path under Claude Code is what put three of four agents ~90
-commits behind their base.
+running in** — following the omp path under Claude Code puts agents on a stale base.
 
 #### Under omp
 
@@ -434,15 +441,14 @@ git ls-files --error-unmatch <input-path> >/dev/null 2>&1 || echo "untracked —
 #### Under Claude Code — **do not request worktree isolation**
 
 `isolation: "worktree"` provisions from **`main`**, never the session's branch, and no parameter
-changes it. Measured directly: a session on a feature branch at `11e0ef0` got an agent worktree
-at `3fc58b2` — `main`. In myapp that was 540 commits behind. (myapp's nominal default is
-`master`, so "it uses the default branch" does not explain it; the reliable invariant is just
-*never the session branch*.)
+changes it — even in a repo whose default branch is `master`, so do not rely on "it uses the
+default branch" either. The reliable invariant is *never the session branch*, and the worktree
+can sit hundreds of commits behind it.
 
 So spawn Phase-3 agents with **no isolation** — they share the main checkout on the feature
 branch, the only base you control. Two agents on one branch race, so tasks in a wave run
 **sequentially**. That trade is correct: a sequential cycle on the right base beats a parallel one
-diffing against code deleted 540 commits ago. For real parallelism, use the fan-out clone model
+diffing against deleted code. For real parallelism, use the fan-out clone model
 (§ Inside a fan-out clone) — each clone is a full checkout at a base you chose.
 
 If you request isolation anyway, the base check below is all that stands between you and a diff
@@ -454,6 +460,14 @@ against deleted code.
    ```
    Put the resulting SHA in cycle state and in every spawn prompt. **Recording it does not pin
    anything** — it is what the agent checks against, nothing more.
+
+   **Agent skills.** When `agent_skills` in `.omp/agent-config.md` § Cycle Options is `true`, end
+   every spawn prompt with: `Before starting, read .claude/skills/<name>/SKILL.md for each skill
+   your instructions name.` Otherwise add nothing.
+
+   **Partial checkout.** When `git config --get core.sparseCheckout` prints `true`, end every spawn
+   prompt with: `This checkout is partial. A tracked path missing from disk is outside the sparse
+   set; add its directory with git sparse-checkout add <dir>.`
 
 2. **Every agent's first action is a base check.** Include this verbatim in the
    spawn prompt — it is a safeguard, not a nicety:
@@ -486,20 +500,18 @@ Spawn them in the clone directly (`isolated: false`, no `isolation: "worktree"`)
 on the feature branch, one task at a time where they touch the same files.
 
 The clone *is* the isolation the parallel design provides; a second nested layer
-buys nothing and breaks two things at once. Measured in fan-out 1
-(`docs/internal/parallel-cycles-evidence-run1.md` E2): Claude Code provisioned the
-workspace at `origin/main` — 244 commits behind the session's actual base — and
-placed it under the **primary repo**, not the clone the session was running in. A
+buys nothing and breaks two things at once: Claude Code provisions the nested
+workspace at `origin/main`, not the session's actual base, and places it under the
+**primary repo**, not the clone the session is running in. A
 colliding branch is noisy; a wrong base is silently wrong, and a workspace outside
 the clone defeats clone-per-cycle isolation entirely.
 
 **A refused command is answered once, not retried.** If a tool call is denied — by a permission
 rule, by the auto-mode classifier, or by a human — do not reissue it, reword it, or try the same
 thing through another shell. Record what you could not do and why, in cycle state and in the run
-report's Harness findings, then work around it or stop. Measured in fan-out 8: one orchestrator
-reissued a single denied command **101 times**, which is every denial that round bar one. It
-produced no new information after the first, and the gate log now captures refusals, so a retry
-loop is recorded 101 times as well.
+report's Harness findings, then work around it or stop. A retry produces no new information after
+the first refusal, and the gate log captures every refusal, so a retry loop is recorded once per
+attempt.
 
 If the refusal is blocking real work, escalate to the operator with the command, the reason, and
 what it stops you doing. That is one question, not a hundred attempts.
@@ -512,12 +524,10 @@ so `cd /path/to/clone` ⏎ `git push -u origin HEAD` matches the grant
 The same is true of `&&` chains and `;` sequences: granted words joined together
 are an ungranted command.
 
-Measured in fan-out 4: **18.5h of permission-dialog wait across 6 asks**, against
-1.6h of real gate wait, every one of them a command the project had already
-granted and the `cd` had un-granted — 8h03m on a `CHANGELOG.md` edit, 7h13m on
-`git add` + `git commit`, 2h57m on `git push`. Three clones each spent most of a
-night parked on a dialog for work they were allowed to do. Issue one command per
-call, unprefixed, and let the harness match it.
+A `cd` prefix un-grants a command the project already granted, and the clone parks
+on a permission dialog for work it is allowed to do — for hours, when nobody is
+watching, and longer than every real gate in the cycle combined. Issue one command
+per call, unprefixed, and let the harness match it.
 
 **Mode override:** in `--mode hotfix`, isolation is skipped. A single implementation agent runs in the main checkout on the feature branch (`isolated: false`). The rest of this section applies only when mode is `full` or `lean`.
 
@@ -527,7 +537,7 @@ call, unprefixed, and let the harness match it.
 
 **Handoff format** — every Phase-3 implementation agent's final response must include a `## Deviations` section. Each item: `task: [task-id] | ac: [AC ref] | implemented: [what] | reason: [why]`. Write `None` if the implementation matches PRD AC literally. The orchestrator forwards each deviation to monitor via a `DEVIATIONS` message (see §3.4 Success).
 
-Named agents (`scaffold`, `ui-story`, `test`, `pre-digest`, etc.) have their model set in their definition. Pass `model:` only to override. There are no unnamed agents left to spawn generically — `pre-digest` was the last one, and spawning it as a stand-in cost fan-out 6 two hand-transcribed digests.
+Named agents (`scaffold`, `ui-story`, `test`, `pre-digest`, etc.) have their model set in their definition. Pass `model:` only to override. Spawn every agent by name; no generic agent stands in for one (§ Per-task agent sequence, step 1).
 
 ### Agent identity (`role` field)
 
@@ -593,12 +603,13 @@ tables, backticks, brackets and `#123` issue references — every one of which i
 some layer of shell quoting. `Edit` matches an exact string and fails loudly when the match is not
 unique; `sed -i` silently does nothing, or the wrong thing, and returns 0 either way.
 
-Measured in fan-out 7, one cycle, three failures: a `#` delimiter collided with `#462` in the row
-text; a `[` inside a double-quoted `sed` broke the expression and wrote `test_files_touched:false`
-into state; and zsh's `$ref:t` modifier mangled a `git show` path so the counts came back 0. Each
-was caught by reading the command's output and redone. **None changed a decision, and the second
-wrote a wrong value that would have fed `self-improve`** — which reads this file and cannot tell a
-measured `false` from a quoting accident. **Two modes**, selected by `agent_messaging` in `.omp/agent-config.md` § Cycle Options (default `false`):
+A `#` delimiter collides with an issue reference in the row text; a `[` inside a double-quoted
+`sed` breaks the expression and writes a wrong value such as `test_files_touched:false` into
+state; zsh's `$ref:t` modifier mangles a `git show` path so counts come back 0. **A wrong value
+written this way feeds `self-improve`**, which reads this file and cannot tell a measured `false`
+from a quoting accident.
+
+**Two modes**, selected by `agent_messaging` in `.omp/agent-config.md` § Cycle Options (default `false`):
 
 - **`agent_messaging: false` (default) — inline.** *You*, the orchestrator, write the state file directly. The monitor's verb list (`GATE`, `SPAWNED`, `PARENT`, `RESCUE`, `DEVIATIONS`, `SCOPE_CHANGE`, `SUPERVISOR_HEALTH`, …) is your **checklist of what to record when**. This is the normal path and is **not** a degradation — never log it as a rescue. No background monitor is spawned. Inline is also the only mode that works without the irc tool / agent-teams.
 - **`agent_messaging: true` — delegated.** Spawn the background monitor once at Phase 3 start. The monitor blocks on `irc(op: "wait", from: "Main", timeoutMs: 0)` to receive verbs in real time — send each verb via `irc(op: "send", to: "<monitor-id>", message: "<verb>")`. It writes the state file so your context stays lean:
@@ -669,20 +680,19 @@ Before entering Phase 1A, route per the active `--mode`:
   someone filed it, and the base has moved since. `grep` every symbol, file and "currently X" the
   issue names, against `[base]`, before deriving a single criterion. Where the issue and the code
   disagree, the code is right and the issue's premise is a finding — record it and derive AC from
-  what is there. Measured in fan-out 7: #406's suggested test asserted that neither use case
-  appeared in either file, which #403 had made false a week earlier; a lean cycle deriving AC
-  verbatim would have shipped a red test, or "fixed" a sanctioned shortcut back out. This costs one
-  grep and it is the cheapest check in the phase.
+  what is there. An issue's suggested test can assert something a later change already made
+  false; a lean cycle deriving AC verbatim then ships a red test, or "fixes" a sanctioned shortcut
+  back out. This costs one grep and it is the cheapest check in the phase.
 
   **Read `.claude/skills/ac-authoring/SKILL.md` before deriving that AC, and apply it.** It is
   marked `disable-model-invocation`, so read the file — do not expect it to load itself. `create-prd` loads it on
-  the `full` path; skipping the spawn skipped the rules too, and the rules are where the failures
-  are. Measured in fan-out 4 (#443): the orchestrator wrote an AC naming a private field —
-  `_hasLoadedProgramsOnce` is the *sole* gating signal — which `ac-authoring` rule 1 rejects
-  outright ("observable, not an internal implementation detail"; its own bad example is "the search
-  function calls the repository"). `coding-1.0` implemented it faithfully and produced a blank pane.
-  The same skill's requirement that every feature carry `(-)` criteria, and its empty-state coverage
-  category, are pointed straight at the remount case the AC set also missed.
+  the `full` path; skipping the spawn skips the rules too, and the rules are where the failures
+  are. An AC naming a private field — "`_hasLoadedOnce` is the *sole* gating signal" — is what
+  `ac-authoring` rule 1 rejects outright ("observable, not an internal implementation detail"; its
+  own bad example is "the search function calls the repository"), and an implementing agent builds
+  it faithfully into a blank pane. The same skill's requirement that every feature carry `(-)`
+  criteria, and its empty-state coverage category, are pointed straight at the remount and
+  empty-state cases inline AC misses.
 
   Deriving AC inline does not make it a lesser artifact. It is the same contract with the same
   agents reading it — only the author changed.
@@ -747,9 +757,9 @@ In `--mode lean`, **also present the inline AC summary above the task list** —
 
 - **Both `(+)` and `(-)` criteria, marked as such.** An all-`(+)` set is incomplete per `ac-authoring` and is the shape that ships blank-state regressions.
 - **One scenario these criteria do not cover**, named in a sentence. Not a disclaimer — a specific sequence, state, or input the AC set is silent about, and whether you judge it in or out of scope. If you genuinely cannot name one, say that; it is a claim the reader can push back on.
-- **Any criterion that names a private field, method, or internal flag**, flagged for rewrite before approval. That is `ac-authoring` rule 1, and it is the one that failed.
+- **Any criterion that names a private field, method, or internal flag**, flagged for rewrite before approval. That is `ac-authoring` rule 1, the one inline AC breaks most.
 
-**Why this gate carries more weight in lean.** In `full`, AC is drafted by `create-prd` — a second agent reading the feature independently — and then reviewed by a human at Gate 1. `lean` removes the independent reading and keeps only the human. That is a real reduction, and fan-out 4 is what it cost: two regressions in code that was otherwise correct, both traceable to the inline AC rather than to any implementing agent. `verify` then passed 11/11, because verify audits coverage of *stated* criteria and structurally cannot see a criterion that was never stated; `review` caught it by reasoning from the code outward. A run report reading `verify: PASS 11/11, 0 NO IMPL` looked like a comprehensively validated cycle and was not.
+**Why this gate carries more weight in lean.** In `full`, AC is drafted by `create-prd` — a second agent reading the feature independently — and then reviewed by a human at Gate 1. `lean` removes the independent reading and keeps only the human. That is a real reduction: a wrong inline AC ships regressions in code that is otherwise correct, and no implementing agent is at fault. `verify` passes them, because verify audits coverage of *stated* criteria and structurally cannot see a criterion that was never stated; only `review`, reasoning from the code outward, can catch them. A run report reading `verify: PASS 11/11, 0 NO IMPL` says the stated criteria are covered, not that the cycle is validated.
 
 The three requirements above do not restore the independent reading. They make the gap visible to the one reviewer lean still has.
 
@@ -763,18 +773,16 @@ required, in this order:
 2. **Whether its premise still holds against the base** (§ Phase 1A) — and if anything in it has
    gone stale, what. That is the one fact the reader cannot get by opening the issue themselves.
 
-The heading is not decoration. Round 9 ran this rule four times: all four cycles wrote issue prose
-next to the prompt, two gave it a heading, and one delivered part 2 without part 1 — a staleness
-note for an issue whose ask was never restated. Unlabelled prose is also why the first measurement
-of this scored it 0 of 4: the gate log truncates its excerpt, and a summary that goes last is
-invisible to anything sampling the top of the message. A named section is checkable; a paragraph
-in the right place is not, and a heading without the number and title does not say which of five
-open windows this gate belongs to.
+The heading is not decoration. Without it the summary drifts into unlabelled prose, and part 2
+arrives without part 1 — a staleness note for an issue whose ask was never restated. The gate log
+truncates its excerpt, so a summary that goes last is invisible to anything sampling the top of
+the message. A named section is checkable; a paragraph in the right place is not, and a heading
+without the number and title does not say which open window this gate belongs to.
 
 It goes last, next to the prompt, so the reader has it in view while deciding. The reader is
 approving AC derived from a body they would otherwise have to leave the terminal to read, and under
-a fan-out they are doing that five times across five windows. Fan-out 8's two feature issues were
-three-sentence stubs whose entire content would have fitted in a sentence of this summary.
+a fan-out they are doing that once per open window. A stub issue fits whole in a sentence of this
+summary.
 
 End the message with `<!-- gate:gate-2 -->`, or `<!-- gate:gate-1+2 -->` in `lean` (see § Tagging a gate).
 
@@ -783,8 +791,8 @@ Approved → create feature branch, update state, Phase 3. Changes → apply, re
 ### Reading a suite result
 
 **Never run the test command into your own context, and never trust a pipe to
-bound it.** In v0 run 2 a `| tail -5` still delivered 22,819 characters, twice,
-to learn that 81 tests passed. Every suite run, scoped or full, goes through:
+bound it.** A `| tail -5` still delivers every character a reporter writes on
+one line — tens of thousands, to learn a pass count. Every suite run, scoped or full, goes through:
 
 ```sh
 python3 .claude/skills/cycle/suite-result.py run <name> -- [Run all tests command]
@@ -797,7 +805,8 @@ One line back — `SUITE <name> PASS tests=3891 failed=0 elapsed=110s log=<path>
 **Exit 0 passed, 2 failed, 3 running, 4 unparseable.** Branch on the code, not on
 truthiness. **4 is not 2 and not 0**: no pack pattern matched this reporter, so
 report that rather than inferring a verdict — the fix is a row in
-`.claude/packs/<pack>/suite-patterns.md`, not a guess here.
+`.claude/packs/<pack>/suite-patterns.md`, not a guess here. **1** means nothing ran — a usage
+error, or Windows with no Git Bash to run the command — and its message names the fix; relay it.
 
 ### Tagging a gate
 
@@ -809,10 +818,9 @@ Use the name of the gate being raised — `gate-1`, `gate-2`, `gate-1+2`, `gate-
 `scope` — or a short descriptive slug for an ad-hoc question.
 
 The hook falls back to matching the text when the tag is absent, and that fallback is why the tag is
-required. Across fan-out 2, 3 and 4 it named **no** gate correctly: its patterns were keyed to this
-skill's own wording — "proceed to tasks?", "begin implementation?" — and the orchestrator writes
-"## Gate 1C+2B (lean — consolidated)" or "**4B is blocked.**" instead. The only label it ever
-produced was a false positive. Six real gates totalling 1h02m in fan-out 4 were reported as *"none
+required: its patterns are keyed to this skill's own wording — "proceed to tasks?", "begin
+implementation?" — and the orchestrator writes "## Gate 1C+2B (lean — consolidated)" or "**4B is
+blocked.**" instead. Untagged, it names no gate correctly, and real gates are reported as *"none
 classified as a gate"*, which reads as nobody having waited.
 
 Do **not** tag a message that ends because you are waiting on an agent — that is not a gate, and the
@@ -836,18 +844,18 @@ If `analyzer_baseline` in `.omp/agent-config.md` § Hygiene flags is `soft_warn`
 ```
 
 **Capture the finding lines, not the whole output**, using the `analyzer_finding` pattern from
-`.claude/packs/<active-pack>/analyzer-patterns.md`. `flutter analyze` prints
-`No issues found! (ran in 5.4s)` — the elapsed time is in the output, so a whole-file diff is
+`.claude/packs/<active-pack>/analyzer-patterns.md`. An analyzer's output can carry
+its elapsed time (`No issues found! (ran in 5.4s)`), so a whole-file diff is
 non-empty on every run even when both sides have zero findings, and under `hard_fail_if_exceeded`
-that forced REQUEST CHANGES on every cycle regardless of the code. Filtering at capture time means
+that forces REQUEST CHANGES on every cycle regardless of the code. Filtering at capture time means
 the Phase 4A diff needs no special handling: an empty baseline and an empty current are equal.
 
 **`agent_states/`, not `cycle_reports/`.** The baseline is scratch with a lifespan of one cycle:
 written at Phase 3 start, read once at Phase 4A, meaningless afterwards. `cycle_reports/` is a
 permanent record and, where a vault is configured, a *shared* one — so a baseline written there is
-never consumed and never pruned. One deployment accumulated 61 of them, plus 59 directories that
-existed only to hold one. The bytes are small (~159 KB); the problem is permanence and noise in a
-repository holding several applications' history. `agent_states/` is gitignored, is
+never consumed and never pruned, along with a directory that exists only to hold it. The bytes are
+small; the problem is permanence and noise in a repository holding several applications'
+records. `agent_states/` is gitignored, is
 per-clone under a fan-out, and is what `clear-agent-states.py` exists to empty.
 
 Phase 4A re-runs the same command and diffs. New warnings in the diff:
@@ -864,7 +872,7 @@ python3 .claude/skills/cycle/pitfalls.py lib/data/foo_repository.dart test/data/
 
 It returns the `## Known pitfalls for files you'll touch` section ready to paste into the spawn prompt, `hard` preface included. Exit 0 attach it, **1 attach nothing**, **3 no pitfalls file** — optional configuration, not a finding, so don't report it as a gap. `--files-from -` takes the Relevant Files list on stdin.
 
-Reading the file costs ~5,200 tokens whatever matches, because it grows with the project's bug history rather than with the task.
+Reading the file costs its whole size in context whatever matches, because it grows with the project's bug history rather than with the task.
 
 `unparsed:` lines name entries that can never match — a missing `Globs:` or `Body:`. Surface them in the run report: a pitfall that silently stopped applying is the failure the mechanism exists to prevent. An unreadable `Severity:` reads as `hard`.
 
@@ -900,8 +908,7 @@ Run this in the background — it does not block Phase 3 from continuing. Scaffo
 
 Initialize state persistence per **§ State persistence**: by default (`agent_messaging: false`) write the state file inline — no agent spawned. Only when `agent_messaging: true`, spawn the background monitor here (model: monitor row from **Model Allocation** table in `.omp/agent-config.md`).
 
-**The supervisor (item 5.5.1)** runs distinct from monitor (monitor: deterministic state archival; supervisor: heuristic observation). OQ-9 (consolidation) is deferred pending real telemetry.
-
+**The supervisor (item 5.5.1)** runs distinct from monitor (monitor: deterministic state archival; supervisor: heuristic observation).
 The supervisor is **not** a long-lived daemon and needs **no** agent-messaging. The orchestrator drives it by spawning a fresh, short-lived check per cadence tick (below); each spawn does exactly one check for one agent and exits, with continuity persisted on disk in `agent_states/supervisor/state.md`. This is what makes supervision work in environments without the irc tool / agent-teams.
 
 **The supervisor requires omp. Under Claude Code it does not run** — see § Cadence under
@@ -989,9 +996,8 @@ SKIP [agent] [task] reason: <why this task did not need it>
 ```
 
 Without that line the override is invisible — it reads as the flag having fired, and `self-improve`
-counts flag behaviour it can only read from prose. Measured in fan-out 7: two Phase-3 skips were
-orchestrator judgment against the configured flags, both defensible, neither recorded, and the only
-trace was a sentence in a run report. A flag that is quietly overridden is a flag nobody can tune.
+counts flag behaviour it can only read from prose. A defensible skip left unrecorded survives only
+as a sentence in a run report. A flag that is quietly overridden is a flag nobody can tune.
 
 
 1. **Pre-digest** (`pre-digest` agent, background job) — default for any task touching ≥ `skip_predigest_if_files_lt` existing files (default 2). Spawn all independent tasks' pre-digests as parallel background jobs, then collect via `job poll`:
@@ -1001,12 +1007,10 @@ trace was a sentence in a run report. A flag that is quietly overridden is a fla
              { id: "predigest-2.0", role: "Pre-digest (task 2.0)", assignment: "Files: [paths]. Write your digest to local://digest-2.0.md." }])
    ```
    **Spawn the named `pre-digest` agent, and give it the path to write.** It holds `Write` and places
-   its own digest; collect the path it returns, do not transcribe its output. Fan-out 6 spawned a
-   read-only agent for this instead — the skill said "generic haiku agent", which names nothing a
-   Claude Code orchestrator can spawn — and both digests came back as *"Since I'm in READ-ONLY mode,
-   I cannot write files, but here's the complete information formatted for you to save"*. The
-   orchestrator pasted them by hand: orchestrator context spent copying, and a digest silently
-   re-authored in transit. The implementation agent's `assignment` references the file.
+   its own digest; collect the path it returns, do not transcribe its output. A read-only stand-in
+   cannot write the file and returns the digest for you to save instead: orchestrator context spent
+   copying, and a digest silently re-authored in transit. The implementation agent's `assignment`
+   references the file.
 
 2. **Implement** — dispatch by the parent task's `[kind: …]` tag:
 
@@ -1035,12 +1039,12 @@ trace was a sentence in a run report. A flag that is quietly overridden is a fla
    The classifier returns a `## Existing test classifications` table. Lift it into the test
    agent's `assignment`.
 
-   **A `keep` verdict is a hypothesis, not a finding.** It has been wrong twice, in different
-   ways. It reported existing view-model tests already covered new scoping behavior when every
-   stub used `any(named: 'x')`, which matches `null` too. And in fan-out 4 it returned **47/47
-   `keep`** with two wrong, one of whose stated reasons described its own vacuity exactly — the
-   test passed because the change had removed the widget it asserted about, so nothing could ever
-   make it fail. An orchestrator override was all that stood between that and a green cycle.
+   **A `keep` verdict is a hypothesis, not a finding.** It goes wrong in two ways. It reports
+   existing tests already cover new behaviour when every stub uses `any(named: 'x')`, which
+   matches `null` too. And it keeps a test whose stated reason describes its own vacuity — the test
+   passes because the change removed the widget it asserts about, so nothing can ever make it
+   fail. A near-all-`keep` table can carry such a verdict, and an orchestrator override is all that
+   stands between it and a green cycle.
 
    Each `keep` must cite a `file:line` assertion **and** say what would have to change for the
    test to start failing. Pass any `keep` that does neither to the test agent as `update`
@@ -1048,10 +1052,9 @@ trace was a sentence in a run report. A flag that is quietly overridden is a fla
    return as a prompt to check the two or three tests closest to the changed symbols yourself
    before lifting the table.
 
-   Raised from haiku to sonnet after fan-out 4, alongside the two rule changes above — so if this
-   stops recurring, which of the three fixed it is not separable. The gate's output is consumed
-   blind by the test agent and an error here surfaces two stages later, if at all, which is what
-   argued for the more capable model rather than only the cheaper rule changes.
+   It runs on sonnet, not haiku. The gate's output is consumed blind by the test agent and an
+   error here surfaces two stages later, if at all, which justifies the more capable model on top
+   of the rules above.
 
 4. **Test** (separate agent from implementer; gets a fresh isolated workspace from the updated feature-branch HEAD after the implementer's merge). The test agent reads `local://ac.md` and `local://ctx-sources.md` but does NOT need the digest:
    - **Write**: `task(agent: "test", context: "Write tests for the implemented feature.", tasks: [{ id: "test-<n>", role: "Test engineer (task <n>)", isolated: true, assignment: "Source files: [paths]\nTest files: [paths]\nTask: [desc]\nRead local://ac.md for AC. Read local://ctx-sources.md for context-source data.\n[pre-flight table]" }])`
@@ -1059,7 +1062,7 @@ trace was a sentence in a run report. A flag that is quietly overridden is a fla
 
 ### 3.4 — Handle results
 
-- **Success**: capture the agent's `## Deviations` section — forward each to monitor (`DEVIATIONS [task-id] AC [ac-id]: [what] | reason: [why]`). Under omp the task branch is already merged into the feature branch (branch-mode merge on isolated agent completion); under Claude Code, merge it yourself. Verify the merge is clean: **Analyze / lint** inline, and the test suite through `run-suite.sh` rather than inline — `bash .claude/skills/cycle/run-suite.sh start merge-[task-id] -- [Run all tests command]`, then read the verdict with `python3 .claude/skills/cycle/suite-result.py check merge-[task-id]` before spawning the next task (see § Reading a suite result). This fires after **every** sub-task, so it is the most frequent full-suite run in a cycle and the one that most needs the cross-clone lock: under fan-out, unlocked runs here are what stretch a 2m39s suite past eight minutes (evidence-run2 F1). Send status to monitor.
+- **Success**: capture the agent's `## Deviations` section — forward each to monitor (`DEVIATIONS [task-id] AC [ac-id]: [what] | reason: [why]`). Under omp the task branch is already merged into the feature branch (branch-mode merge on isolated agent completion); under Claude Code, merge it yourself. Verify the merge is clean: **Analyze / lint** inline, and the test suite through `run-suite.sh` rather than inline — `bash .claude/skills/cycle/run-suite.sh start merge-[task-id] -- [Run all tests command]`, then read the verdict with `python3 .claude/skills/cycle/suite-result.py check merge-[task-id]` before spawning the next task (see § Reading a suite result). This fires after **every** sub-task, so it is the most frequent full-suite run in a cycle and the one that most needs the cross-clone lock: under fan-out, unlocked concurrent runs here stretch a suite several times over. Send status to monitor.
 - **Failure**: escalation ladder (below)
 - **Contradiction-exit** (agent's return contains `status: contradiction-exit` per the `contradiction-exit` skill — item 5.4.4): emit `RESCUE contradiction-loop [task-id]: [trigger value] | resolution: human escalation | artifact: [report path or "agent return"]` to monitor, then jump to **L4** immediately. Do **not** run the escalation ladder for L1–L3 — the agent already exhausted its retries by construction. Preserve the structured block verbatim in the user-facing message.
 - **Stalled** (agent killed by the harness watchdog, or returns no clean result): run **Stall salvage** (below), then the escalation ladder using the salvage assessment as context
@@ -1087,9 +1090,9 @@ Supervisor spawns are fresh per check — continuity lives in `agent_states/supe
 Do not spawn supervisor checks under Claude Code. Set supervisor status to `disabled` with
 `reason:harness-unsupported` at Phase 3 start and continue the cycle without supervision.
 
-The counter path this section used to describe does not work, and shipping it produced worse
-outcomes than no supervisor at all: a cycle with 25 sub-tasks across six implementation agents
-spawned exactly **one** check, on the first agent's completion, and reported itself supervised.
+A counter-based cadence does not work here, and is worse than no supervisor at all: a cycle
+across many implementation agents spawns a single check, on the first agent's completion, and
+reports itself supervised.
 
 The mechanism breaks on agent identity. The PostToolUse hook writes counters keyed by the
 harness's own agent id, while cadence needs the `<role>-<task-number>` label — and Claude
@@ -1105,7 +1108,7 @@ that checks once per cycle is a quality gate the run report will claim you had.
 
 ### Supervisor health (5.5.5)
 
-Six layered mechanisms, evaluated as you spawn and collect each check (the cadence above):
+Seven layered mechanisms, evaluated as you spawn and collect each check (the cadence above):
 
 1. **Last-check record (not a liveness watchdog).** The supervisor touches `agent_states/supervisor/heartbeat` at the end of every successful check. Because checks are intermittent *by design*, a stale heartbeat is **not** an outage signal — never treat heartbeat age as "offline." Record the heartbeat mtime as the supervisor's `last_check` for the run report. Liveness is judged per-check by mechanism 2.
 2. **Per-check spawn watchdog.** When you spawn a `CHECK <agent-id>`, treat the spawn as failed if it errors or does not return a summary within 30s. Increment `supervisor_check_failures`, emit `RESCUE supervisor-stall [supervisor]: check [agent-id] no return in [N]s | resolution: skip-or-disable | artifact: agent_states/supervisor/state.md` to monitor, and skip this tick's result.
@@ -1113,7 +1116,7 @@ Six layered mechanisms, evaluated as you spawn and collect each check (the caden
 4. **Circuit breaker.** Maintain the **Supervisor health** section in cycle state (via monitor's `SUPERVISOR_HEALTH` verb). If `supervisor_check_failures` increments 3 times within a 5-minute window, **disable** the supervisor for the rest of the cycle: emit `RESCUE supervisor-disabled [supervisor]: 3 check failures in 5m | resolution: degraded mode | artifact: cycle-state` and forward `SUPERVISOR_HEALTH status:disabled spawns:[n] stalls:[n] heartbeat:[last] disabled_at:[now] reason:circuit-breaker`. Stop spawning supervisor checks; the cycle continues in degraded mode (no whispers, no escalations — falls back to today's behavior).
 5. **Run-report check success rate.** When you build the cycle run report at Phase 4A, populate the **Supervisor health** subsection of the Agent Telemetry block from cycle state: `supervisor_checks` attempted, `supervisor_check_failures`, and success rate. Classify the cycle as **degraded** if success rate < 90% or status is `disabled`.
 
-7. **Zero-spawn check — an error condition, not a footnote.** Applies under omp only; a Claude
+6. **Zero-spawn check — an error condition, not a footnote.** Applies under omp only; a Claude
    Code cycle records `status:disabled reason:harness-unsupported` and is not degraded for it.
    At Phase 4A, if the supervisor was enabled (not skipped by flag, not disabled for the
    harness, not circuit-broken) and `supervisor_checks == 0`, the
@@ -1129,7 +1132,7 @@ Six layered mechanisms, evaluated as you spawn and collect each check (the caden
    **A ratio, not a floor.** One check across six agents passes `> 0` while supervising almost
    nothing. Compare `supervisor_checks` against the number of agents that ran: fewer than one
    check per active agent is itself worth surfacing, even though it clears the zero test.
-6. **`self-improve` hook.** Documented in `.omp/agents/self-improve.md` Step 2 (Effectiveness patterns → Supervisor health). When `supervisor-stall` or `supervisor-disabled` appears in ≥ 3 of the last 5 cycles, `self-improve` raises a P0 recommendation.
+7. **`self-improve` hook.** Documented in `.omp/agents/self-improve.md` Step 2 (Effectiveness patterns → Supervisor health). When `supervisor-stall` or `supervisor-disabled` appears in ≥ 3 of the last 5 cycles, `self-improve` raises a P0 recommendation.
 
 ### Plan-revision flow (5.5.6)
 
@@ -1193,13 +1196,13 @@ Existing-code bugs (not agent-written code):
 3. Don't fix unless blocking. If blocking: fix it, and add `Closes #<n>` to the PR body
    alongside the story's own. **Do not close it by hand** — the fix ships when the PR
    merges, and closing it now records it done while it is still unmerged. Same reason as
-   step 9 (M31).
+   step 9.
 
 ### Commit protocol
 
 Per parent task, when all sub-tasks pass:
 1. **Clean-check** — assert `git status --porcelain` in the main checkout is empty. The orchestrator writes no implementation code, so a dirty main checkout means something leaked: abort, report to the user.
-2. Run test + typecheck/lint commands (from **Project Commands** in `.omp/agent-config.md`) in the main checkout, after the task branch is merged. **This is the full-suite run the agents no longer make** — they run scoped tests only (see the `test` agent § Running tests without being killed), so this gate is what actually catches cross-cutting breakage. Under a fan-out, start it with `run-suite.sh` rather than inline: the lock keeps concurrent cycles from fighting over one machine, which is what stretched an eight-minute suite past the watchdog.
+2. Run test + typecheck/lint commands (from **Project Commands** in `.omp/agent-config.md`) in the main checkout, after the task branch is merged. **This is the full-suite run the agents no longer make** — they run scoped tests only (see the `test` agent § Running tests without being killed), so this gate is what actually catches cross-cutting breakage. Under a fan-out, start it with `run-suite.sh` rather than inline: the lock keeps concurrent cycles from fighting over one machine, which otherwise stretches the suite past the watchdog.
 3. **Silent-skip gate** — grep the diff of test files (`git diff [base]...HEAD -- '<test-glob>'`, where `<test-glob>` is the **Test path glob** from `.omp/agent-config.md` § Project Commands) for the regex patterns in the active pack's **Test anti-patterns** file. Any hit blocks.
    On hit: emit `RESCUE silent-skip [task-id]: [file:line + pattern] | resolution: re-spawn test agent | artifact: none` to monitor, then re-spawn the `test` agent (isolated) with the offending file + matched pattern. One retry; a second hit escalates per L3.
 4. Green and gate clean → mark parent `[x]`, update monitor. Under **omp** the task branch is already merged and the workspace cleaned up — nothing manual. Under **Claude Code** neither happens on its own: merge the task branch, then `git worktree remove` its directory and `git branch -D` its branch. Leftovers are what the Phase-0 janitor has to sweep next run.
@@ -1210,10 +1213,10 @@ Never auto-revert commits. Report to user with options.
 ### When no agent holds the permission a task needs
 
 Under Claude Code each agent's `tools:` grant is static, so a task can be well-formed and still have
-no agent able to run it. Fan-out 1 hit this: a task needed `dart run drift_dev schema dump` *and*
-`git worktree add`, and no agent held both. It was resolved by the orchestrator doing the work
-itself — which is the failure, not the fix. The run report then grades a cycle whose agent
-boundaries were quietly not the ones the pipeline describes.
+no agent able to run it — a task needing `dart run drift_dev schema dump` *and* `git worktree add`,
+say, when no agent holds both. The orchestrator doing the work itself is the failure, not the fix:
+the run report then grades a cycle whose agent boundaries were quietly not the ones the pipeline
+describes.
 
 When you find a task no agent can execute, in this order:
 
@@ -1222,8 +1225,8 @@ When you find a task no agent can execute, in this order:
    `~/.claude/agents`, so there is no local frontmatter, and editing the framework's copy
    mid-cycle is what `guard-framework.py` blocks.
 3. **Escalate to the user** — the expected exit, not the last resort. Some work is legitimately
-   human: placing a 1.85 MB dataset was, and `Write` is no substitute (it re-encodes the bytes,
-   and that story's invariant was a missing trailing newline).
+   human: placing a byte-exact dataset is, and `Write` is no substitute — it re-encodes the
+   bytes, and a story's invariant can be as small as a missing trailing newline.
 
 **Do not run it yourself.** An orchestrator absorbing agent work is `harness-findings` probe 10, and
 it hides a permanent matrix gap behind a cycle that looks clean. Whatever you choose, record it in
@@ -1234,9 +1237,9 @@ this section does not apply: agents hold bare `bash`, so a task that fails here 
 there, which is exactly why the failure has to be reported rather than absorbed.
 
 **Do not brief an agent on what it cannot run.** The grant is a floor, not a ceiling — a
-classifier may allow more, and not identically every time: two `coding` spawns minutes apart
-disagreed about `shasum`, and the one that believed its briefing wrote a throwaway script
-instead. Let agents try and report a real refusal.
+classifier may allow more, and not identically every time: two `coding` spawns can disagree
+about one command, and the one that believes a briefing saying it cannot run it writes a
+throwaway workaround instead. Let agents try and report a real refusal.
 
 ### Dependencies
 
@@ -1272,16 +1275,16 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    - Deviations from PRD AC (copy the cycle state's **Deviations** section verbatim; write "None" if empty)
    - Scope changes (copy the cycle state's **Scope changes** section verbatim; write "None" if empty)
 4. Present cycle report to user inline
-5. Generate run report → `agent_tasks/reports/report-prd-[feature-name]-[YYYY-MM-DD].md` using template `.claude/skills/cycle/report-template.md`. **Agent Audit**, **Rescues**, and **Agent Telemetry** sections are required. Copy the **Rescues** list from the cycle state file verbatim into the run report's `## Rescues` section (write "None" if cycle state has no rescues). For **Agent Telemetry**, run `python3 .claude/skills/cycle/aggregate-telemetry.py` (or `~/.claude/skills/cycle/aggregate-telemetry.py`, whichever resolves) and paste its output into the section — it emits the table rows and the Phase-3 totals block ready to use. **Run it after step 6, not here** — `verify` and `review` have not been spawned yet at this point, so a table collected now omits the cycle's two most expensive agents by construction. Fan-out 6: a `review` that made 20 tool calls had no row at all, and two of four clones reported this independently. Write the rest of the report in order and come back for **Agent Telemetry**, **Gate wait** and **Permission prompts** once step 6 has returned. **Do not read `agent_states/events/` yourself.** Under a fan-out, finalize archives each clone's events and gate log to `<clones-root>/telemetry/<clone>/` before clearing them, so the cross-clone questions stay answerable after every cycle has ended — point the aggregator at those with `--events`. Measured, that directory is ~175× the size of the table it produces, and one deployment reached 966 files where the raw read exceeds a context window — which is why reports in that vault say telemetry was not collected. The script handles the empty and missing cases with the template's own wording, and prefixes a warning when agent ids have collapsed or the events span more than one cycle. **Reproduce any warning it prints verbatim** — a tidy table over collapsed ids or several runs is worse than no table. For **Gate wait**, run `python3 .claude/skills/cycle/gate-report.py` (or the `~/` path) and paste its output. It reports how long the cycle spent waiting on a human and on which gates — the run report is otherwise blind to the largest non-agent cost in a cycle, and the one number that decides how many cycles a person can actually run at once. A fan-out clone should also be read across the whole run with `--log <clones-root>/gate-log.tsv`. Intervals that ended on an agent-completion wakeup are excluded from the gate figures and reported separately — they are idle-on-an-agent, not human wait, and mixing them overstated gate wait 40× in one run. If it says **not captured**, say that rather than writing zero: no log means the hooks are not wired, which is a different claim from nobody having waited. An `OPEN gate` line means this cycle is still parked at one — reproduce it. **Permission prompts** (probe 12) is required. The *wait* is now captured automatically — `gate-report.py` logs each ask as `gate=permission` and reports it apart from gate wait, because a dialog blocks the cycle without being a decision the pipeline asked for. Paste those lines; an `OPEN permission ask` means the cycle is blocked on one right now, so reproduce it rather than reporting the run as idle. **Refused calls are captured too, and they are a different thing.** A refusal opens no dialog and nobody waits, so it never appeared in any wait figure — fan-out 7 reported zero permission wait while three tool calls had been refused across two clones, because `PostToolUse` does not fire on a refusal. `gate-report.py` now reports them apart, with the reason and the agent. Reproduce that block: **a refusal an agent worked around is still a capability this pipeline does not have**, and the fix differs by reason — a classifier refusal on a sanctioned script wants a grant or a scoped script, a user rejection wants nothing. The rest is still yours and lives only in this session: name the agent, the exact command, and whether a grant or a scoped script is the right fix. **Harness findings** is required too: work the probe checklist in the `harness-findings` skill and fill the run report's `## Harness findings` section. These are process faults — what the harness cost this cycle — and are recorded independently of whether the work shipped, because a cycle can pass every product metric and still have built against the wrong base. Write `None — probes 1-12 checked, all clean.` only if you actually worked the list. If >10 reports exist, summarize oldest into `agent_tasks/agent_metrics.md` — and **delete the archived files only when `vault_root` is empty** (see report-template § Report archival; a vault is a permanent record, never pruned).
+5. Generate run report → `agent_tasks/reports/report-prd-[feature-name]-[YYYY-MM-DD].md` using template `.claude/skills/cycle/report-template.md`. **Agent Audit**, **Rescues**, and **Agent Telemetry** sections are required. Copy the **Rescues** list from the cycle state file verbatim into the run report's `## Rescues` section (write "None" if cycle state has no rescues). For **Agent Telemetry**, run `python3 .claude/skills/cycle/aggregate-telemetry.py` (or `~/.claude/skills/cycle/aggregate-telemetry.py`, whichever resolves) and paste its output into the section — it emits the table rows and the Phase-3 totals block ready to use. **Run it after step 6, not here** — `verify` and `review` have not been spawned yet at this point, so a table collected now omits the cycle's two most expensive agents by construction. Write the rest of the report in order and come back for **Agent Telemetry**, **Gate wait** and **Permission prompts** once step 6 has returned. **Do not read `agent_states/events/` yourself.** Under a fan-out, finalize archives each clone's events and gate log to `<clones-root>/telemetry/<clone>/` before clearing them, so the cross-clone questions stay answerable after every cycle has ended — point the aggregator at those with `--events`. That directory is orders of magnitude larger than the table it produces, and a raw read of it can exceed a context window and leave the report saying telemetry was not collected. The script handles the empty and missing cases with the template's own wording, and prefixes a warning when agent ids have collapsed or the events span more than one cycle. **Reproduce any warning it prints verbatim** — a tidy table over collapsed ids or several runs is worse than no table. For **Gate wait**, run `python3 .claude/skills/cycle/gate-report.py` (or the `~/` path) and paste its output. It reports how long the cycle spent waiting on a human and on which gates — the run report is otherwise blind to the largest non-agent cost in a cycle, and the one number that decides how many cycles a person can actually run at once. A fan-out clone should also be read across the whole run with `--log <clones-root>/gate-log.tsv`. Intervals that ended on an agent-completion wakeup are excluded from the gate figures and reported separately — they are idle-on-an-agent, not human wait, and mixing them overstates gate wait many times over. If it says **not captured**, say that rather than writing zero: no log means the hooks are not wired, which is a different claim from nobody having waited. An `OPEN gate` line means this cycle is still parked at one — reproduce it. **Permission prompts** (probe 12) is required. The *wait* is captured automatically — `gate-report.py` logs each ask as `gate=permission` and reports it apart from gate wait, because a dialog blocks the cycle without being a decision the pipeline asked for. Paste those lines; an `OPEN permission ask` means the cycle is blocked on one right now, so reproduce it rather than reporting the run as idle. **Refused calls are captured too, and they are a different thing.** A refusal opens no dialog and nobody waits, so it appears in no wait figure — `PostToolUse` does not fire on a refusal, and a cycle can report zero permission wait while calls were refused. `gate-report.py` reports them apart, with the reason and the agent. Reproduce that block: **a refusal an agent worked around is still a capability this pipeline does not have**, and the fix differs by reason — a classifier refusal on a sanctioned script wants a grant or a scoped script, a user rejection wants nothing. The rest is still yours and lives only in this session: name the agent, the exact command, and whether a grant or a scoped script is the right fix. **Harness findings** is required too: work the probe checklist in the `harness-findings` skill and fill the run report's `## Harness findings` section. These are process faults — what the harness cost this cycle — and are recorded independently of whether the work shipped, because a cycle can pass every product metric and still have built against the wrong base. Write `None — probes 1-12 checked, all clean.` only if you actually worked the list. If >10 reports exist, summarize oldest into `agent_tasks/agent_metrics.md` — and **delete the archived files only when `vault_root` is empty** (see report-template § Report archival; a vault is a permanent record, never pruned).
 6. **Autonomous verify & review** — read `.omp/agent-config.md` Optional Agents section.
 
    **Mode override:** in `--mode hotfix`, **skip the review spawn entirely** and spawn only `verify` at **lite** depth (see 5.6.6). In `--mode lean` and `--mode full`, behave as below.
 
    **Skip flag:** when `skip_review_if_files_lt` (Per-phase skip flags in `.omp/agent-config.md`, default 0/off) is > 0 and `git diff [base] --name-only | wc -l` is below it, also skip review. Note the skip in the run report's Agent Audit (`review: skipped — files changed N < threshold M`).
 
-   **Before spawning either, start the full-suite run.** Neither agent may launch one itself: at
-   2m39s solo and ~8 minutes under fan-out contention it trips the 600s watchdog, which killed a
-   `verify` agent (evidence-run2 F1). One run serves both — whether a commit's tests pass is a fact
+   **Before spawning either, start the full-suite run.** Neither agent may launch one itself: under
+   fan-out contention a full suite runs past the 600s watchdog, which kills the agent waiting on
+   it. One run serves both — whether a commit's tests pass is a fact
    about that commit, not a judgment needing two opinions.
 
    With `ci_workflow` set in **Project Commands**:
@@ -1292,8 +1295,8 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    **Issue it exactly as written — no `cd` prefix, no `&&` chain.** A compound command matches no
    prefix grant, so prefixing this with `cd <clone>` re-opens the permission dialog the script exists
-   to close. Measured in fan-out 4: 18.5h of dialog wait across 6 asks, on commands the project had
-   already granted, every one of them defeated by a leading `cd`. The script resolves the repository
+   to close, and the cycle parks on a dialog for a command the project already granted
+   (§ Inside a fan-out clone). The script resolves the repository
    from its own working directory; you are already in it.
 
    It pushes the branch, dispatches the workflow **on that branch**, and prints the run id for this
@@ -1305,22 +1308,20 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    Pass that run id into **both** spawn prompts, **together with the suite result you already
    measured at step 1.** Both agents conclude on that result; the CI run is `ubuntu-latest`
    confirmation of it. An agent given a run id and no measured result has nothing to conclude on
-   but the run, and in fan-out 6 one of them did not conclude at all — `verify` returned with
-   `Verdict: IN PROGRESS` and "waiting for CI run to complete", while `review`, given the same id,
-   cited the figures and finished. **If stdout is empty, treat it as a failed
+   but the run, and can return `Verdict: IN PROGRESS`, "waiting for CI run to complete", instead
+   of concluding. **If stdout is empty, treat it as a failed
    dispatch** — do not fall back to the newest run of the workflow.
 
    Do not dispatch by hand with `-f ref="$BR"`. `-f` passes a workflow *input*; it does not choose the
-   ref the run is attributed to. Fan-out 4 dispatched that way three times and every run came back
-   `headBranch: develop`, `headSha: <base>`, so the sha lookup found nothing and all three cycles fell
-   back to a local suite run while believing they had a CI path.
+   ref the run is attributed to. A run dispatched that way comes back `headBranch: develop`,
+   `headSha: <base>`, so the sha lookup finds nothing and the cycle falls back to a local suite run
+   while believing it had a CI path.
 
    **When you need to block on a suite yourself, use `run-suite.sh wait <name>` — do not write a
-   poll loop.** The subcommand exists for this and the skill never used to say so, which is how two
-   orchestrators hand-rolled one and both got it wrong. In fan-out 6 one wrote
-   `until ! run-suite.sh check <name>`, which exits immediately because `check` returns 3 while
-   running, and reported a suite finished with ~70s left. In fan-out 7 another's background loop was
-   killed by the harness for low memory with four sibling clones active — and a killed poller is
+   poll loop.** A hand-rolled loop goes wrong two ways. `until ! run-suite.sh check <name>` exits
+   immediately, because `check` returns 3 while running, and reports a suite finished while it is
+   still running. A background loop can be killed by the harness for low memory while sibling
+   clones are active — and a killed poller is
    indistinguishable from a killed suite until someone checks, so the reflex is to start a second
    full suite under memory pressure. `wait` blocks in one call, holds no lock of its own, and takes
    `--timeout`.
@@ -1346,13 +1347,12 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    **They do not share state, but under a fan-out they share a checkout.** Neither is isolated in a
    clone, verify's Step 4c mutates `lib/` and restores it, and review's Step 6 fixes live in the
-   working tree. Both sides are now guarded — review reads committed blobs at `$SHA`, and verify
+   working tree. Both sides are guarded — review reads committed blobs at `$SHA`, and verify
    restores from what it read rather than resetting to HEAD — but the guard has a visible failure
    mode you own: **if verify's report contains a `restore-skipped:` line, the tree still holds a
    falsification mutation.** Verify saw the file change under it and correctly refused to clobber
    whatever was there. Do not commit, push or dispatch CI until you have read that file and put it
-   right. Measured in fan-out 7: verify mutated two model files while review had a third modified,
-   and they missed each other by luck.
+   right.
 
    Run **Context Sources retrieval** for stages `verify` and `review` (see § Context Sources retrieval) and prepend any `## Context: <id>` blocks to the respective prompts below.
 
@@ -1393,17 +1393,16 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    **Files-changed check** — `review` no longer applies its own fixes; it reports them under
    `## Proposed fixes` and writes nothing to `lib/`. So `## Files changed: None` is the expected
-   result, and **writes there are now a finding**: either the agent definition drifted or something
+   result, and **writes there are a finding**: either the agent definition drifted or something
    else touched the tree. Diff the tree against that section before acting on any verify finding —
-   a verify finding that looks already-fixed used to be review's edit rather than a false positive,
+   a verify finding that looks already-fixed may be such an edit rather than a false positive,
    and attributing those edits to verify corrupts the run report.
 
    **Apply review's proposed fixes yourself, after both agents have returned** — never while verify
    is still running, because its Step 4c has `lib/` mutated in place and a write into that window
    makes verify decline to restore. Spawn one `coding` agent with the `## Proposed fixes` block as
-   its assignment, let it commit, then re-run the suite. Budget for it: in fan-out 7 this was one
-   spawn, 9 tool calls and 32s for a 13-line fix, and it happened anyway — it was simply unplanned,
-   because review had applied the edit and nothing owned committing it.
+   its assignment, let it commit, then re-run the suite. Budget for it: it is one short spawn, and it
+   is yours because review applies nothing and nothing else owns committing the fix.
 
    **Report-file check** — for each agent spawned, confirm its report file exists at the dictated path and its header `Verdict:` is no longer `IN PROGRESS`. A missing file or a still-`IN PROGRESS` verdict means the agent stalled before finishing — run **Stall salvage** (§3.4); its `PARTIAL — agent stalled` report then feeds the gate below.
 
@@ -1416,7 +1415,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    | PARTIAL | > 0 | Block 4B — present unimplemented criteria, require user to fix or explicitly accept the gaps |
    | FAIL | any | Block 4B — present failures, require fixes before release |
 
-   Whenever that table stops and asks — a PARTIAL confirmation, or a blocked 4B — end the message with `<!-- gate:gate-4b -->` (§ Tagging a gate). The same applies when 4B leaves the PR with you and waits for it to be merged: tag that `<!-- gate:pr-merge -->`. Measured in fan-out 4, the merge wait was the single largest gate in the run — three clones, 48m29s — and every one of them was logged unlabelled.
+   Whenever that table stops and asks — a PARTIAL confirmation, or a blocked 4B — end the message with `<!-- gate:gate-4b -->` (§ Tagging a gate). The same applies when 4B leaves the PR with you and waits for it to be merged: tag that `<!-- gate:pr-merge -->`. The merge wait can be the largest gate in a run, and untagged it is logged unlabelled.
 
    If `verify` was skipped, the gate does not apply — proceed to 4B but note: **"Verify was skipped — run `/verify` before merging."**
 
@@ -1432,15 +1431,15 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 7b. **Vault sync** — if `vault_root` (§ Docs Vault in `.omp/agent-config.md`) is non-empty, commit and push the vault repo so this cycle's reports reach its remote (e.g. `myapp-docs`). Orchestrator-run — the finalize monitor holds only the agent_states cleanup permission, not git. **Best-effort: a vault push failure must not fail the cycle.**
 
    ```sh
-   # Stage only THIS CYCLE's files. Two things this must survive, both measured:
+   # Stage only THIS CYCLE's files. Two things this must survive:
    #
    #   * The session shell is zsh, where an unmatched glob is a FATAL error rather
    #     than a literal — a lean cycle has no PRD and no PR body at this point, so a
-   #     glob loop died on its second pattern and staged nothing while reporting
-   #     success (evidence-run2 F2). So: no globs. `git status` does the enumerating,
-   #     and its output is the same in every shell.
+   #     glob loop dies on its second pattern and stages nothing while reporting
+   #     success. So: no globs. `git status` does the enumerating, and its output is
+   #     the same in every shell.
    #   * The vault is one repo shared by every clone, so an app-scoped add stages the
-   #     other cycles' in-flight files too (evidence-run1 E13).
+   #     other cycles' in-flight files too.
    #
    # The feature must be followed by a real delimiter — a date, `.`, `/`, or end of
    # line — or `auth` also matches `auth-refactor`.
@@ -1474,7 +1473,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    # name containing a newline survives `-z` but not the `tr` back to lines, a
    # pre-staged rename arrives as one `old -> new` record, and there will be shapes
    # nobody has listed yet. Each of those drops an artifact silently, which is the
-   # failure mode this whole step keeps rediscovering. So compare, and say so.
+   # failure mode this whole step guards against. So compare, and say so.
    if [ -n "$FILES" ]; then
      MISSING=$(printf '%s\n' "$FILES" | while IFS= read -r f; do
        [ -n "$f" ] || continue
@@ -1500,7 +1499,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    # `.git/index.lock` when a sibling cycle is mid-write, and an unnoticed failure
    # of the `restore --staged` above leaves another cycle's file staged — which
    # would ride into this commit and recreate the commingling this design exists to
-   # prevent (E13). So check the index one last time and refuse if it is not clean.
+   # prevent. So check the index one last time and refuse if it is not clean.
    # A refusal is recoverable; a quietly wrong commit in a shared permanent record
    # is not.
    # Retry the unstage before giving up: the reason a foreign path is still here is
@@ -1550,18 +1549,17 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    [ "$ok" = 1 ] || echo "vault push failed after 5 attempts — reports are committed locally in the vault; push manually."
    ```
 
-   **Why cycle-scoped, not app-scoped.** Fan-out 1 ran three cycles with an app-scoped add and
-   commingled anyway, because all three shared `app_slug: myapp`: `22e1da8` says *cycle 378* and
-   contains 404's and 419's PRDs; `842e27f` says *cycle 404* and contains 419's analyzer baseline;
-   `793ddac` says *cycle 419* and contains **404's PR body**. Cleanly named, not cleanly scoped.
+   **Why cycle-scoped, not app-scoped.** Concurrent cycles on one application share one
+   `app_slug`, so an app-scoped add commits each cycle's siblings' PRDs, analyzer baselines and PR
+   bodies under its own message. Cleanly named, not cleanly scoped.
    App scoping isolates *applications* from each other, which is not the failure mode fan-out has.
 
    **Why scoped rather than `add -A`.** The vault is one repo shared by every clone and every
    application (§ Docs Vault). `add -A` stages whatever else happens to be in the working tree —
    under fan-out that is another cycle's in-progress report, committed under this cycle's message
-   and possibly mid-write. Staging only `{app_slug}`'s three paths keeps a cycle's commit to its own
-   artifacts. Paths are tested before staging because a lean cycle writes no PRD, and `git add` on a
-   missing pathspec fails the whole step.
+   and possibly mid-write. Staging only the changed paths that name `{feature}` keeps a cycle's commit
+   to its own artifacts. The list comes from `git status`, so a file a lean cycle never wrote (its PRD)
+   is simply absent, never a missing pathspec.
 
    **Why the retry.** Two cycles finishing close together both push; one is rejected non-fast-forward.
    The rebase-and-retry turns a lost race into a delay. `--autostash` covers another cycle's
@@ -1594,9 +1592,9 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
    **With slice marks, publish per `.claude/skills/cycle/stack.md` instead** — one PR per layer.
 8b. **Vault sync again** — if `vault_root` is non-empty, re-run **step 7b's sync verbatim**.
 
-   The PR body is written *here*, in step 8, after 7b has already run. So a cycle never commits
-   its own PR body: in fan-out 1 two were swept up by a *later* cycle's commit, and the last
-   cycle's was simply orphaned, sitting untracked in the vault until someone noticed. This step
+   The PR body is written *here*, in step 8, after 7b has already run. So 7b never commits a
+   cycle's own PR body: without this step it is swept up by a *later* cycle's commit, or, for the
+   last cycle, sits untracked in the vault until someone notices. This step
    is what makes a cycle's final artifact reach the vault under the cycle that produced it.
 
    Same best-effort contract as 7b — a push failure must not fail the release.
@@ -1606,9 +1604,8 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
 
    The PR body's `Closes #<n>` is what closes the issue, and GitHub honours it when the PR
    merges. The board follows from the same event via the `pr-merged-board-done` workflow.
-   A cycle stopped and asked about this rather than guessing (M31): step 9 used to close
-   the issue and mark it Done at Finalize, so an issue read `completed` while its fix was
-   unmerged — and stayed wrong if the PR was abandoned.
+   Closing the issue and marking it Done at Finalize makes it read `completed` while its fix
+   is unmerged — and leaves it wrong if the PR is abandoned.
 
    So confirm the link exists rather than recording an outcome:
 
@@ -1652,8 +1649,7 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
     certainty. Two cycles never share a fragment filename, so there is nothing to merge.
 
     **Condense, do not restate.** The PR body already carries the full argument, so the fragment
-    is the short version someone greps for months later — not a fourth copy. Measured in fan-out
-    4: the `#430` changelog entry reproduced its PR body nearly sentence for sentence.
+    is the short version someone greps for months later — not a fourth copy of the PR body.
 
     If the project has no `Changelog fragments` path configured, skip this step and say so in the
     run report rather than inventing a location.
@@ -1665,14 +1661,12 @@ Two parts: **4A** runs immediately with no user interaction. **4B** runs when th
     bash .claude/skills/cycle/reap-clones.sh finish --apply
     ```
 
-    It deletes the clone's regenerable build output and marks the clone reapable. It refuses on
+    It deletes the clone's regenerable build output (a pool slot keeps it) and marks the clone reapable. It refuses on
     its own outside a fan-out clone, so run it unconditionally rather than detecting the clone
     yourself. It does **not** remove the clone — a cycle cannot delete the worktree its own
     session is standing in; removal is `sweep`, which you do not run.
 
     **This is step 11 and not part of Finalize, deliberately.** It marks the clone's HEAD, and
-    Finalize is not the last thing a cycle does — step 10 commits after it. Measured in fan-out 5
-    (J3): the marker recorded a commit the cycle then moved past, `sweep` refused the clone, and
-    two sibling clones that happened to commit their fragment before Finalize did not hit it.
-    Same skill, same mode, two orderings.
+    Finalize is not the last thing a cycle does — step 10 commits after it. A marker written at
+    Finalize records a commit the cycle then moves past, and `sweep` refuses the clone.
 

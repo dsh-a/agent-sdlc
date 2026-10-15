@@ -18,7 +18,8 @@ chk() { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1" "want [$3] got [$2]"; fi
 # -P: mktemp hands back /var/... on macOS, a symlink to /private/var, and the
 # shim resolves with `pwd -P`. Comparing unresolved paths is the same trap the
 # reap documents.
-R="$(cd "$(mktemp -d)" && pwd -P)"
+# The root has a space, as a Windows profile path can, so every path below does.
+R="$(cd "$(mktemp -d)" && pwd -P)/with space"; mkdir -p "$R"
 
 # A miniature framework: small manifest, exact assertions. It carries the real
 # deploy.sh and the real shim, so what is under test is the pair.
@@ -36,6 +37,12 @@ cp "$ROOT_DIR/deploy.sh" "$FW/deploy.sh"; chmod +x "$FW/deploy.sh"
 cp "$ROOT_DIR/.claude/skills/cycle/preflight-deploy.sh" "$FW/.claude/skills/cycle/"
 chmod +x "$FW/.claude/skills/cycle/preflight-deploy.sh"
 git -C "$FW" add -A; git -C "$FW" commit -qm fw
+
+# A sandbox HOME wired to this fixture, as test_deploy.sh does, so no case
+# reads or writes the real ~/.claude and every `check` judges the fixture.
+export HOME="$R/home"; mkdir -p "$HOME/.claude"
+ln -s "$FW/.claude/skills" "$HOME/.claude/skills"
+ln -s "$FW/.claude/agents" "$HOME/.claude/agents"
 
 P="$R/proj"; mkdir -p "$P/.claude" "$P/.omp"
 git init -q "$P"
@@ -79,7 +86,10 @@ chk "non-zero on a dangling link" "$rc" 1
 chk "  ... says PREFLIGHT: problems" \
     "$(printf '%s' "$out" | tail -1 | grep -c '^PREFLIGHT: problems')" 1
 chk "  ... and prints a repair command naming the project" \
-    "$(printf '%s' "$out" | tail -1 | grep -c "deploy.sh link")" 1
+    "$(printf '%s' "$out" | tail -1 | grep -cF "bash '$FW/deploy.sh' link '$P'")" 1
+fix="$(printf '%s' "$out" | tail -1 | sed -n 's/.*fix with: //p')"
+bash -c "$fix" >/dev/null 2>&1
+chk "  ... which, run as printed, repairs it" "$(bash "$SHIM" >/dev/null 2>&1; echo $?)" 0
 
 # The repair command is the one `check` named. An unwired hook is a hand edit,
 # so the verdict names no command.
@@ -144,10 +154,17 @@ git init -q "$C2"
 cp "$FW/.claude/skills/cycle/preflight-deploy.sh" "$C2/$SHIM"
 cp "$FW/deploy.sh" "$C2/deploy.sh"; chmod -x "$C2/deploy.sh"
 cd "$C2"
-out="$(bash "$SHIM" 2>&1)"; rc=$?
-chk "refuses a non-executable deploy.sh" "$rc" 2
-chk "  ... as unreachable, not as a pass" \
-    "$(printf '%s' "$out" | tail -1)" "PREFLIGHT: unreachable"
+# Not on Windows: Git Bash decides executability from a file's shebang, not a
+# mode bit, so `chmod -x` changes nothing and the file stays runnable.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) ;;
+  *)
+    out="$(bash "$SHIM" 2>&1)"; rc=$?
+    chk "refuses a non-executable deploy.sh" "$rc" 2
+    chk "  ... as unreachable, not as a pass" \
+        "$(printf '%s' "$out" | tail -1)" "PREFLIGHT: unreachable"
+    ;;
+esac
 
 # --- it changes nothing ---------------------------------------------------
 #

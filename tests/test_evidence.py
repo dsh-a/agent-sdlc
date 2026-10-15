@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Tests for .claude/skills/evidence/evidence.py — stdlib only.
 
-Each check below pins one of the specific mistakes that produced ten
-instrumentation errors in a single `/refine` session. The thesis is that those
-mistakes are now **unexpressible**, not merely discouraged, so several checks
+Each check below pins one specific evidence-gathering mistake. Those mistakes
+are **unexpressible**, not merely discouraged, so several checks
 assert on the module's *source* (no `--include` flag, no shelling out to grep)
 rather than on its output: a behavioural test passes until someone adds the
 hazard back.
@@ -24,6 +23,7 @@ import importlib.util
 import pathlib
 import subprocess
 import sys
+import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / ".claude" / "skills" / "evidence" / "evidence.py"
@@ -72,8 +72,10 @@ def check_no_shell_hazard() -> None:
           '"--include"' not in src and "'--include'" not in src)
     check("grep is never invoked", "\"grep\"" not in src and "'grep'" not in src
           and "subprocess.run([\"grep" not in src)
-    # round-trip takes a caller-named command and is the only shell=True use.
-    check("exactly one shell=True, in round-trip", src.count("shell=True") == 1)
+    # round-trip takes a caller-named command and is the only shell use: the
+    # platform shell off Windows, Git Bash on it.
+    check("exactly one shell=, in round-trip",
+          src.count("shell=") == 1 and "shell=bash is None" in src)
 
 
 def check_corpus_is_mandatory_and_stated() -> None:
@@ -95,7 +97,7 @@ def check_corpus_is_mandatory_and_stated() -> None:
 
 
 def check_undetermined_is_never_absent() -> None:
-    """Class 5 — the single most expensive conflation in the session."""
+    """Class 5 — the most expensive conflation: could-not-read reported as absent."""
     print("\ncould-not-determine is a third outcome")
     p = run("absence", "--pattern", "INSERT POLICY",
             f"{FIX}/migrations/0001_init.sql", f"{FIX}/does/not/exist.sql")
@@ -191,6 +193,66 @@ def check_anchors_are_read_not_retyped() -> None:
     retyped = "a phrase appears only in a corrective context"  # true prose, wrong bytes
     check("the retyped form is genuinely absent from the file", text.count(retyped) == 0)
     check("the real bytes are unique", text.count(wrapped_anchor) == 1)
+
+
+def check_guarded_edit_keeps_line_endings() -> None:
+    """An edit changes the bytes it names and no others.
+
+    Text mode normalises line endings on read and writes the platform's, which
+    would turn one anchored edit into a whole-file diff: an LF file CRLF on
+    Windows, a CRLF file LF everywhere else. The file's own ending is kept.
+    """
+    print("\nguarded-edit leaves the file's line endings alone")
+    edit = '[{"tag":"b","old":"beta","new":"BETA"}]'
+    for name, nl in (("LF", b"\n"), ("CRLF", b"\r\n")):
+        with tempfile.TemporaryDirectory() as td:
+            f = pathlib.Path(td) / "x.md"
+            f.write_bytes(nl.join([b"alpha", b"beta", b"gamma", b""]))
+            run("guarded-edit", str(f), "--edits", "-", "--apply", stdin=edit)
+            check(f"an {name} file stays {name}",
+                  f.read_bytes() == nl.join([b"alpha", b"BETA", b"gamma", b""]),
+                  repr(f.read_bytes()))
+            multi = '[{"tag":"bg","old":"beta\\ngamma","new":"B1\\nB2\\nG"}]'
+            f.write_bytes(nl.join([b"alpha", b"beta", b"gamma", b"delta"]))
+            run("guarded-edit", str(f), "--edits", "-", "--apply", stdin=multi)
+            check(f"lines an edit adds to an {name} file are {name}",
+                  f.read_bytes() == nl.join([b"alpha", b"B1", b"B2", b"G", b"delta"]),
+                  repr(f.read_bytes()))
+
+
+def check_guarded_edit_keeps_mixed_line_endings() -> None:
+    """Each line keeps its own ending; a mixed file is never normalised."""
+    print("\nguarded-edit leaves a mixed-ending file's other lines alone")
+    lines = [b"alpha\n", b"beta\n", b"gamma\r\n", b"delta\n", b"eps\r\n", b"zeta"]
+    with tempfile.TemporaryDirectory() as td:
+        f = pathlib.Path(td) / "x.md"
+        f.write_bytes(b"".join(lines))
+        edits = ('[{"tag":"lf","old":"beta","new":"BETA"},'
+                 '{"tag":"crlf","old":"eps","new":"EPS"}]')
+        p = run("guarded-edit", str(f), "--edits", "-", "--apply", stdin=edits)
+        check("the mixed-file edit applies", field(p, "verdict") == "applied", p.stdout)
+        got = f.read_bytes().splitlines(keepends=True)
+        want = [b"alpha\n", b"BETA\n", b"gamma\r\n", b"delta\n", b"EPS\r\n", b"zeta"]
+        check("an edited LF line stays LF and an edited CRLF line stays CRLF",
+              got == want, repr(got))
+        check("untouched lines are byte-identical",
+              [got[i] for i in (0, 2, 3, 5)] == [lines[i] for i in (0, 2, 3, 5)], repr(got))
+
+        # Lines an edit adds take the endings of the lines it replaced, in
+        # order; extras repeat the last. An edit that replaces no line ending
+        # gives its new lines the ending of the line it sits in.
+        f.write_bytes(b"a\nb\r\nc\nd\r\ne\n")
+        split = ('[{"tag":"span","old":"b\\nc","new":"B\\nX\\nC"},'
+                 '{"tag":"inline","old":"e","new":"E1\\nE2"}]')
+        run("guarded-edit", str(f), "--edits", "-", "--apply", stdin=split)
+        check("added lines follow the replaced and enclosing lines' endings",
+              f.read_bytes() == b"a\nB\r\nX\r\nC\nd\r\nE1\nE2\n", repr(f.read_bytes()))
+
+        f.write_bytes(b"one\r\ntwo\nthree")
+        run("guarded-edit", str(f), "--edits", "-", "--apply",
+            stdin='[{"old":"three","new":"3a\\n3b"}]')
+        check("a new line in the unterminated last line takes the line above's ending",
+              f.read_bytes() == b"one\r\ntwo\n3a\n3b", repr(f.read_bytes()))
 
 
 def check_guarded_edit_is_all_or_nothing() -> None:
@@ -337,6 +399,8 @@ def main() -> int:
     check_round_trip_never_assumes_acceptance()
     check_enumerate_takes_no_expected_total()
     check_usage_errors()
+    check_guarded_edit_keeps_line_endings()
+    check_guarded_edit_keeps_mixed_line_endings()
     print()
     if failures:
         print(f"{len(failures)} failure(s): {', '.join(failures)}")

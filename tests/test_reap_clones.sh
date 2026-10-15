@@ -54,6 +54,15 @@ chk "  ... and writes the marker at the clones root" "$([ -f "$ROOT/.reapable/c1
 chk "  ... recording the head sha" \
     "$(grep -c "\"head\":\"$(git -C "$WT" rev-parse HEAD)\"" "$ROOT/.reapable/c1.json")" 1
 
+# A pool slot keeps its build output: the next launch reuses the slot warm.
+setup; cd "$WT"; printf 'clone=c1\nslot=1\n' > "$WT/agent_states/.fanout-clone"
+out="$(bash "$S" finish --apply 2>&1)"
+chk "finish in a pool slot keeps build output" "$([ -f "$WT/build/x/blob" ] && echo yes || echo no)" yes
+chk "  ... says why" "$(echo "$out" | grep -c 'pool slot, reused warm')" 1
+chk "  ... and still marks it reapable" "$([ -f "$ROOT/.reapable/c1.json" ] && echo yes || echo no)" yes
+bash "$S" sweep --root "$ROOT" --apply >/dev/null 2>&1
+chk "  ... so sweep still removes the slot" "$([ -d "$WT" ] && echo yes || echo no)" no
+
 # A symlinked candidate must never be followed out of the tree.
 setup; cd "$WT"
 mkdir -p "$R/outside"; touch "$R/outside/precious"; rm -rf "$WT/.dart_tool"
@@ -69,7 +78,7 @@ chk "  ... but names the clone" "$(echo "$out" | grep -c 'would remove')" 1
 
 # A commit on top of the finished one is the normal case, not a divergence: the
 # cycle writes its changelog fragment at step 10, after Finalize has written the
-# marker at step 7. Refusing it meant sweeping nothing (evidence-run5 J3).
+# marker at step 7. Refusing it would sweep nothing.
 echo more > "$WT/f"; git -C "$WT" add f; git -C "$WT" commit -qm "changelog fragment"
 out="$(bash "$S" sweep --root "$ROOT" --apply 2>&1)"
 chk "sweep accepts a commit made after Finalize" "$([ -d "$WT" ] && echo yes || echo no)" no

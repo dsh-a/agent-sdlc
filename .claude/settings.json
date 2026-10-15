@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-secrets.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/guard-secrets.py"
           }
         ]
       }
@@ -63,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/log-event.py"
           }
         ]
       }
@@ -74,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/log-event.py"
           }
         ]
       }
@@ -85,7 +85,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/log-event.py"
           }
         ]
       }
@@ -96,7 +96,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-log.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/gate-log.py"
           }
         ]
       }
@@ -107,7 +107,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-log.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/gate-log.py"
           }
         ]
       }

@@ -22,9 +22,15 @@ chk() { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1" "want [$3] got [$2]"; fi
 has() { if printf '%s' "$2" | grep -qF -- "$3"; then ok "$1"; else bad "$1" "missing [$3] in: $2"; fi; }
 hasnt() { if printf '%s' "$2" | grep -qF -- "$3"; then bad "$1" "unexpected [$3] in: $2"; else ok "$1"; fi; }
 
-R="$(mktemp -d)"
+# The root has a space, as a Windows profile path can, so every path below does.
+R0="$(mktemp -d)"; R="$R0/with space"; mkdir -p "$R"
+trap 'rm -rf "$R0"' EXIT
 BIN="$R/bin"; REC="$R/rec"; mkdir -p "$BIN" "$REC"
 WORK="$R/work"; mkdir -p "$WORK"
+# The script's launchers land in a private TMPDIR whose path has a space, as a
+# Windows profile path can, so every case runs against one.
+export TMPDIR="$R/tmp dir"; mkdir -p "$TMPDIR"
+launchers_left() { find "$TMPDIR" -name 'open-terminal.*' | wc -l | tr -d ' '; }
 
 # A stub records its own name and argv, one line, and exits 0.
 mkstub() {
@@ -66,66 +72,172 @@ done
 export PATH="$BIN:$SYS"
 # A clean environment: no emulator hints, no remote/CI short-circuit.
 unset TERM_PROGRAM KITTY_WINDOW_ID SSH_CONNECTION SSH_TTY CI TERMINAL 2>/dev/null || true
+# Windows sets OS=Windows_NT for every process, and the script's fallback
+# detection reads it — so on a Windows host the stubbed-Linux case ran the
+# Windows branch instead.
+unset OS 2>/dev/null || true
 
 # `launch` backgrounds with `& disown`, so the script exits before the stub has
 # necessarily written. Wait for the recording to appear rather than reading it
 # immediately — the first cut read an empty file every time and reported a
 # missing dispatch that had in fact happened.
 run() {
-  : > "$REC/calls"
+  : > "$REC/calls"; : > "$REC/launcher"
   bash "$S" "$@" >/dev/null 2>&1
   local i=0
   while [ ! -s "$REC/calls" ] && [ "$i" -lt 50 ]; do sleep 0.05; i=$((i+1)); done
   printf '%s' "$(cat "$REC/calls" 2>/dev/null)"
 }
 
+# The stubs never run the launcher, so its self-delete never fires; the suite
+# removes each one it is handed.
+launcher() { local f; f="$(cat "$REC/launcher")"; cygpath -u "$f" 2>/dev/null || printf '%s' "$f"; }
+drop_launcher() { rm -f -- "$(launcher)"; }
+
 # ------------------------------------------------------------------ windows ----
 #
-# The case the script could not express at all before.
+# Git Bash's `uname -s`: the command runs under Git Bash in Windows Terminal or
+# mintty.
 set_uname 'MINGW64_NT-10.0'
-mkstub 'powershell.exe'
-out="$(run --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
-has  "Windows dispatches to PowerShell, not an X11 emulator" "$out" "powershell.exe"
-has  "  ... with -NoExit, so the window survives the command" "$out" "-NoExit"
-has  "  ... and Set-Location, since POSIX cd && cmd is a 5.1 syntax error" "$out" "Set-Location"
-hasnt "  ... and never hands the POSIX string to a shell" "$out" "bash -lc"
-
-mkstub 'pwsh.exe'
-out="$(run --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
-has  "pwsh is preferred over the bundled powershell.exe" "$out" "pwsh.exe"
-
-mkstub 'wt.exe'
+# A stand-in `cygpath`. `-w /` names a Git root at $GR. Windows forms put $R at
+# C:/R, so `-m` keeps the space in "tmp dir" and `-ms` gives its 8.3 name
+# TMPDIR~1 unless $R/no-short-names exists; `-u` maps both back.
+GR="$R/Program Files/Git"; mkdir -p "$GR/bin"
+CYG="$R/cyg"; mkdir -p "$CYG"
+cat > "$CYG/cygpath" <<STUB
+#!/usr/bin/env bash
+R='$R'; GR='$GR'; p="\$2"
+case "\$1 \$p" in
+  "-w /") printf '%s\n' 'C:\Program Files\Git\'; exit 0 ;;
+  '-u C:\Program Files\Git\') printf '%s\n' "\$GR"; exit 0 ;;
+esac
+case "\$1" in
+  -m|-ms)
+    case "\$p" in "\$R"*) p="C:/R\${p#"\$R"}" ;; esac
+    [ "\$1" = -ms ] && [ ! -e "\$R/no-short-names" ] && p="\${p//tmp dir/TMPDIR~1}" ;;
+  -u)
+    p="\${p//\\\\//}"
+    case "\$p" in C:/R*) p="\$R\${p#C:/R}" ;; esac
+    p="\${p//TMPDIR~1/tmp dir}" ;;
+esac
+printf '%s\n' "\$p"
+STUB
+chmod +x "$CYG/cygpath"
+export PATH="$CYG:$BIN:$SYS"
+unset LOCALAPPDATA OPEN_TERMINAL_LAUNCHER_DIR 2>/dev/null || true
+# Pinned, so the assertions do not depend on where this host keeps Git; and the
+# host's real mintty is pointed away from, or the no-wt case opens a window.
+export OPEN_TERMINAL_GITBASH='C:\Git\bin\bash.exe'
+export OPEN_TERMINAL_MINTTY="$R/no-such-mintty"
+# The launcher's command is POSIX — `cd … && claude "/cycle N"` — which
+# PowerShell cannot run, so it runs under Git Bash. wt.exe records MSYS2_ARG_CONV_EXCL too: without it MSYS rewrites the
+# arguments it passes to a native program.
+cat > "$BIN/wt.exe" <<STUB
+#!/usr/bin/env bash
+printf '%s' "\${@: -1}" > "$REC/launcher"
+printf 'wt.exe %s CONV=%s\n' "\$*" "\${MSYS2_ARG_CONV_EXCL:-}" >> "$REC/calls"
+STUB
+chmod +x "$BIN/wt.exe"
+for s in powershell.exe pwsh.exe; do mkstub "$s"; done
 out="$(run --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
 has  "Windows Terminal is used when present" "$out" "wt.exe"
+has  "  ... running Git Bash, not PowerShell" "$out" 'C:\Git\bin\bash.exe -l '
+hasnt "  ... never PowerShell" "$out" "powershell"
+hasnt "  ... nor pwsh" "$out" "pwsh"
+has  "  ... with MSYS path conversion off for the call" "$out" "CONV=*"
+# wt.exe re-parses its command line (quotes and `;` are significant), so it
+# gets a file path, never the command.
+hasnt "  ... handing it a file, never the command string" "$out" "/cycle 184"
+has  "  ... whose file holds the command, quotes intact" "$(cat "$(launcher)" 2>/dev/null)" 'claude "/cycle 184"'
+# wt.exe re-tokenises its command line, so the path it gets has no space.
+has  "  ... given by its 8.3 form when TMPDIR has a space" "$(cat "$REC/launcher")" "C:/R/TMPDIR~1/open-terminal."
+drop_launcher
 hasnt "  ... and without --tab it opens a window, not a tab" "$out" " nt "
 out="$(run --tab --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
 has  "  ... while --tab asks Windows Terminal for a tab" "$out" " nt "
+drop_launcher
+
+# No 8.3 names: the launcher goes to a directory whose Windows form has no space.
+: > "$R/no-short-names"
+mkdir -p "$R/launchers" "$R/appdata"
+OPEN_TERMINAL_LAUNCHER_DIR="$R/launchers" run --cwd "$WORK" --title T -- 'x' >/dev/null
+has  "with no 8.3 names, wt gets a launcher in OPEN_TERMINAL_LAUNCHER_DIR" "$(cat "$REC/launcher")" "C:/R/launchers/open-terminal."
+has  "  ... which holds the command" "$(cat "$(launcher)" 2>/dev/null)" 'x'
+drop_launcher
+LOCALAPPDATA='C:\R\appdata' run --cwd "$WORK" --title T -- 'x' >/dev/null
+has  "  ... else in LOCALAPPDATA" "$(cat "$REC/launcher")" "C:/R/appdata/open-terminal."
+drop_launcher
+bash "$S" --cwd "$WORK" -- 'x' >/dev/null 2>"$R/err"; rc=$?
+chk  "  ... and with neither, it refuses" "$rc" 1
+has  "  ... naming the setting that fixes it" "$(cat "$R/err")" "OPEN_TERMINAL_LAUNCHER_DIR"
+chk  "  ... and leaves no launcher file behind" "$(launchers_left)" 0
+rm -f "$R/no-short-names"
 
 rm -f "$BIN/wt.exe"
-mkstub 'cmd.exe'
+cat > "$BIN/mintty" <<STUB
+#!/usr/bin/env bash
+printf '%s' "\${@: -1}" > "$REC/launcher"
+printf 'mintty %s\n' "\$*" >> "$REC/calls"
+STUB
+chmod +x "$BIN/mintty"; export OPEN_TERMINAL_MINTTY="$BIN/mintty"
 out="$(run --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
-has  "without Windows Terminal, a new window comes from cmd start" "$out" "cmd.exe /c start"
-# `start` takes its first quoted argument as the window title, so the empty ""
-# is load-bearing: without it the shell is swallowed and nothing launches.
-has  "  ... keeping start's empty title argument" "$out" 'start  pwsh.exe'
+has  "without Windows Terminal, Git Bash's own mintty opens the window" "$out" "mintty -t T --dir"
+has  "  ... running the launcher under bash" "$out" "/usr/bin/bash -l "
+has  "  ... whose file holds the command" "$(cat "$(launcher)" 2>/dev/null)" 'claude "/cycle 184"'
+drop_launcher
 
-rm -f "$BIN/pwsh.exe" "$BIN/powershell.exe"
+export OPEN_TERMINAL_MINTTY="$R/no-such-mintty"
 bash "$S" --cwd "$WORK" -- 'x' >/dev/null 2>"$R/err"; rc=$?
-chk "no PowerShell at all refuses rather than silently doing nothing" "$rc" 1
-has  "  ... naming what it looked for" "$(cat "$R/err")" "pwsh.exe or powershell.exe"
+chk "no terminal at all refuses rather than silently doing nothing" "$rc" 1
+has  "  ... naming what it looked for" "$(cat "$R/err")" "wt.exe, or Git Bash's mintty"
+chk  "  ... and leaves no launcher file behind" "$(launchers_left)" 0
+
+# --- Git Bash discovery, with no OPEN_TERMINAL_GITBASH ---------------------------
+# The window runs Git's bin\bash.exe in the Git root `cygpath -w /` names.
+unset OPEN_TERMINAL_GITBASH
+cat > "$BIN/wt.exe" <<STUB
+#!/usr/bin/env bash
+printf '%s' "\${@: -1}" > "$REC/launcher"
+printf 'wt.exe %s CONV=%s\n' "\$*" "\${MSYS2_ARG_CONV_EXCL:-}" >> "$REC/calls"
+STUB
+chmod +x "$BIN/wt.exe"
+
+: > "$GR/bin/bash.exe"
+out="$(run --cwd "$WORK" --title T -- 'x')"
+has  "Git Bash is bin\\bash.exe in the Git root cygpath names" "$out" \
+     'C:\Program Files\Git\bin\bash.exe -l '
+drop_launcher
+rm -f "$GR/bin/bash.exe"
+out="$(run --cwd "$WORK" --title T -- 'x')"
+has  "  ... and the bash on PATH when that root has none" "$out" "$SYS/bash -l "
+drop_launcher
+
+export PATH="$BIN:$SYS"
+bash "$S" --cwd "$WORK" -- 'x' >/dev/null 2>"$R/err"; rc=$?
+chk "with no cygpath to ask, no Git Bash is found and nothing opens" "$rc" 1
+has  "  ... naming where it looked" "$(cat "$R/err")" \
+     'looked at OPEN_TERMINAL_GITBASH, bin\bash.exe under `cygpath -w /`, and bash on PATH'
+chk  "  ... and leaves no launcher file behind" "$(launchers_left)" 0
+rm -f "$BIN/wt.exe"
+export OPEN_TERMINAL_MINTTY="$BIN/mintty"
+out="$(run --cwd "$WORK" --title T -- 'x')"
+has  "mintty opens without a Git Bash path, since it runs /usr/bin/bash" "$out" "mintty -t T --dir"
+drop_launcher
+unset OPEN_TERMINAL_GITBASH OPEN_TERMINAL_MINTTY
 
 # -------------------------------------------------------------------- macos ----
 #
 # No Ghostty: the fallback must run the command under zsh.
 set_uname 'Darwin'
-# The script uses /bin/zsh when it exists and bash otherwise, by absolute path,
-# so assert the shell this host should get.
-MAC_SH=bash; [ -x /bin/zsh ] && MAC_SH=zsh
 # Point the Ghostty check at a path that does not exist. On a machine that has
 # Ghostty installed, the no-Ghostty fallback — the branch the zsh default lives
 # in — is otherwise unreachable, and this assertion silently tested the
 # developer's own install instead.
 export OPEN_TERMINAL_GHOSTTY_APP="$R/no-such-Ghostty.app"
+# And a zsh that exists, since the host may have none at /bin/zsh (Linux CI,
+# Windows) — the case is "a Mac", not "this machine".
+mkstub zsh; export OPEN_TERMINAL_ZSH="$BIN/zsh"
+MAC_SH=zsh
 out="$(run --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
 has  "macOS with no Ghostty falls back to Terminal.app" "$out" "open -a Terminal"
 # The launcher is a temp file; read the one the stub was handed.
@@ -146,12 +258,14 @@ unset TERM_PROGRAM
 
 # -------------------------------------------------------------------- linux ----
 #
-# Unchanged: bash is correct here, and a platform with no emulator still fails.
+# bash is correct here, and a platform with no emulator fails.
 set_uname 'Linux'
 export TERMINAL=wezterm
 out="$(run --cwd "$WORK" --title T -- 'claude "/cycle 184"')"
 has  "Linux still runs the command under bash" "$out" "bash -lc"
 unset TERMINAL
+
+chk "the suite leaves no launcher file behind" "$(launchers_left)" 0
 
 printf '\nopen-terminal: %s\n' \
   "$([ $FAILED = 0 ] && echo 'all checks passed.' || echo 'FAILURES above.')"

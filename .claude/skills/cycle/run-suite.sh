@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # run-suite.sh — start a long command, poll it, read a bounded tail. One stove.
 #
-# Exists because of two measured facts (evidence-run2 F1):
+# Exists because of two facts:
 #
 #   * An agent is killed after 600s without progress, and the progress clock is
 #     time between *tool results*. A single Bash call that blocks for the whole
-#     of `flutter test` therefore dies — three agents were killed this way, one
-#     of them the salvage agent sent to recover the first.
-#   * The full suite takes 2m39s solo at 343% CPU. Three fan-out clones running
-#     it at once each stretch to roughly eight minutes, which is how a 600s limit
-#     gets crossed without anything being wrong.
+#     of `flutter test` therefore dies, and so does any agent sent to recover
+#     it the same way.
+#   * A full suite is CPU-bound. Fan-out clones running it at once each stretch
+#     several-fold, which is how a 600s limit gets crossed without anything
+#     being wrong.
 #
 # So: `start` returns immediately, `check` is one quick call the agent can make
 # as often as it likes, and each check resets the progress clock. The waiting is
 # still real — it just stops looking like a hang.
 #
 # The lock is the second half. Under a fan-out every clone shares one machine, so
-# only one full suite runs at a time; the others queue. Three eight-minute
-# fights become three two-and-a-half-minute turns, and nothing starves.
+# only one full suite runs at a time; the others queue. Contended runs become
+# short turns, and nothing starves.
 #
 #   run-suite.sh start  <name> -- flutter test
 #   run-suite.sh check  <name> [--lines N]
@@ -25,14 +25,14 @@
 #   run-suite.sh log    <name>                 # full path to the output
 #
 # `check` exits 0 done-and-passed, 2 done-and-failed, 3 still running or queued.
-# Output is bounded by default: the suite prints ~18,800 lines / 2.1 MB, and no
-# agent needs that in its context to learn that 3,591 tests passed.
+# Output is bounded by default: a suite prints thousands of lines, and no agent
+# needs them in its context to learn that the tests passed.
 #
 # Three exit states, not two — **do not poll with a boolean.** Shell treats every
 # non-zero alike, so `until ! run-suite.sh check <name>` exits *immediately*: 3
 # means still running, `!` makes that true, and "still running" becomes the stop
-# condition. An orchestrator wrote exactly that in fan-out 6 and reported a suite
-# as finished with ~70s left on it. A pipeline hides the same thing the other
+# condition, and a suite reads as finished while it is still running. A
+# pipeline hides the same thing the other
 # way: under `set -o pipefail`, `check | grep -q PASS` returns check's 3 rather
 # than grep's verdict. Branch on the code:
 #
@@ -62,6 +62,7 @@ case "$CMD_NAME" in ''|-h|--help) usage 0 ;; esac
 case "$NAME" in *[!A-Za-z0-9._-]*) die "name may only contain letters, digits, . _ -" ;; esac
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "not in a git repo"
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MARKER="$ROOT/agent_states/.fanout-clone"
 STATE="$ROOT/agent_states/suite/$NAME"
 
@@ -151,6 +152,13 @@ check|wait)
     printf 'run-suite: %s — %s in %ss\n' "$NAME" "$([ "$rc" = 0 ] && echo PASSED || echo "FAILED (exit $rc)")" "$el"
     tail -n "$LINES" "$STATE/out" 2>/dev/null
     [ "$rc" = 0 ] || printf '\nFull output: %s\n' "$STATE/out"
+    # A partial checkout (sparse_clones) fails a build on a file outside its set,
+    # and the tool's error can name something else entirely. Say the checkout is
+    # partial, and name each tracked path in the output that is not on disk.
+    if [ "$rc" != 0 ] && [ "$(git -C "$ROOT" config --get core.sparseCheckout 2>/dev/null)" = true ]; then
+      printf '\nThis checkout is partial; its set: git sparse-checkout list\n'
+      (cd "$ROOT" && python3 "$HERE/sparse-set.py" outside --log "$STATE/out") 2>/dev/null
+    fi
     [ "$rc" = 0 ] && exit 0 || exit 2
   elif [ -f "$STATE/started_at" ]; then
     printf 'run-suite: %s — RUNNING for %ss\n' "$NAME" "$(( now - $(cat "$STATE/started_at") ))"

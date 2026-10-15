@@ -1,6 +1,6 @@
 ---
 name: ac-audit-rubric
-description: The verify agent's AC → test coverage audit rubric. Six attack vectors, five verdicts, the coverage-matrix output format. Mirrors the test-rubric (5.4.1) checks from the auditor's perspective — instead of self-iteration, this rubric produces verdicts an independent reviewer assigns to existing tests.
+description: Rubric the verify agent uses to audit acceptance-criteria test coverage.
 disable-model-invocation: true
 ---
 

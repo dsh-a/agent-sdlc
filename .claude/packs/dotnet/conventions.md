@@ -1,9 +1,7 @@
 <!--
-PACK REFERENCE FILE — the `dotnet` pack's conventions.
-This is the source-of-truth copy for the default .NET pack. The ACTIVE conventions
-agents load live in `.claude/skills/project-conventions/SKILL.md`; `/setup` copies this
-file's body into that skill when the dotnet pack is selected. Keep the two in sync, or
-treat this as the canonical version and re-run `/setup` after editing.
+PACK FILE (pack: dotnet) — starter text for a project's conventions.
+`/setup` offers it for the project's instruction file (`CLAUDE.md`, `AGENTS.md`); the
+project's copy is what agents follow.
 -->
 
 # .NET Conventions (pack: dotnet)

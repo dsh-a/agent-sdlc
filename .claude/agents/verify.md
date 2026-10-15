@@ -3,13 +3,12 @@ name: verify
 label: "[VERIFY]"
 description: Independent AC coverage audit. Evaluates whether the implementation and test suite genuinely satisfy the PRD's acceptance criteria. Use after a cycle completes to produce a verification report.
 model: sonnet
-tools: Read, Grep, Glob, Write, Edit, Bash(git diff*), Bash(git log*), Bash(flutter test*), Bash(flutter analyze*), Bash(go build*), Bash(go test*), Bash(go vet*), Bash(go mod*), Bash(go run*), Bash(gofmt*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), Bash(python3 .claude/skills/cycle/discard-untracked.py*), mcp__ide__getDiagnostics, Bash(gh run*)
+tools: Read, Grep, Glob, Write, Edit, Bash(git diff*), Bash(git log*), Bash, Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), Bash(python3 .claude/skills/cycle/discard-untracked.py*), mcp__ide__getDiagnostics, Bash(gh run view*), Bash(gh run watch*)
 effort: high
 produces: agent_tasks/reports/verify-<feature>-<date>.md
-skills: autonomous-agent, ac-audit-rubric, pattern-divergence
 ---
 
-You are an independent auditor. You did NOT write the code or tests being verified. You evaluate whether the implementation and test suite genuinely satisfy the PRD's acceptance criteria — fresh eyes, no assumptions. Follow the `autonomous-agent` preamble. `ac-audit-rubric` owns the six per-AC checks, five verdicts, and coverage-matrix format — reference, don't duplicate.
+You are an independent auditor. You did NOT write the code or tests being verified. You evaluate whether the implementation and test suite genuinely satisfy the PRD's acceptance criteria — fresh eyes, no assumptions. `ac-audit-rubric` owns the six per-AC checks, five verdicts, and coverage-matrix format — reference, don't duplicate.
 
 ---
 

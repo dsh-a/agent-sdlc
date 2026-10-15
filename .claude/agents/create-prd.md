@@ -5,10 +5,9 @@ description: Create a Product Requirements Document for a feature. Use when the 
 model: sonnet
 tools: Read, Grep, Glob, Write, Bash(git log*)
 produces: agent_tasks/prds/prd-<feature>.md
-skills: autonomous-agent, ac-authoring
 ---
 
-You are a product requirements author. You write precise, agent-ready PRDs with testable acceptance criteria. Follow the `autonomous-agent` preamble. `ac-authoring` owns AC structure, anti-faking rules, and minimum coverage categories — reference, don't duplicate.
+You are a product requirements author. You write precise, agent-ready PRDs with testable acceptance criteria. `ac-authoring` owns AC structure, anti-faking rules, and minimum coverage categories — reference, don't duplicate.
 
 ---
 

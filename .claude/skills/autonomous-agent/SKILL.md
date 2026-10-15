@@ -1,6 +1,6 @@
 ---
 name: autonomous-agent
-description: Shared preamble for autonomous Phase-3 agents — autonomy rules, file-I/O rules, LSP-first code intelligence, ast_grep/ast_edit for structural edits, irc whisper handling, contradiction-exit emission. Loaded by test, ui-story, scaffold, verify, review, create-prd, generate-tasks, self-improve, supervisor, test-preflight.
+description: Shared preamble for agents spawned by /cycle: autonomy, file I/O, code intelligence, whispers. Autoloaded by omp agents.
 disable-model-invocation: true
 ---
 
@@ -23,11 +23,10 @@ You are an autonomous agent spawned by the `/cycle` orchestrator. The rules belo
 
 ## Skill resolution
 
-Your agent prompt names skills to load (`test-rubric`, `project-conventions`, and so on). How
-they reach you differs by harness: omp autoloads them from `autoloadSkills:`, while a Claude
-Code subagent gets no autoload and must read the file itself. Assume nothing is preloaded.
+The harness loads the skills your agent definition lists into your context. Your prompt may
+name one that is not there.
 
-To load a named skill, read the first path that exists, in this order:
+To load a named skill that is not in your context, read the first path that exists, in this order:
 
 1. `.claude/skills/<name>/SKILL.md` — relative to your working directory (a Phase-3 worktree
    usually does **not** have this; try it anyway, a deployment may symlink it in)
@@ -47,6 +46,8 @@ it was unreachable and which one.
 
 ## Code intelligence (LSP-first)
 
+This section applies when your harness gives you the tools it names; otherwise use the search and edit tools you have.
+
 When you need to find definitions, references, or rename symbols, prefer the **`lsp`** tool over `grep`:
 - `lsp(action: "definition", ...)` — jump to a symbol's definition (more accurate than grepping for the name).
 - `lsp(action: "references", ...)` — find all call sites of a symbol (catches shadowed names grep misses).
@@ -62,7 +63,7 @@ For structural code search and codemods (pattern-based, not text-based), prefer 
 
 ## Whisper handling (Phase-3 implementation agents)
 
-If your role implements code in a worktree (`test`, `ui-story`, `scaffold`, `coding`), supervisor whispers arrive via **irc** as `irc:incoming` turns at your next step boundary — no file polling. Drain your irc inbox (`irc(op: "inbox")`) between sub-tasks and major steps to catch any pending whispers. `pause`-severity whispers are binding; `note` and `strong` are advisory. Report whispers seen and your response in your final summary. Full protocol: `whispers` skill.
+If your role implements code in a worktree (`test`, `ui-story`, `scaffold`, `coding`), supervisor whispers reach you over the transport the `whispers` skill gives for your harness. Under omp they arrive via **irc** as `irc:incoming` turns: drain your inbox (`irc(op: "inbox")`) between sub-tasks and major steps. Under Claude Code, poll `agent_states/whispers/<agent-id>.md` at the same points. `pause`-severity whispers are binding; `note` and `strong` are advisory. Report whispers seen and your response in your final summary. Full protocol: `whispers` skill.
 
 Non-implementation agents (`verify`, `review`, `create-prd`, `generate-tasks`, `self-improve`, `monitor`, `supervisor`, `test-preflight`) do not receive whispers — they run too briefly or have orthogonal responsibilities.
 

@@ -1,20 +1,13 @@
 #!/usr/bin/env python3
 """suite-result — learn whether the suite passed without reading the suite.
 
-Measured, v0 run 2: the orchestrator ran
+A suite run as `flutter test ... 2>&1 | tail -5` puts its full output in the
+agent's context anyway: the `tail` bounds nothing, because the harness captures
+the command's whole output regardless of what the pipeline does with it.
 
-    flutter test test/ui/setup/ --reporter compact 2>&1 | tail -5
-
-and **22,819 characters** entered its context. The `tail -5` bounded nothing —
-the harness captures the command's full output regardless of what the pipeline
-does with it. It did this twice, ~11k tokens, to learn that 81 tests passed.
-Across that run, tool output was 52.6% of everything that accumulated in the
-orchestrator's transcript, and this was its largest single contributor.
-
-`run-suite.sh` already solved half of this: it captures to a file and `check`
-prints a bounded tail. But a tail is still prose, it still scales with the
-reporter's verbosity, and nothing stops an agent running the bare command
-instead — which is exactly what happened. This closes the other half:
+`run-suite.sh` captures to a file and `check` prints a bounded tail. But a tail
+is still prose, it still scales with the reporter's verbosity, and nothing stops
+an agent running the bare command instead. This closes the other half:
 
   * **The command's output never reaches stdout.** It goes to a file; one line
     comes back. There is nothing for a harness to expand.
@@ -32,7 +25,8 @@ instead — which is exactly what happened. This closes the other half:
 each other's runs: start a suite with `run-suite.sh start`, read its verdict
 with `suite-result.py check`.
 
-Exit 0 passed, 2 failed, 3 still running, 4 finished but unparseable, 1 usage.
+Exit 0 passed, 2 failed, 3 still running, 4 finished but unparseable, 1 usage
+or, on Windows, no Git Bash to run the command with.
 
 **4 is not 2.** If the patterns do not match, this reports `UNPARSED` and the
 raw exit code rather than inferring a verdict from it. A suite that exits 0
@@ -45,11 +39,15 @@ measurement, and that is what the distinct code is for.
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import re
 import subprocess
 import sys
 import time
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+from git_bash import GitBashNotFound, git_bash  # noqa: E402
 
 DEFAULT_MAX_FAILURES = 15
 
@@ -236,6 +234,13 @@ def cmd_run(args: argparse.Namespace, root: pathlib.Path,
         print("suite-result: no command given after --", file=sys.stderr)
         return 1
 
+    # A suite command is POSIX shell: Git Bash on Windows, /bin/sh elsewhere.
+    try:
+        bash = git_bash()
+    except GitBashNotFound as e:
+        print(f"suite-result: {e}", file=sys.stderr)
+        return 1
+
     sd = state_dir(root, args.name)
     sd.mkdir(parents=True, exist_ok=True)
     log = sd / "out"
@@ -244,7 +249,8 @@ def cmd_run(args: argparse.Namespace, root: pathlib.Path,
     with log.open("w", encoding="utf-8", errors="replace") as fh:
         # Output goes to the file, never to our stdout. This is the line that
         # keeps 22,819 characters out of a context window.
-        proc = subprocess.run(" ".join(args.command), shell=True,
+        cmd = " ".join(args.command)
+        proc = subprocess.run([bash, "-c", cmd] if bash else cmd, shell=bash is None,
                               stdout=fh, stderr=subprocess.STDOUT, cwd=root)
     elapsed = int(time.time() - began)
     (sd / "rc").write_text(f"{proc.returncode}\n", encoding="utf-8")
