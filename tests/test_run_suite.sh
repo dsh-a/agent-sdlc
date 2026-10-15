@@ -14,7 +14,8 @@ ok() { printf 'ok    %s\n' "$1"; }
 bad() { printf 'FAIL  %s\n     %s\n' "$1" "${2:-}"; FAILED=1; }
 chk() { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1" "want [$3] got [$2]"; fi; }
 
-R="$(mktemp -d)"; git init -q "$R"; cd "$R"
+# The roots have a space, as a Windows profile path can, so every path below does.
+R="$(mktemp -d)/with space"; git init -q "$R"; cd "$R"
 
 # start must return immediately even for slow work.
 t0=$(date +%s)
@@ -38,8 +39,8 @@ chk "  ... and exits 3 for not-finished" "$rc" 3
 # `case` on a command substitution, not `check | grep -q`: this file runs with
 # `pipefail`, so that pipeline takes check's exit 3 rather than grep's 0 and the
 # `&& break` never fires — the loop then outlives the 8s job and asserts RUNNING
-# after it has finished. Same family as the zsh glob in evidence-run2 F2: the
-# test harness's own shell settings changed what the test measured.
+# after it has finished. The harness's own shell settings must not change what
+# the test measures.
 for _ in $(seq 1 40); do
   case "$(bash "$S" check slow 2>&1)" in *RUNNING*) break ;; esac
   sleep 0.25
@@ -67,7 +68,7 @@ chk "failure exits 2" "$rc" 2
 chk "  ... names the exit code" "$(echo "$out" | grep -c 'exit 7')" 1
 chk "  ... and points at the full log" "$(echo "$out" | grep -c 'Full output')" 1
 
-# Output bounding: the real suite prints ~18,800 lines and no agent needs them.
+# Output bounding: a real suite prints thousands of lines and no agent needs them.
 bash "$S" start noisy -- 'for i in $(seq 1 5000); do echo "line $i"; done' >/dev/null 2>&1
 bash "$S" wait noisy --timeout 60 >/dev/null 2>&1
 n="$(bash "$S" check noisy 2>/dev/null | wc -l | tr -d ' ')"
@@ -132,6 +133,31 @@ bash "$S" wait dup --timeout 30 >/dev/null 2>&1
 bash "$S" start dup -- 'echo reused' >/dev/null 2>&1
 bash "$S" wait dup --timeout 30 >/dev/null 2>&1
 chk "a finished name can be reused" "$(bash "$S" check dup 2>&1 | grep -c reused)" 1
+
+# In a partial checkout, a failure that names a tracked file left off disk says
+# so, with the directory to add, rather than reading as a missing file.
+SP="$(mktemp -d)/with space"; git init -q -b develop "$SP/app"
+mkdir -p "$SP/app/src/A" "$SP/app/src/B"
+echo a > "$SP/app/src/A/a.txt"; echo b > "$SP/app/src/B/b.txt"
+git -C "$SP/app" add -A; git -C "$SP/app" -c user.email=t@t -c user.name=t commit -qm i
+git -C "$SP/app" worktree add -q --no-checkout --detach "$SP/slot" develop
+git -C "$SP/slot" sparse-checkout set --cone src/A >/dev/null 2>&1
+git -C "$SP/slot" checkout -q --detach develop
+cd "$SP/slot"
+bash "$S" start sp -- 'echo "error: cannot open src/B/b.txt"; exit 1' >/dev/null 2>&1
+bash "$S" wait sp --timeout 30 >/dev/null 2>&1
+out="$(bash "$S" check sp 2>&1)"; rc=$?
+chk "a failure in a partial checkout names the file outside the set" \
+    "$rc|$(echo "$out" | grep -c 'src/B/b.txt: outside the sparse set; add it with `git sparse-checkout add src/B`')" "2|1"
+chk "  ... and says the checkout is partial" "$(echo "$out" | grep -c 'This checkout is partial')" 1
+bash "$S" start sp-ok -- 'echo "read src/B/b.txt"' >/dev/null 2>&1
+bash "$S" wait sp-ok --timeout 30 >/dev/null 2>&1
+chk "  ... a pass adds nothing" "$(bash "$S" check sp-ok 2>&1 | grep -c 'sparse')" 0
+cd "$SP/app"
+bash "$S" start full -- 'echo "error: cannot open src/B/missing.txt"; exit 1' >/dev/null 2>&1
+bash "$S" wait full --timeout 30 >/dev/null 2>&1
+chk "a failure in a full checkout adds nothing" "$(bash "$S" check full 2>&1 | grep -c 'sparse')" 0
+cd "$R"
 
 [ "$FAILED" = 0 ] && { echo; echo "run-suite: all checks passed."; } || { echo; echo "run-suite: FAILURES"; }
 exit $FAILED

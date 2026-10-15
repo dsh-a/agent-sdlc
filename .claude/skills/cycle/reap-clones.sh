@@ -4,7 +4,8 @@
 # Two subcommands, because end-of-cycle teardown cannot be one action:
 #
 #   finish   run *inside* a clone at Finalize. Deletes regenerable build output
-#            and marks the clone reapable. Does not remove the clone.
+#            (kept in a pool slot, which the next launch reuses warm) and marks
+#            the clone reapable. Does not remove the clone.
 #   sweep    run from anywhere. Removes clones that `finish` marked, after
 #            re-checking that nothing has changed since.
 #
@@ -14,12 +15,12 @@
 # command fails against it. So the cycle shrinks and declares; something outside
 # it removes.
 #
-# Shrinking is where nearly all of the win is. Measured on a fan-out 4 clone:
-# 1.8G total, of which build/ is 1.5G and .dart_tool/ is 270M — the checkout
-# itself is ~30M across 959 tracked files. `finish` reclaims ~98% immediately,
-# from inside, with no worktree removal involved. That is what makes it safe to
-# leave `sweep` human-triggered instead of running a daemon that polls GitHub:
-# the husk left behind is 30M, so nothing is urgent.
+# Shrinking is where nearly all of the win is: build output (`build/`,
+# `.dart_tool/`) is most of a clone, and the tracked checkout a small fraction.
+# `finish` reclaims it immediately, from inside, with no worktree removal
+# involved. That is what makes it safe to leave `sweep` human-triggered
+# instead of running a daemon that polls GitHub: the husk left behind is small,
+# so nothing is urgent.
 #
 # `sweep` is deliberately NOT merge-aware. Whether a PR merged is a fact about
 # the PR, not about the clone — some branches are not merged for a long time and
@@ -29,10 +30,12 @@
 # checkout, never a commit.
 #
 # `sweep` is also not the launcher's reap and does not replace it.
-# start-parallel-cycles.sh removes *every* clone under the root before a run,
-# marked or not, because a cycle that crashed before Finalize leaves an unmarked
-# clone that must not block the next launch. This sweep is the conservative
-# between-runs pass: only what a cycle explicitly declared finished.
+# start-parallel-cycles.sh resets its pool slots in place and removes every other
+# clone under the root before a run, marked or not, because a cycle that crashed
+# before Finalize leaves an unmarked clone that must not block the next launch.
+# This sweep is the conservative pass that gives disk back: it removes what a
+# cycle explicitly declared finished, pool slots included, and the next launch
+# recreates a removed slot cold.
 #
 #   reap-clones.sh finish                  # inside a clone, at Finalize
 #   reap-clones.sh sweep                   # list what would go, remove nothing
@@ -81,7 +84,14 @@ cmd_finish() {
 
   freed=0
   removed=""
-  for name in $CANDIDATES; do
+  # A pool slot is reset and reused by the next launch; its build output is what
+  # keeps that launch's build incremental, so it stays.
+  CANDS_HERE="$CANDIDATES"
+  if grep -q '^slot=' "$TOP/$FANOUT_MARKER" 2>/dev/null; then
+    say "kept build output: pool slot, reused warm by the next launch"
+    CANDS_HERE=""
+  fi
+  for name in $CANDS_HERE; do
     d="$TOP/$name"
     # Never follow a symlink out of the tree, and never treat a file as a dir.
     [ -d "$d" ] || continue
@@ -127,7 +137,7 @@ cmd_finish() {
     > "$MD/$CLONE.json" || fail "could not write the reapable marker."
 
   say "marked $CLONE reapable ($BR @ ${SHA:0:8})"
-  say "reclaimed $((freed/1024))M; the clone is now a ~30M husk awaiting sweep"
+  say "reclaimed $((freed/1024))M; the clone awaits the next launch or a sweep"
 }
 
 # ---------------------------------------------------------------- sweep
@@ -181,9 +191,8 @@ cmd_sweep() {
     # Accept a descendant, not only an exact match. The marked commit is the
     # cycle's state when it declared itself finished; commits *on top of* it are
     # the same line of work carried forward, and refusing them refuses the normal
-    # case. Measured in fan-out 5 (J3): c1 was skipped because the changelog
-    # fragment lands after Finalize, and two sibling clones committed theirs
-    # before it — same skill, same mode, two orderings.
+    # case: the changelog fragment can land after Finalize or before it — same
+    # skill, same mode, two orderings.
     #
     # An unrelated tree is still refused: --is-ancestor is false for anything
     # that does not descend from the marked commit, which is the property that

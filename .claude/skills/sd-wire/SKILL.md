@@ -21,7 +21,7 @@ Three OMP-native mechanisms carry the framework:
 
 | Piece | Mechanism | What it delivers |
 |---|---|---|
-| **Skills** | `skills.customDirectories` in `.omp/config.yml` | All 25+ skills: `cycle`, `project-conventions`, `test-rubric`, `minimalism`, etc. Discovered at startup alongside project-local skills. First-wins dedup on skill name. |
+| **Skills** | `skills.customDirectories` in `.omp/config.yml` | All 25+ skills: `cycle`, `test-rubric`, `minimalism`, etc. Discovered at startup alongside project-local skills. First-wins dedup on skill name. |
 | **Agents** | Symlink `.omp/agents/` → agent-sdlc `.omp/agents/` | 13 omp-native task agent definitions: `scaffold`, `review`, `test`, `coding`, `ui-story`, `verify`, etc. |
 | **Packs & patterns** | Symlink `.claude/packs/` → agent-sdlc `.claude/packs/` + scaffold pattern symlinks | Flutter conventions, test anti-patterns, scaffold templates (`interface.md`, `use-case.md`, etc.). Agents read these at runtime via `read` tool. |
 
@@ -87,14 +87,14 @@ Copy from an existing wired project and customize:
 - **Docs Vault** — `vault_root` and `app_slug` (or leave empty)
 - **Context Sources** — MCP servers to consult at pipeline stages
 
-The `project-conventions` skill is already populated for Flutter; if using
-a different stack, run `/setup` or copy from `packs/<lang>/conventions.md`.
+Conventions live in the project's instruction file; `/setup` seeds it from
+`packs/<lang>/conventions.md`.
 
 ### 4. Link the framework in
 
 ```bash
 bash /path/to/agent-sdlc/deploy.sh link .
-bash /path/to/agent-sdlc/deploy.sh grants          # paste into .claude/settings.json
+bash /path/to/agent-sdlc/deploy.sh grants --apply . # write the permissions this project lacks
 bash /path/to/agent-sdlc/deploy.sh check .
 ```
 
@@ -192,7 +192,7 @@ cycle — missing, dangling, pointing at a different framework checkout, and sha
 and reports a project-specific scaffold pattern as an override rather than a fault.
 
 Then launch omp from the project root. The system prompt should list discovered skills from both
-agent-sdlc (`cycle`, `project-conventions`, …) and project-local skills, and `/skill:cycle` should
+agent-sdlc (`cycle`, `test-rubric`, …) and project-local skills, and `/skill:cycle` should
 load the orchestrator.
 
 ## How skills resolve
@@ -224,6 +224,6 @@ skill with the same name as one from agent-sdlc, the project-local one wins
 | Skills not discovered | Check `skills.customDirectories` path in `.omp/config.yml` points to agent-sdlc's `.claude/skills/`. The directory must contain `*/SKILL.md` subdirectories. |
 | Agents not spawning | Verify `.omp/agents/` symlink resolves. Check agent `.md` files have `name` + `description` frontmatter. |
 | Scaffold agent can't find patterns | Verify `.claude/agents/scaffold/` has the symlinked pattern files. The agent reads them at runtime. |
-| `project-conventions` feels wrong | The skill is pre-populated for Flutter. For other stacks, run `/setup` or manually edit agent-sdlc's `.claude/skills/project-conventions/SKILL.md`. |
+| Conventions feel wrong | They live in the project's instruction file. Edit it there, or run `/setup` to seed it from the pack. |
 | Model not found | Check `modelRoles` in `.omp/config.yml` match your `~/.omp/agent/models.yml`. |
 | Symlink broken after moving agent-sdlc | Re-run steps 4–5 with the new path. Symlinks are absolute. |

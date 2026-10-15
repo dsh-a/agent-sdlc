@@ -16,7 +16,7 @@ sibling file contains the comment *"this comment exists so a future reader of th
 migration does not conclude it was missed."*
 
 That is the gap this skill fills. Every rule here is about **how a fact was obtained**,
-not about what the fact was. `project-conventions` owns what the code should look like;
+not about what the fact was. The project's conventions own what the code should look like;
 `ac-audit-rubric` owns whether an AC is covered; this owns whether you actually know.
 
 ---
@@ -210,6 +210,9 @@ Three invariants, each one a failure class:
   `guarded-edit`, not after an abort.
 - `guarded-edit` **checks by default**; `--apply` writes. Every anchor's count is taken
   against the original bytes before any substitution, so a batch cannot half-apply.
+  Anchors match with line endings normalised to `\n`; on write every line keeps its own
+  ending, and a line an edit adds takes the ending of the line it replaces (or of the line
+  it sits in), so a mixed-ending file changes only where the edit does.
 - `tables` reports two fault kinds. `fault=cells` is an unambiguous structural mismatch.
   `fault=pipe-run` is the observed defect's shape — a run of two or more consecutive
   escaped pipes whose raw pipe count disagrees with the header. A single `\|` in a cell and

@@ -1,6 +1,6 @@
 ---
 name: minimalism-review
-description: Over-engineering review lens for the review agent. Scans a diff for what to delete — reinvented stdlib, needless dependencies, speculative abstractions, dead flexibility — with a fixed tag vocabulary and a net-lines score. Complements correctness/security review; it only hunts complexity. Language-neutral. Loaded by the review agent as a sub-step of Code quality.
+description: Over-engineering lens for the review agent: what a diff can delete.
 disable-model-invocation: true
 ---
 
@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 Review the diff for unnecessary complexity only. The diff's best outcome is getting shorter. One line per finding: location, what to cut, what replaces it.
 
-This is the review-time mirror of the `minimalism` ladder the implementers build under. Same instinct, opposite direction: the ladder stops code being written; this catches what slipped through. Concrete idioms (which stdlib call, which native feature) come from `project-conventions` and the active pack.
+This is the review-time mirror of the `minimalism` ladder the implementers build under. Same instinct, opposite direction: the ladder stops code being written; this catches what slipped through. Concrete idioms (which stdlib call, which native feature) come from the project's conventions and the active pack.
 
 ---
 
@@ -27,7 +27,7 @@ Tags:
 ## Hunt
 
 - Dependencies added to (or already in) the manifest doing what stdlib/platform ships.
-- Single-implementation interfaces and abstract types that aren't a required layer seam (`project-conventions` mandates interfaces at layer boundaries — those are *not* findings; an abstract type with one impl and one caller inside a layer *is*).
+- Single-implementation interfaces and abstract types that aren't a required layer seam (the project's conventions mandate interfaces at layer boundaries — those are *not* findings; an abstract type with one impl and one caller inside a layer *is*).
 - Factories with one product, wrappers that only delegate, files/modules exporting one thing.
 - Dead flags, unread config, hand-rolled loops that are one standard collection call.
 - A copy/`with` / clone helper re-implemented by hand where the generated or existing one exists.

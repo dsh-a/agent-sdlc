@@ -1,9 +1,7 @@
 <!--
-PACK REFERENCE FILE — not a live skill.
-This is the `flutter` language pack's conventions, kept as a worked example for
-authoring new packs. The ACTIVE conventions the agents load live in
-`.claude/skills/project-conventions/SKILL.md`. To make Flutter the active pack,
-copy this file's body into that skill (see `.claude/packs/README.md`).
+PACK FILE (pack: flutter) — starter text for a project's conventions.
+`/setup` offers it for the project's instruction file (`CLAUDE.md`, `AGENTS.md`); the
+project's copy is what agents follow.
 -->
 
 # Flutter Conventions (pack: flutter)

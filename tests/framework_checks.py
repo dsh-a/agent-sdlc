@@ -17,6 +17,8 @@ import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / ".claude/skills/cycle"))
+import git_bash  # noqa: E402
 SCAFFOLD_DIR = ROOT / ".claude/agents/scaffold"
 PACKS_DIR = ROOT / ".claude/packs"
 
@@ -195,9 +197,8 @@ def check_falsification_contract() -> list[str]:
     # mutation verify made. In a fan-out clone `review` runs concurrently in the
     # same checkout and its Step 6 fixes live in the working tree by design, so a
     # git restore of a file review has fixed destroys it silently and neither agent
-    # can tell. Fan-out 7 measured the near miss: verify mutated two model files
-    # while review had a third modified. Verify also holds no `git checkout` grant,
-    # so that route was only ever reaching through a project-level allow.
+    # can tell. Verify also holds no `git checkout` grant, so that route reaches
+    # only through a project-level allow.
     for harness in (".claude", ".omp"):
         f = ROOT / harness / "agents/verify.md"
         body = f.read_text(encoding="utf-8")
@@ -229,18 +230,9 @@ PHASE3_PERMISSIONS = (
     ("Bash(git commit", "commit its own work"),
     ("Bash(git log", "the mandated base check `git log --oneline -3` before it touches anything"),
     ("Bash(git diff", "see what it changed before reporting it"),
-    ("Bash(flutter pub run build_runner", "regenerate rather than hand-edit a generated file, "
-                                          "which the project rules forbid outright"),
-    ("Bash(dart format", "run the **Format** command from § Project Commands, which `commands.md` calls part "
-                         "of an implementation agent's Definition of Done and CI enforces with "
-                         "`--set-exit-if-changed`. No implementation agent held it until fan-out 8, "
-                         "where one spent 101 denied calls trying to `sed` the grant into its own "
-                         "definition — the second time this list drifted from what the pipeline "
-                         "instructs, and the reason to add a row here whenever Project Commands "
-                         "gains one"),
     ("Bash(bash .claude/skills/cycle/run-suite.sh start", "start a long command without blocking on it — "
                                                     "the alternative is being killed by the 600s "
-                                                    "watchdog mid-test-run (evidence-run2 F1)"),
+                                                    "watchdog mid-test-run"),
 )
 
 
@@ -274,13 +266,11 @@ def check_gate_issue_summary() -> list[str]:
     """The lean gate must carry a labelled, two-part issue summary.
 
     The reader approves AC derived from an issue body they would otherwise leave
-    the terminal to open — five times over, under a fan-out. Round 9 ran the
-    prose version of this rule four times: all four wrote issue context next to
-    the prompt, only two labelled it, and one gave the staleness half without
-    ever restating the ask. Each element below is what made the difference
-    between those outcomes, so each is pinned: a tidier rewrite that drops the
-    heading makes the rule unmeasurable, and dropping either numbered part is
-    exactly the failure observed.
+    the terminal to open — five times over, under a fan-out. Without each
+    element below the summary goes unlabelled, or gives the staleness half
+    without restating the ask, so each is pinned: a tidier rewrite that drops the
+    heading makes the rule unmeasurable, and dropping either numbered part loses
+    half the summary.
     """
     problems: list[str] = []
     f = ROOT / ".claude/skills/cycle/SKILL.md"
@@ -304,16 +294,14 @@ def check_story_declared_depth() -> list[str]:
     """Depth is declared once, on the story, and never picked silently.
 
     `--mode` is a launch-time flag holding one value; blast radius is a fact about
-    the issue. Every fan-out through round 11 therefore ran `--mode lean` for all
-    five clones — not a judgement, just the only setting that did not park each
-    orchestrator on a question. Fan-out 4 is what that cost: two regressions
-    traceable to lean's inline AC, with `verify` reporting 11/11 because it audits
-    coverage of *stated* criteria and cannot see one nobody stated.
+    the issue. A launch-wide mode applies one depth to every clone, whatever each
+    story needs, and a story run too lean ships regressions `verify` cannot see:
+    it audits coverage of *stated* criteria, not of one nobody stated.
 
     Three pieces have to stay joined for the fix to hold, so each is pinned:
     `/refine` writes the field, `/cycle` reads it before Phase 1A, and the
     launcher refuses a gap rather than letting N sessions discover it one at a
-    time. Any one of them silently defaulting restores the original failure.
+    time. Any one of them silently defaulting puts depth back on a guess.
     """
     problems: list[str] = []
     for rel, frags in (
@@ -385,12 +373,11 @@ def check_refine_restates_the_story() -> list[str]:
 def check_phase3_permissions() -> list[str]:
     """Every Phase-3 agent can run what Phase 3 tells it to run.
 
-    Fan-out 1 found the matrix had been derived from an assumed task shape: the
-    `test` agent held neither `git` nor a toolchain, so it could not run the base
-    check its own protocol mandates, and its work was committed for it. A task
-    needing two toolchains had no home at all. Nothing caught either, because
-    harness parity compares agent *bodies* and frontmatter legitimately differs —
-    so the grants are unguarded unless something like this guards them.
+    The grant matrix follows what each protocol tells the agent to run, not an
+    assumed task shape: a `test` agent without `git` and a toolchain cannot run
+    the base check its own protocol mandates. Harness parity compares agent
+    *bodies*, and frontmatter legitimately differs, so the grants are unguarded
+    unless something like this guards them.
 
     omp agents hold bare `bash` and are unaffected; this is a Claude Code contract.
     """
@@ -405,6 +392,11 @@ def check_phase3_permissions() -> list[str]:
         if not line:
             problems.append(f"agents/{name}.md: no `tools:` frontmatter")
             continue
+        # The project's own commands (test, analyze, format, codegen) run under a
+        # plain `Bash`; the project's permission rules decide which are allowed.
+        if "Bash" not in [i.strip() for i in line[len("tools:"):].split(",")]:
+            problems.append(f"agents/{name}.md: no plain `Bash` — it cannot run the "
+                            f"project's own commands")
         for token, why in PHASE3_PERMISSIONS:
             if token in line:
                 continue
@@ -432,7 +424,22 @@ def check_phase3_permissions() -> list[str]:
             problems.append(f"agents/{name}.md: grant reaches `run-suite.sh wait`, which blocks — "
                             f"grant start/check/log explicitly instead")
 
+    # A `tools:` line names framework commands only. A stack's commands belong to
+    # the project: its § Project Commands table and its permission rules.
+    for f in sorted((ROOT / ".claude/agents").glob("*.md")):
+        line = next((l for l in f.read_text(encoding="utf-8").splitlines()
+                     if l.startswith("tools:")), "")
+        for cmd in re.findall(r"Bash\((\w+)", line):
+            if cmd not in FRAMEWORK_COMMANDS:
+                problems.append(f"agents/{f.name}: `tools:` names `{cmd}`, a stack or project "
+                                f"command — hold a plain `Bash` instead")
+
     return problems
+
+
+# The commands a `tools:` line may name: git, the GitHub CLI, the runners of
+# framework scripts, and the shell utilities the read-only agents use.
+FRAMEWORK_COMMANDS = {"git", "gh", "bash", "python3", "ls", "wc", "du", "touch", "date"}
 
 
 # The tiers Claude Code's Agent tool accepts for `model:`. A label outside this set
@@ -663,19 +670,13 @@ def check_sync_cache_cannot_be_committed() -> list[str]:
     """`.claude/skills/synced/` must be ignored, not merely untracked.
 
     It is Claude Code's skill-sync cache: UUID-named buckets, per-machine, and
-    meaningless in another checkout. `deploy.sh` § manifest already refuses to
-    *deploy* it — the manifest skips any skill directory git does not track, and
-    that guard is the reason `check` stopped reporting "1 missing" forever.
+    meaningless in another checkout. `deploy.sh` § manifest refuses to *deploy*
+    it — the manifest skips any skill directory git does not track.
 
-    But the guard is keyed on trackedness, and nothing stopped the directory from
-    being tracked. It held **218 files**, so one `git add -A` or one IDE
-    "stage all" committed the lot, and the manifest would then have started
-    linking a per-machine cache into every project. Twice in one session a
-    `git add -A` had to be unwound by hand.
-
-    Same shape as `docs/personal/` in the same file, which sat
-    untracked-and-unignored until 2026-09-27 — anything put there would have been
-    committed. The fix there was an ignore line; this is the other one.
+    But that guard is keyed on trackedness, and only the ignore line keeps the
+    directory untracked. Without it, one `git add -A` or one IDE "stage all"
+    commits the lot, and the manifest then links a per-machine cache into every
+    project.
     """
     problems: list[str] = []
     gi = ROOT / ".gitignore"
@@ -802,12 +803,12 @@ def check_settings_sample_grants() -> list[str]:
     except Exception as e:                                  # noqa: BLE001
         return [f"settings.json.sample is unreadable: {e}"]
 
-    r = subprocess.run(["bash", str(ROOT / "deploy.sh"), "grants"],
+    r = subprocess.run([git_bash.bash(), (ROOT / "deploy.sh").as_posix(), "grants"],
                        capture_output=True, text=True, cwd=ROOT)
     if r.returncode != 0:
         return [f"deploy.sh grants failed: {r.stderr.strip()[:200]}"]
     want = [m.group(1) for m in re.finditer(r'"(Bash\([^"]+\))",', r.stdout)]
-    have = [g for g in allow if ".claude/skills/" in g]
+    have = [g for g in allow if g.startswith("Bash(")]
 
     # The file rules too. The sample shipped with none, so a project built from it
     # prompted on every PRD, task file, state file and report a cycle wrote — the
@@ -860,7 +861,7 @@ def check_hooks_are_wired() -> list[str]:
                 for h in sorted(shipped - wired)]
     # ... and on every event it handles: `deploy.sh check`'s rule for a project.
     r = subprocess.run(
-        ["bash", "-c", 'eval "$(sed -n \'/^hook_event_gaps() {/,/^}/p\' "$1")"; '
+        [git_bash.bash(), "-c", 'eval "$(sed -n \'/^strip_cr() /p; /^hook_event_gaps() {/,/^}/p\' "$1")"; '
                        'hook_event_gaps "$2" "$3"', "_",
          str(ROOT / "deploy.sh"), str(ROOT / ".claude/hooks"), str(sample)],
         capture_output=True, text=True)
@@ -869,6 +870,70 @@ def check_hooks_are_wired() -> list[str]:
     for line in r.stdout.splitlines():
         name, _, missing = line.partition("\t")
         problems.append(f"{name} is wired in settings.json.sample, but not on: {missing}")
+    return problems
+
+
+def _tracked(*patterns: str) -> list[pathlib.Path]:
+    r = subprocess.run(["git", "ls-files", "--", *patterns], cwd=ROOT,
+                       capture_output=True, text=True)
+    return [ROOT / f for f in r.stdout.splitlines() if (ROOT / f).is_file()]
+
+
+def check_one_bash_lookup() -> list[str]:
+    """Python finds bash through `git_bash.py` alone.
+
+    On Windows a bare "bash" is WSL and `shell=True` is cmd.exe; the helper
+    finds Git Bash or stops. A second lookup is a second set of rules.
+    """
+    problems = []
+    for f in _tracked("*.py"):
+        rel = f.relative_to(ROOT).as_posix()
+        if not rel.startswith((".claude/", "tests/")) or f.name in (
+                "git_bash.py", "test_git_bash.py", "framework_checks.py"):
+            continue
+        src = f.read_text(encoding="utf-8", errors="replace")
+        # A call, not prose: a backticked `shell=True` in a docstring is not one.
+        for bad, why in ((r'which\("bash"\)', "use git_bash.bash()"),
+                         (r'\["bash",', "use git_bash.bash()"),
+                         (r"(?<!`)shell=True", "use git_bash.git_bash(), as suite-result.py does")):
+            if rel.startswith("tests/") and "shell" in bad:
+                continue
+            if re.search(bad, src):
+                problems.append(f"{rel}: {bad} — {why}")
+    return problems
+
+
+def check_one_cr_idiom() -> list[str]:
+    """Shell scripts read Python's output through `strip_cr`, defined identically.
+
+    deploy.sh's comment on `strip_cr` states when it applies. The definition
+    is checked to strip CR and to keep the command's exit status.
+    """
+    problems = []
+    want = None
+    defs = {}
+    for f in _tracked("*.sh"):
+        rel = f.relative_to(ROOT).as_posix()
+        if rel.startswith(("tests/", "docs/")):
+            continue
+        for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
+            if line.startswith("strip_cr() "):
+                defs[rel] = line
+            elif "tr -d '\\r'" in line:
+                problems.append(f"{rel}: tr -d '\\r' outside strip_cr — use strip_cr")
+            if "reconfigure(newline=" in line:
+                problems.append(f"{rel}: stdout reconfigured for LF — use strip_cr")
+    want = defs.get("deploy.sh")
+    if want is None:
+        return problems + ["deploy.sh: no strip_cr definition"]
+    problems += [f"{rel}: strip_cr differs from deploy.sh's" for rel, d in defs.items()
+                 if d != want]
+    r = subprocess.run([git_bash.bash(), "-c",
+                        want + "\nstrip_cr printf 'a\\r\\nb\\r\\n'; "
+                               "strip_cr sh -c 'exit 3'; echo \"rc=$?\""],
+                       capture_output=True, text=True)
+    if r.stdout != "a\nb\nrc=3\n":
+        problems.append(f"strip_cr: want LF lines and the command's status, got {r.stdout!r}")
     return problems
 
 
@@ -892,6 +957,8 @@ ALL_CHECKS = {
     "phase-3 permissions": check_phase3_permissions,
     "model labels": check_model_labels,
     "script dependencies": check_script_dependencies,
+    "one bash lookup": check_one_bash_lookup,
+    "one CR idiom": check_one_cr_idiom,
 }
 
 

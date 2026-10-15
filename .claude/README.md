@@ -21,8 +21,6 @@ discovers agents from `.omp/agents/` (native, priority 100).
     scaffold/          # 26 language-neutral pattern shapes (23 GoF + interface/service/use-case)
       INDEX.md         # routing table — triggers + disambiguation; read this to pick a pattern
   skills/              # skills — see skills/README.md
-    project-conventions/  # ACTIVE stack conventions (loaded by agents)
-    ui-test-patterns/     # ACTIVE UI test patterns (loaded by agents)
     context-sources/      # the MCP/RAG plug-in contract
     cycle/                # the orchestrator (/cycle)
   packs/               # swappable language packs — see packs/README.md
@@ -32,13 +30,12 @@ discovers agents from `.omp/agents/` (native, priority 100).
 ## The two layers
 
 **Core (stack-neutral).** The orchestrator, agents, and most skills carry no language
-assumptions. They read commands, paths, and rules from `.omp/agent-config.md` and load conventions from
-the `project-conventions` skill.
+assumptions. They read commands, paths, and rules from `.omp/agent-config.md` and follow the conventions in
+the project's instruction file.
 
 **Pack (stack-specific).** A pack supplies the conventions, test patterns, anti-patterns, and
-code idioms for one stack. The **active** conventions are loaded deterministically from the
-`project-conventions` skill (via each agent's `skills:` frontmatter); a pack is the
-swappable source you populate that skill from. Default active pack: **flutter**. See
+code idioms for one stack. A project chooses its pack in its own config, and `/setup` seeds the project's
+instruction file and Project Commands from it. Default pack: **flutter**. See
 [`packs/README.md`](packs/README.md).
 
 ## What reads what

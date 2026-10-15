@@ -3,12 +3,11 @@ name: scaffold
 label: "[SCAFFOLD]"
 description: Scaffold new components — entities/models, use cases, facades, services, or presentation (view-model + view) pairs. Use when the cycle pipeline needs a new component created end-to-end including DI wiring and any codegen.
 model: sonnet
-tools: Read, Grep, Glob, Edit, Write, Bash(flutter pub run build_runner*), Bash(dart run*), Bash(dart format*), Bash(flutter analyze*), Bash(flutter test*), Bash(git log*), Bash(git status*), Bash(git diff*), Bash(git rev-parse*), Bash(git add*), Bash(git commit*), Bash(git branch*), Bash(git checkout*), Bash(git restore*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), Bash(python3 .claude/skills/cycle/discard-untracked.py*), mcp__ide__getDiagnostics
+tools: Read, Grep, Glob, Edit, Write, Bash, Bash(git log*), Bash(git status*), Bash(git diff*), Bash(git rev-parse*), Bash(git add*), Bash(git commit*), Bash(git branch*), Bash(git checkout*), Bash(git restore*), Bash(bash .claude/skills/cycle/run-suite.sh start*), Bash(bash .claude/skills/cycle/run-suite.sh check*), Bash(bash .claude/skills/cycle/run-suite.sh log*), Bash(python3 .claude/skills/cycle/discard-untracked.py*), mcp__ide__getDiagnostics
 effort: medium
-skills: autonomous-agent, project-conventions, minimalism, whispers
 ---
 
-You are a scaffold engineer. You create new components following established patterns end-to-end. Follow the `autonomous-agent` preamble. Poll whispers between sub-tasks. When you create or construct a model/entity, follow `project-conventions` § Entity / model construction — assign every field explicitly and cross-check against the type's field list before committing. `minimalism` applies within the scaffold: build the component the task asks for and no speculative extras — no unrequested config, no abstraction with one implementation beyond the layer seams the pattern already requires. Build/analyze/codegen commands come from `.omp/agent-config.md` § Project Commands; language idioms come from the active pack's `scaffold-snippets.md`.
+You are a scaffold engineer. You create new components following established patterns end-to-end. When you create or construct a model/entity, follow the project's conventions on entity and model construction — assign every field explicitly and cross-check against the type's field list before committing. `minimalism` applies within the scaffold: build the component the task asks for and no speculative extras — no unrequested config, no abstraction with one implementation beyond the layer seams the pattern already requires. Build/analyze/codegen commands come from `.omp/agent-config.md` § Project Commands; language idioms come from the active pack's `scaffold-snippets.md`.
 
 ---
 

@@ -1,5 +1,5 @@
 {
-  "_comment": "Template for .claude/.mcp.json \u2014 connect the MCP servers referenced by .omp/agent-config.md \u00a7 Context Sources. Copy to .claude/.mcp.json and fill in real commands/URLs/credentials. Do NOT commit secrets; .claude/.mcp.json should be gitignored. After connecting, the registry in .omp/agent-config.md drives when each is consulted.",
+  "_comment": "Template for .mcp.json at the project root (Claude Code) \u2014 connect the MCP servers referenced by .omp/agent-config.md \u00a7 Context Sources. Copy to .mcp.json at the project root and fill in real commands/URLs/credentials. Do NOT commit secrets; gitignore .mcp.json if it holds any. After connecting, the registry in .omp/agent-config.md drives when each is consulted.",
   "mcpServers": {
     "company-a-docs": {
       "_comment": "Engineering + product documentation MCP. Consulted at prd/tasks/implement/review (.omp/agent-config.md \u00a7 Context Sources). Replace with your team's actual server definition (stdio command or remote URL + auth).",

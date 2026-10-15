@@ -71,7 +71,9 @@ sha_of() { git rev-parse -q --verify "refs/heads/$1^{commit}" 2>/dev/null; }
 N=0
 while [ -n "$(sha_of "$BR-s$((N + 1))")" ]; do N=$((N + 1)); done
 
-config() { python3 "$HERE/config-get.py" "$@" 2>/dev/null; }
+# A command's output as bash reads it: LF lines. See deploy.sh's strip_cr.
+strip_cr() { "$@" | tr -d '\r'; return "${PIPESTATUS[0]}"; }
+config() { strip_cr python3 "$HERE/config-get.py" "$@" 2>/dev/null; }
 
 # Sets LAYER_BRANCH[] and LAYER_BASE[], bottom-up.
 compute_layers() {

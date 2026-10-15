@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
 """evidence.py — establish an evidentiary claim without going through a shell.
 
-Written after a `/refine` session that produced roughly **ten instrumentation
-errors against zero wrong claims about the codebase**. The reasoning from
-evidence held up; the gathering of evidence did not. Two of the ten were one step
-from being filed as GitHub issues — including a bug report asserting that "every
-`session_set` write has been rejected" for want of an INSERT policy, concluded
-from reading 1 of 26 migration files.
+Reasoning from evidence is only as good as the gathering of it, and the
+gathering is where claims go wrong: a conclusion drawn from 1 of 26 migration
+files reads exactly like one drawn from all of them.
 
-Four of those failure classes are the same bug four times: **grep was reached
-through a shell, and a shell is a lossy channel for both the pattern and the
-verdict.**
+Most of those failures are one bug: **grep reached through a shell, and a shell
+is a lossy channel for both the pattern and the verdict.**
 
     grep -rn "epic:" . --include=*.md         # zsh ate the glob; the command
                                               # never ran, and inside an && chain
@@ -68,9 +64,9 @@ the whole file exists for.
 with no paths exits 2. "State your corpus" is enforced by argparse rather than by
 a sentence in a skill file.
 
-**Nothing here accepts an expected total.** Predicted item counts were wrong three
-times in that session while the content was right, so `enumerate` reports every
-item's disposition and takes no count to check against.
+**Nothing here accepts an expected total.** A predicted item count can be wrong
+while the content is right, so `enumerate` reports every item's disposition and
+takes no count to check against.
 """
 
 from __future__ import annotations
@@ -83,6 +79,12 @@ import pathlib
 import re
 import subprocess
 import sys
+
+# The cycle skill's git_bash.py, found from this file's real path: a project
+# reaches this script through a link to the skill directory.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+                                "cycle"))
+from git_bash import GitBashNotFound, git_bash  # noqa: E402
 
 OK, NO, USAGE, UNDETERMINED = 0, 1, 2, 3
 
@@ -183,9 +185,8 @@ WS = re.compile(r"\s+")
 def normalise(s: str, fold: bool) -> str:
     """Collapse every whitespace run to one space. Optionally case-fold.
 
-    This is what lets a phrase match across a line wrap. Four gate failures in
-    one session came from a qualifier and the phrase it qualified landing on
-    different lines:
+    This is what lets a phrase match across a line wrap, where a qualifier and
+    the phrase it qualifies land on different lines:
 
         line 203:   ... ⚠️ **Not a Supabase
         line 204:   anonymous session**: `enable_anonymous_sign_ins = false` ...
@@ -293,10 +294,9 @@ def cmd_absence(a: argparse.Namespace) -> int:
 def cmd_anchor(a: argparse.Namespace) -> int:
     """Print bytes to be copied into an edit, with uniqueness proved at print time.
 
-    `guarded-edit` catches a retyped anchor, which is the right outcome and was
-    reached five times in one session — each time costing a turn, each time
-    because an `old` string was written from recall of prose authored minutes
-    earlier, usually with a line wrap guessed wrong. This is the other half:
+    `guarded-edit` catches a retyped anchor, which is the right outcome and costs
+    a turn: an `old` string written from recall of prose, usually with a line
+    wrap guessed wrong. This is the other half:
     read the file and copy the bytes, as an operation rather than an exhortation.
     """
     try:
@@ -368,6 +368,43 @@ def guarded_edit(text: str, edits: list[dict]) -> tuple[str | None, list[tuple[s
     return out, counts
 
 
+EOL = re.compile(r"\r\n|\r|\n")
+
+
+def edit_keeping_endings(raw: str, edits: list[dict]) -> str:
+    """`raw` with `edits` applied as `guarded_edit` applies them, each line ending kept.
+
+    Anchors match the newline-normalised text. Every `\\n` carries the ending it
+    has in `raw`; one an edit adds takes the endings of the line endings that
+    edit replaced, in order, repeating the last, and with none replaced, the
+    ending of the line the edit sits in (or of the line above, on an
+    unterminated last line; `\\n` in a file without one).
+    """
+    text = EOL.sub("\n", raw)
+    ends: list[str | None] = [None] * len(text)
+    for i, m in zip((i for i, ch in enumerate(text) if ch == "\n"), EOL.finditer(raw)):
+        ends[i] = m.group()
+    out = text
+    for e in edits:
+        old, new = e["old"], e["new"]
+        p = out.find(old)
+        if p < 0:  # an earlier edit consumed it; str.replace would skip it too
+            continue
+        q = p + len(old)
+        taken = [ends[k] for k in range(p, q) if out[k] == "\n"]
+        if not taken:
+            after = out.find("\n", q)
+            before = out.rfind("\n", 0, p)
+            taken = [ends[after] if after >= 0 else ends[before] if before >= 0 else "\n"]
+        added, n = [], 0
+        for ch in new:
+            added.append(taken[min(n, len(taken) - 1)] if ch == "\n" else None)
+            n += ch == "\n"
+        out = out[:p] + new + out[q:]
+        ends = ends[:p] + added + ends[q:]
+    return "".join(ends[i] if ch == "\n" else ch for i, ch in enumerate(out))
+
+
 def cmd_guarded_edit(a: argparse.Namespace) -> int:
     try:
         raw = sys.stdin.read() if a.edits == "-" else pathlib.Path(a.edits).read_text("utf-8")
@@ -386,12 +423,13 @@ def cmd_guarded_edit(a: argparse.Namespace) -> int:
 
     path = pathlib.Path(a.file)
     try:
-        text = path.read_text(encoding="utf-8")
+        raw = path.read_bytes().decode("utf-8")
+        text = EOL.sub("\n", raw)
     except (OSError, UnicodeDecodeError) as e:
         print(f"GUARDED-EDIT verdict=undetermined — {a.file}: {e}", file=sys.stderr)
         return UNDETERMINED
 
-    new, counts = guarded_edit(text, edits)
+    _, counts = guarded_edit(text, edits)
     bad = [(t, c) for t, c in counts if c != 1]
     verdict = "aborted" if bad else ("applied" if a.apply else "checked")
     print(f"GUARDED-EDIT verdict={verdict} edits={len(edits)} "
@@ -403,8 +441,10 @@ def cmd_guarded_edit(a: argparse.Namespace) -> int:
               "retyping them — `evidence.py anchor` prints them with uniqueness proved.")
         return NO
     if a.apply:
+        # Bytes in and out: each line keeps its own ending, which text mode
+        # would replace with the platform's on every line.
         try:
-            path.write_text(new or "", encoding="utf-8")
+            path.write_bytes(edit_keeping_endings(raw, edits).encode("utf-8"))
         except OSError as e:
             print(f"GUARDED-EDIT verdict=undetermined — write failed: {e}", file=sys.stderr)
             return UNDETERMINED
@@ -472,8 +512,7 @@ def table_faults(text: str) -> list[tuple[int, int, int, int, str]]:
     The second rule is deliberately narrow rather than "any raw disagreement".
     A single `\\|` in a cell is idiomatic and renders correctly, as does a pipe
     inside a code span; flagging either would make this gate cry wolf, and a
-    gate whose failures get dismissed as probe artifacts is the ninth failure
-    class this file was written against.
+    gate whose failures get dismissed as probe artifacts is no gate at all.
     """
     faults: list[tuple[int, int, int, int, str]] = []
     lines = text.splitlines()
@@ -606,8 +645,15 @@ def cmd_round_trip(a: argparse.Namespace) -> int:
     if local is None:
         print(f"ROUND-TRIP verdict=undetermined — local unreadable: {label}", file=sys.stderr)
         return UNDETERMINED
+    # The read-back is POSIX shell: Git Bash on Windows, /bin/sh elsewhere.
     try:
-        r = subprocess.run(a.remote_cmd, shell=True, capture_output=True, text=True,
+        bash = git_bash()
+    except GitBashNotFound as e:
+        print(f"ROUND-TRIP verdict=undetermined — {e}", file=sys.stderr)
+        return UNDETERMINED
+    try:
+        r = subprocess.run([bash, "-c", a.remote_cmd] if bash else a.remote_cmd,
+                           shell=bash is None, capture_output=True, text=True,
                            timeout=a.timeout)
     except (OSError, subprocess.TimeoutExpired) as e:
         print(f"ROUND-TRIP verdict=undetermined — read-back failed: {e}", file=sys.stderr)
@@ -646,8 +692,7 @@ BULLET = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+(.*)$")
 def items(text: str, unit: str) -> list[str]:
     """List items, each joined with its continuation lines.
 
-    A wrapped item is one item. Counting them per-line is how a four-item list
-    was reported for a six-item one.
+    A wrapped item is one item; counting per line miscounts a list.
     """
     pat = CHECKBOX if unit == "checkbox" else BULLET
     out: list[str] = []
@@ -665,9 +710,8 @@ def items(text: str, unit: str) -> list[str]:
 def dispositions(before: list[str], after: list[str], threshold: float) -> list[tuple[str, str]]:
     """`(disposition, item)` for every item on either side.
 
-    Enumerates rather than counts. Predicted totals were wrong three times in one
-    session while the content was right, and only an enumeration told an
-    arithmetic error apart from an edit defect.
+    Enumerates rather than counts: only an enumeration tells an arithmetic error
+    in a predicted total apart from an edit defect.
     """
     remaining = list(after)
     out: list[tuple[str, str]] = []

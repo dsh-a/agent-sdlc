@@ -37,6 +37,6 @@ spawn agent: test
 
 ## What this shim does NOT do
 
-- Re-implement the test workflow inline. The agent owns Steps 1–7 (gather AC, read source, check existing tests + pattern, plan, write, run + rubric, report). Loading the agent gives you `project-conventions`, `ui-test-patterns`, `test-rubric`, `contradiction-exit`, `pattern-divergence`, and `whispers` skills automatically.
+- Re-implement the test workflow inline. The agent owns Steps 1–7 (gather AC, read source, check existing tests + pattern, plan, write, run + rubric, report). The agent works from the project's conventions and UI test patterns, and the `test-rubric`, `contradiction-exit`, `pattern-divergence` and `whispers` skills.
 - Apply rubric checks itself. The agent does that in-process.
 - Decide depth tiering. That's a cycle-orchestrator decision (5.6.6), not a `/test` concern.

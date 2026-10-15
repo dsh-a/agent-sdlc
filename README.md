@@ -36,7 +36,6 @@ agent through the models you choose.
 .claude/                       # the pipeline — copy into a project to install
   skills/                      # /cycle orchestrator, entry-point commands, agent rubrics
     cycle/                     #   the orchestrator
-    project-conventions/       #   ACTIVE stack conventions (loaded by agents)
     context-sources/           #   the MCP / RAG plug-in contract
   packs/                       # swappable language packs
     flutter/                   #   default active pack
@@ -59,8 +58,9 @@ agent through the models you choose.
 
 The **core** — orchestrator, agents, skills — is stack-neutral. Everything a specific stack
 needs lives in a **pack** under `.claude/packs/<lang>/`: conventions, test patterns, idioms.
-Switching stacks means pointing **Active Pack** at a different `packs/<lang>/` and populating
-the `project-conventions` skill from it — which `/setup` automates. See
+A project chooses its pack in its own `.omp/agent-config.md` and keeps its conventions in its
+own instruction file, so one framework checkout serves projects on different stacks. `/setup`
+does both. See
 [`.claude/packs/README.md`](.claude/packs/README.md).
 
 ---
@@ -85,8 +85,7 @@ the `project-conventions` skill from it — which `/setup` automates. See
 | `/refine` | Refine a story toward INVEST / Definition-of-Ready |
 | `/self-improve` | Analyze past cycle runs and tune agent/skill instructions |
 
-Agents also load internal skills that aren't invoked directly — `project-conventions` (active
-stack rules), `minimalism` (the reuse-first ladder), `context-sources` (the plug-in contract),
+Agents also load internal skills that aren't invoked directly — `minimalism` (the reuse-first ladder), `context-sources` (the plug-in contract),
 plus the output-format rubrics.
 
 **Agents** — spawned by `/cycle`:
@@ -126,7 +125,8 @@ Claude Code fallbacks:
 cd /path/to/your-project
 bash ~/dev/agent-sdlc/deploy.sh link .
 bash ~/dev/agent-sdlc/deploy.sh gitignore --apply .
-bash ~/dev/agent-sdlc/deploy.sh grants             # paste into .claude/settings.json
+bash ~/dev/agent-sdlc/deploy.sh grants --apply .   # write the permissions and hook wiring this project lacks
+bash ~/dev/agent-sdlc/deploy.sh doctor             # check this machine (Windows: doctor --fix)
 ```
 
 Symlinks, not copies: one checkout, every project current. `deploy.sh check .` verifies a
@@ -134,6 +134,9 @@ deployment and reports what is missing.
 
 The links hold absolute paths, so they are per machine. Don't commit them — that is what the
 `gitignore` block is for.
+
+**On Windows**, do [`docs/SETUP.md` § Windows](docs/SETUP.md#windows) first: Git Bash, Developer
+Mode, and `deploy.sh doctor --fix`, then restart the terminal app.
 
 ### 2. Pick your OpenRouter models
 
@@ -156,8 +159,9 @@ Simpler, and what `.omp/models.yml.sample` now recommends: name the provider id 
 
 `/setup` detects your stack (`pubspec.yaml` → flutter, `*.sln`/`*.csproj` → dotnet,
 `package.json` → node, …), selects a pack, and generates `.omp/agent-config.md` — Project
-Commands, Architecture Review Rules, Active Pack, Context Sources, and model preset — then
-populates the active `project-conventions` skill from the pack. You can edit
+Commands, Architecture Review Rules, Active Pack, Context Sources, and model preset. It then
+offers the pack's conventions for the project's instruction file and sets up the project's
+permissions. You can edit
 `.omp/agent-config.md` directly at any time; it's the single source of customization.
 
 To wire in knowledge sources, copy `.omp/mcp.json.sample` → `.omp/mcp.json`, fill in your
@@ -527,6 +531,62 @@ A project picks up the script's permission with `deploy.sh grants <project>`. Ev
 stack triggers the project's `pull_request` workflows for the bottom base; `cycle/stack.md` §
 Project CI has the guard that runs an expensive job on the top PR only.
 
+### Parallel cycles
+
+`/cycle --parallel 419 404 378` runs `.claude/skills/cycle/start-parallel-cycles.sh`, which starts
+one cycle per issue, each in its own worktree and terminal. The worktrees are a fixed pool under the
+clones root (`~/dev/cycles` by default): `<repo>-slot-1` … `<repo>-slot-N`, with N set by
+`parallel_slots` in `.omp/agent-config.md` § Cycle Options (default 3). A run with more issues than
+slots stops before changing anything.
+
+Slots are reused, not recreated. At launch each slot is reset to the base branch with
+`git clean -fd` (no `-x`), so ignored build output survives and a later run builds incrementally; a
+missing slot is created; `--fresh` recreates them all. Before any slot is reset or any other clone
+under the root is removed, the launcher refuses on uncommitted work (untracked files included), an
+unfinished merge, rebase or cherry-pick, commits that only a detached HEAD holds, or a process still
+running inside it. A slot's feature branch lives in the repository and is never deleted. The first
+launch reaps the per-issue clones an earlier launcher left under the root, under the same checks: a
+dirty one stops the run until it is committed or cleaned. The process check uses `pgrep`, which Git
+Bash lacks, so on Windows it finds nothing: close every cycle window from the previous run before
+launching again.
+
+**Disk footprint** is N × (checkout + build output), fixed rather than rewritten every run; the
+launch prints it, and `--dry-run` prints it along with which slots would be reused or created.
+Lower `parallel_slots` on a machine short of disk. `reap-clones.sh sweep --root <clones-root>
+--apply` removes slots whose cycles finished, and the next launch recreates them cold. Keep the
+clones root out of IDE indexing.
+
+**Partial checkout** is opt-in, for repositories where a full checkout per slot costs real disk or
+time. With `sparse_clones` set to `true` in § Cycle Options (`/setup` offers it, default no), each
+slot is a cone-mode sparse checkout of:
+
+- the paths its story's `## Slices` areas name in backticks (a file brings its directory);
+- `always_checkout`, a comma-separated list in the same section;
+- `.claude`, `.omp` and the top-level directories of § Artifact Paths, so the cycle reads its config
+  and commits its artifacts;
+- under the `dotnet` pack, the transitive `ProjectReference` closure, read from the project files'
+  XML by `packs/dotnet/sparse_closure.py`;
+- every file at the repository root and directly inside each ancestor directory (cone mode).
+
+`.claude/skills/cycle/sparse-set.py plan` derives the set; the launch prints it per slot. A story
+with no `## Slices`, or an area with no backticked path, a glob, `..` or an absolute path, gets a
+full checkout and the launch says why. A new slot is created with `git worktree add --no-checkout`,
+given its set, then checked out; a reused slot has its set replaced at reset; once the option is
+off, a slot that was sparse returns to a full checkout at its next reset. Partial slots are git
+worktrees only: `omp worktree add` copies the whole tree, so new slots use git and `--cloner omp`
+refuses. The first sparse slot sets `extensions.worktreeConfig` in the repository's git config,
+which keeps each slot's set its own; the primary checkout stays full. The setting stays after the
+option is turned off, and older libgit2-based tools (some IDE git integrations and GUI clients) may
+refuse a repository that has it. Once no slot is sparse, remove it from the primary checkout with
+`git config --unset extensions.worktreeConfig`.
+
+Risks, as `/setup` states them: a build or test that needs a file outside the set fails, and in
+.NET the error can look unrelated; cross-cutting changes the story did not predict are not visible
+to the agents; IDE tooling opened on a slot sees part of the solution. When a suite run by
+`run-suite.sh` fails in a partial slot, `check` says the checkout is partial and names each tracked
+path in the output that is not on disk, with the `git sparse-checkout add <dir>` that brings it in.
+`sparse-set.py outside <path>...` answers the same question for any path.
+
 ### Opening a terminal window
 
 `.claude/skills/cycle/open-terminal.sh` runs a command in a new terminal window, and is what
@@ -538,13 +598,17 @@ bash .claude/skills/cycle/open-terminal.sh --tab --cwd ~/dev/app -- 'claude "/cy
 ```
 
 `--tab` opens a tab in the current window instead. Supported on Ghostty 1.3+ through its
-AppleScript dictionary; everywhere else it falls back to a window rather than failing, since
+AppleScript dictionary and on Windows Terminal; everywhere else it falls back to a window rather than failing, since
 the caller's command still runs either way. macOS will ask for automation consent the first
 time, and every AppleScript call is time-bounded so an unanswered dialog degrades to a window
 instead of hanging.
 
 Terminals it opens into: Ghostty, iTerm2, WezTerm, kitty, Terminal.app on macOS; Ghostty, WezTerm,
-kitty, gnome-terminal, konsole, alacritty, xterm on Linux (or `$TERMINAL`). It exits 0 when a
+kitty, gnome-terminal, konsole, alacritty, xterm on Linux (or `$TERMINAL`); Windows Terminal, else
+Git Bash's mintty, on Windows — running the command under Git Bash, handed over as a launcher file
+because `wt.exe` re-parses a command string and loses its quotes. Windows Terminal needs that
+file at a path with no space; with an account name that has one and 8.3 names disabled, set
+`OPEN_TERMINAL_LAUNCHER_DIR` to an existing directory whose path has none. It exits 0 when a
 window opened and 1 when none could be — in an SSH or CI session, or with no emulator found — and
 deliberately does **not** decide what that means. A cycle launcher must treat a missing window as a
 failure; something advisory should not.
@@ -567,7 +631,8 @@ Run `/setup`, or edit `.omp/agent-config.md` directly:
 | MCP / RAG plug-ins | `.omp/agent-config.md` → **Context Sources** + `.omp/mcp.json` |
 | Model spending | `.omp/agent-config.md` → **Model Allocation** + `.omp/config.yml` → `modelRoles` |
 | Auto verify/review | `.omp/agent-config.md` → **Optional Agents** |
-| Conventions (naming, layers) | `.claude/skills/project-conventions/SKILL.md` (from the pack) |
+| Agents read their skills (off by default) | `.omp/agent-config.md` → **Cycle Options** → `agent_skills` |
+| Conventions (naming, layers) | the project's instruction file (`CLAUDE.md`, `AGENTS.md`), seeded from the pack |
 | Permissions / approval | `.omp/config.yml` → `tools.approval` |
 | OpenRouter models | `.omp/models.yml.sample` → `~/.omp/agent/models.yml` |
 | Task isolation / concurrency | `.omp/config.yml` → `task.*` |

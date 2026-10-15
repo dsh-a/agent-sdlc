@@ -2,8 +2,7 @@
 
 A blocking hook has two failure modes and they are not symmetric. Missing a
 framework write lets a cycle change what its siblings are running, uncommitted,
-mid-round — the fan-out 8 finding. Blocking ordinary work stalls a cycle for
-hours, which is the failure this whole line of work exists to remove.
+mid-round. Blocking ordinary work stalls a cycle for hours.
 
 So the false-positive cases below matter at least as much as the true ones, and
 the largest of them has its own section: reading the framework must stay free.
@@ -13,6 +12,7 @@ the largest of them has its own section: reading the framework must stay free.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import pathlib
@@ -63,11 +63,15 @@ os.symlink(FW / ".claude/skills/cycle", PROJ / ".claude/skills/cycle")
 os.symlink(FW / ".claude/packs", PROJ / ".claude/packs")
 (PROJ / "lib/app.dart").write_text("void main() {}\n")
 
-AGENT = str(FW / ".claude/agents/coding.md")
+# Forward slashes: these strings go into Bash commands, and bash reads an
+# unquoted `C:\Users\x` as `C:Usersx`. `as_posix()` is the identity off Windows
+# and `C:/Users/...` on it — the form a Windows agent actually types. The
+# backslash and `/c/...` forms get their own section below.
+AGENT = (FW / ".claude/agents/coding.md").as_posix()
 
 # ---------------------------------------------------------------- it blocks
 #
-# The fan-out 8 command, verbatim in shape: sed a grant into an agent definition.
+# sed a grant into an agent definition.
 check("sed into an agent definition is blocked",
       blocked(PROJ, "Bash", command=f"sed -i '' 's/a/b/' {AGENT}"))
 check("  ... and the Edit tool route too, which no Bash deny covers",
@@ -91,8 +95,8 @@ check("  ... and chained behind a granted command",
       blocked(PROJ, "Bash", command=f"git status --short && sed -i '' 's/a/b/' {AGENT}"))
 
 # The live deployment puts agent definitions at user scope, where ~/.claude/agents
-# is itself a symlink into the framework. That is the route fan-out 8 would take
-# today, since a clone has no .claude/agents of its own.
+# is itself a symlink into the framework. That is the route an agent-definition
+# edit takes, since a clone has no .claude/agents of its own.
 USERSCOPE = R / "home/.claude"
 (USERSCOPE).mkdir(parents=True)
 os.symlink(FW / ".claude/agents", USERSCOPE / "agents")
@@ -105,6 +109,7 @@ rc, err = fire(PROJ, "Edit", file_path=AGENT, old_string="a", new_string="b")
 check("the refusal says why it is not answerable by approval",
       "not answerable by approval" in err, err[:200])
 check("  ... and names the path it protected", str(FW) in err, err[:200])
+check("  ... stating the rule, not an incident", "Fan-out" not in err, err[:200])
 check("  ... and tells the agent what to do instead",
       "Harness findings" in err, err[:200])
 
@@ -117,22 +122,19 @@ check("reading an agent definition is allowed",
 check("  ... with cat", not blocked(PROJ, "Bash", command=f"cat {AGENT}"))
 check("  ... with the Read tool", not blocked(PROJ, "Read", file_path=AGENT))
 check("  ... and listing the directory",
-      not blocked(PROJ, "Bash", command=f"ls -la {FW}/.claude/agents/"))
+      not blocked(PROJ, "Bash", command=f"ls -la {FW.as_posix()}/.claude/agents/"))
 check("  ... and diffing against it",
       not blocked(PROJ, "Bash", command=f"diff -q {AGENT} {AGENT}"))
 
-# Running the framework's own tooling is a read, and the suite did not say so.
-# Round 9 blocked `python3 .claude/skills/cycle/aggregate-telemetry.py` 21 times
-# across four cycles: `python3` is in WRITERS, so word-splitting handed back the
-# script itself as a write target. Every block landed in Phase 4B, so telemetry
-# was never aggregated and agent_states never cleared in any cycle. The rule was
-# right; this case was missing.
+# Running the framework's own tooling is a read. `python3` is in WRITERS, so
+# word-splitting hands back the script itself as a write target; blocking it
+# stops Phase 4B from aggregating telemetry and clearing agent_states.
 check("running a framework script is allowed",
       not blocked(PROJ, "Bash", command="python3 .claude/skills/cycle/aggregate-telemetry.py"))
 check("  ... with arguments",
       not blocked(PROJ, "Bash", command="python3 .claude/skills/cycle/clear-agent-states.py --all"))
 check("  ... by absolute path",
-      not blocked(PROJ, "Bash", command=f"python3 {FW}/.claude/skills/cycle/gate-report.py"))
+      not blocked(PROJ, "Bash", command=f"python3 {FW.as_posix()}/.claude/skills/cycle/gate-report.py"))
 check("  ... with bash, which only escaped by accident",
       not blocked(PROJ, "Bash", command="bash .claude/skills/cycle/run-suite.sh log x"))
 check("  ... piped, as the orchestrator actually invokes it",
@@ -145,18 +147,17 @@ check("a python one-liner writing the framework is still blocked",
 check("  ... via a relative path through the clone's symlink",
       blocked(PROJ, "Bash", command="python3 -c \"open('.claude/skills/cycle/SKILL.md','w')\""))
 check("  ... and -m with a framework target is not a script argument",
-      blocked(PROJ, "Bash", command=f"python3 -m pip install --target {FW}/.claude"))
+      blocked(PROJ, "Bash", command=f"python3 -m pip install --target {FW.as_posix()}/.claude"))
 check("  ... nor is a redirect past an exempt script",
       blocked(PROJ, "Bash", command=f"python3 .claude/skills/cycle/gate-report.py > {AGENT}"))
 check("  ... and sh -c carrying a sed still blocks",
       blocked(PROJ, "Bash", command=f"sh -c \"sed -i '' s/a/b/ {AGENT}\""))
 check("  ... copying over a framework script is not 'running' it",
-      blocked(PROJ, "Bash", command=f"cp /tmp/evil.py {FW}/.claude/skills/cycle/gate-report.py"))
+      blocked(PROJ, "Bash", command=f"cp /tmp/evil.py {FW.as_posix()}/.claude/skills/cycle/gate-report.py"))
 
-# A stream editor only writes with -i. Round 10 blocked
-# `sed -n '1,200p' <framework>/skills/harness-findings/SKILL.md` — a read, and the
-# agent had to re-read the file with the Read tool. #31's exemption does not reach
-# these because they are writers, not interpreters.
+# A stream editor only writes with -i: `sed -n '1,200p' <framework>/...` is a
+# read. The interpreter exemption does not reach these because they are writers,
+# not interpreters.
 check("sed -n is a read, not a write",
       not blocked(PROJ, "Bash", command=f"sed -n '1,200p' {AGENT}"))
 check("  ... unquoted range too",
@@ -184,10 +185,9 @@ check("  ... nor is a commit message that names one",
       not blocked(PROJ, "Bash", command=(
           f"git commit -m 'note: {AGENT} needs a grant; reported, not edited'")))
 
-# A program that writes *about* a framework path is not writing to one. Round 10
-# blocked two agents whose Python assembled a run report whose text quoted
-# `aggregate-telemetry.py`. A path in a program counts only on a line that also
-# does something write-shaped.
+# A program that writes *about* a framework path is not writing to one, such as
+# Python assembling a run report whose text quotes `aggregate-telemetry.py`. A
+# path in a program counts only on a line that also does something write-shaped.
 check("a program whose text quotes a framework path is not a write",
       not blocked(PROJ, "Bash", command=(
           "python3 - << 'EOF'\n"
@@ -212,7 +212,7 @@ check("writing project source is allowed",
 check("  ... editing it", not blocked(PROJ, "Edit", file_path=str(PROJ / "lib/app.dart"),
                                       old_string="a", new_string="b"))
 check("  ... sed against it",
-      not blocked(PROJ, "Bash", command=f"sed -i '' 's/a/b/' {PROJ}/lib/app.dart"))
+      not blocked(PROJ, "Bash", command=f"sed -i '' 's/a/b/' {PROJ.as_posix()}/lib/app.dart"))
 check("  ... committing", not blocked(PROJ, "Bash", command="git add -A && git commit -m x"))
 check("  ... running the suite",
       not blocked(PROJ, "Bash", command="flutter test test/widget/foo_test.dart"))
@@ -253,6 +253,262 @@ PLAIN = R / "plain"
 (PLAIN / "lib").mkdir(parents=True)
 check("a non-deployment is left alone",
       not blocked(PLAIN, "Write", file_path=str(PLAIN / "lib/x.dart"), content="x"))
+
+# ------------------------------------------------- Windows command names
+#
+# A command is matched by name whatever spelling the shell accepts for it:
+# `.exe`, `.cmd` and `.bat` suffixes, any case, a directory prefix in either
+# separator, and the launchers `py` and `powershell`. Pure string work, so these
+# run on every host.
+check("python.exe writing the framework is blocked",
+      blocked(PROJ, "Bash", command=f"python.exe -c \"open('{AGENT}','w').write('x')\""))
+check("  ... and py, the python.org launcher",
+      blocked(PROJ, "Bash", command=f"py -c \"open('{AGENT}','w').write('x')\""))
+check("  ... and py -3",
+      blocked(PROJ, "Bash", command=f"py -3 -c \"open('{AGENT}','w').write('x')\""))
+check("  ... and an upper-case, directory-qualified PYTHON.EXE",
+      blocked(PROJ, "Bash",
+              command=f"'C:\\Python312\\PYTHON.EXE' -c \"open('{AGENT}','w').write('x')\""))
+check("  ... and pwsh",
+      blocked(PROJ, "Bash", command=f"pwsh -c \"Copy-Item x {AGENT}; rm {AGENT}\""))
+check("  ... and powershell",
+      blocked(PROJ, "Bash", command=f"powershell -c \"rm {AGENT}\""))
+check("sed.exe -i into an agent definition is blocked",
+      blocked(PROJ, "Bash", command=f"sed.exe -i s/a/b/ {AGENT}"))
+check("  ... and cp.exe over it", blocked(PROJ, "Bash", command=f"cp.exe /tmp/x {AGENT}"))
+check("  ... and a .cmd wrapper", blocked(PROJ, "Bash", command=f"cp.cmd /tmp/x {AGENT}"))
+check("  ... and a .bat wrapper", blocked(PROJ, "Bash", command=f"tee.bat {AGENT}"))
+check("a python.exe heredoc writing the framework is still blocked",
+      blocked(PROJ, "Bash", command=f"python.exe - << 'EOF'\nopen('{AGENT}','w')\nEOF"))
+check("sed.exe -n is still a read",
+      not blocked(PROJ, "Bash", command=f"sed.exe -n 1,50p {AGENT}"))
+check("py running a framework script is allowed",
+      not blocked(PROJ, "Bash", command="py .claude/skills/cycle/aggregate-telemetry.py"))
+check("  ... and env python.exe running one",
+      not blocked(PROJ, "Bash",
+                  command="env python.exe .claude/skills/cycle/aggregate-telemetry.py"))
+check("a versioned python3.12 writing the framework is blocked",
+      blocked(PROJ, "Bash", command=f"python3.12 -c \"open('{AGENT}','w')\""))
+check("  ... and python3.12.exe",
+      blocked(PROJ, "Bash", command=f"python3.12.exe -c \"open('{AGENT}','w')\""))
+check("  ... and ruby3.2",
+      blocked(PROJ, "Bash", command=f"ruby3.2 -e \"File.write('{AGENT}','x')\""))
+check("  ... and node20",
+      blocked(PROJ, "Bash", command=f"node20 -e \"require('fs').write('{AGENT}')\""))
+
+# PowerShell and cmd write with their own verbs. The cmdlet names count in any
+# case; the short aliases and cmd's verbs are ordinary words, so they count only
+# under a pwsh or cmd head.
+for verb in ("Set-Content {a} x", "set-content -Path {a} -Value x", "Add-Content {a} x",
+             "'x' | Out-File {a}", "Copy-Item x {a}", "Move-Item x {a}",
+             "Remove-Item {a}", "New-Item {a}"):
+    check(f"pwsh {verb.format(a='<fw>')} is blocked",
+          blocked(PROJ, "Bash", command=f"powershell.exe -Command \"{verb.format(a=AGENT)}\""))
+for verb in ("sc {a} x", "ac {a} x", "cpi x {a}", "mi x {a}", "ri {a}", "ni {a}",
+             "del {a}", "copy x {a}", "move x {a}"):
+    check(f"pwsh alias: {verb.format(a='<fw>')} is blocked",
+          blocked(PROJ, "Bash", command=f"pwsh -c \"{verb.format(a=AGENT)}\""))
+check("cmd /c copy into the framework is blocked",
+      blocked(PROJ, "Bash", command=f"cmd /c copy x {AGENT}"))
+check("  ... and cmd.exe /c del",
+      blocked(PROJ, "Bash", command=f"cmd.exe /c del {AGENT}"))
+check("pwsh reading the framework is allowed",
+      not blocked(PROJ, "Bash", command=f"pwsh -c \"Get-Content {AGENT}\""))
+check("  ... and cmd /c type", not blocked(PROJ, "Bash", command=f"cmd /c type {AGENT}"))
+check("a python program whose text says copy, move or del is not a write",
+      not blocked(PROJ, "Bash",
+                  command=f"python3 -c \"print('copy {AGENT}, move on, del later')\""))
+
+# ------------------------------------------------- perl, ruby and node writes
+#
+# perl and ruby edit in place with -i, alone or in any short-flag cluster; node
+# writes through its fs methods. Each reads with the same interpreter, and those
+# reads stay free.
+for flags in ("-i -pe s/a/b/", "-pi -e s/a/b/", "-i.bak -pe s/a/b/", "-pi.bak -e s/a/b/",
+              "-0777 -pi -e s/a/b/", "-pie s/a/b/", "-i -n -e print"):
+    check(f"perl {flags} <fw> is blocked",
+          blocked(PROJ, "Bash", command=f"perl {flags} {AGENT}"))
+check("  ... and perl5.36 -pi", blocked(PROJ, "Bash", command=f"perl5.36 -pi -e s/a/b/ {AGENT}"))
+check("  ... and env perl -pi", blocked(PROJ, "Bash", command=f"env perl -pi -e s/a/b/ {AGENT}"))
+check("  ... and a relative path through the clone's symlink",
+      blocked(PROJ, "Bash", command="perl -pi -e s/a/b/ .claude/skills/cycle/SKILL.md"))
+check("  ... and a framework script edited in place, not run",
+      blocked(PROJ, "Bash", command="perl -pi -e s/a/b/ .claude/skills/cycle/x.pl"))
+check("  ... and the files after a script that edits them",
+      blocked(PROJ, "Bash", command=f"perl -i /tmp/edit.pl {AGENT}"))
+check("  ... and inside sh -c",
+      blocked(PROJ, "Bash", command=f"sh -c \"perl -pi -e s/a/b/ {AGENT}\""))
+check("ruby -pi into the framework is blocked",
+      blocked(PROJ, "Bash", command=f"ruby -pi -e 'sub(/a/, \"b\")' {AGENT}"))
+check("  ... and ruby -i.bak", blocked(PROJ, "Bash", command=f"ruby -i.bak -pe 1 {AGENT}"))
+
+for call in ("writeFileSync('{a}', 'x')", "appendFileSync('{a}', 'x')",
+             "writeFile('{a}', 'x', console.log)", "createWriteStream('{a}')",
+             "rmSync('{a}')", "rm('{a}', console.log)", "unlinkSync('{a}')",
+             "unlink('{a}', console.log)", "renameSync('/tmp/x', '{a}')",
+             "rename('/tmp/x', '{a}', console.log)", "copyFileSync('/tmp/x', '{a}')",
+             "copyFile('/tmp/x', '{a}', console.log)", "openSync('{a}', 'w')"):
+    check(f"node -e fs.{call.format(a='<fw>')} is blocked",
+          blocked(PROJ, "Bash", command=f"node -e \"require('fs').{call.format(a=AGENT)}\""))
+check("  ... and fs/promises",
+      blocked(PROJ, "Bash",
+              command=f"node -e \"require('fs/promises').writeFile('{AGENT}', 'x')\""))
+check("  ... and fs.promises.rm",
+      blocked(PROJ, "Bash", command=f"node -e \"require('fs').promises.rm('{AGENT}')\""))
+check("  ... and node:fs/promises unlink",
+      blocked(PROJ, "Bash",
+              command=f"node --eval \"import('node:fs/promises').then(function (f) {{ return f.unlink('{AGENT}') }})\""))
+check("  ... and node -p",
+      blocked(PROJ, "Bash", command=f"node -p \"require('fs').writeFileSync('{AGENT}', 'x')\""))
+check("  ... and a relative path through the clone's symlink",
+      blocked(PROJ, "Bash",
+              command="node -e \"require('fs').writeFileSync('.claude/skills/cycle/SKILL.md', 'x')\""))
+
+check("perl -ne print reading the framework is allowed",
+      not blocked(PROJ, "Bash", command=f"perl -ne print {AGENT}"))
+check("  ... and perl -lne", not blocked(PROJ, "Bash", command=f"perl -lne 'print if /tools/' {AGENT}"))
+check("  ... and a perl open for reading",
+      not blocked(PROJ, "Bash",
+                  command=f"perl -e 'open(F, \"<\", \"{AGENT}\"); print while <F>'"))
+check("  ... and perl -I with a directory holding an i",
+      not blocked(PROJ, "Bash", command=f"perl -I/tmp/lib -ne print {AGENT}"))
+check("  ... and perl -Mstrict, whose module name holds an i",
+      not blocked(PROJ, "Bash", command=f"perl -Mstrict -ne print {AGENT}"))
+check("  ... and ruby -ne", not blocked(PROJ, "Bash", command=f"ruby -ne 'puts $_' {AGENT}"))
+check("  ... and ruby -rjson, whose library name holds no in-place flag",
+      not blocked(PROJ, "Bash", command=f"ruby -rjson -ne 'puts $_' {AGENT}"))
+check("node -e readFileSync on the framework is allowed",
+      not blocked(PROJ, "Bash",
+                  command=f"node -e \"console.log(require('fs').readFileSync('{AGENT}', 'utf8'))\""))
+check("  ... and fs/promises readFile",
+      not blocked(PROJ, "Bash",
+                  command=f"node -e \"require('fs/promises').readFile('{AGENT}').then(console.log)\""))
+check("running a framework script with node is allowed",
+      not blocked(PROJ, "Bash", command="node .claude/skills/cycle/report.js --out /tmp/r.md"))
+check("  ... and with perl",
+      not blocked(PROJ, "Bash", command=f"perl {FW.as_posix()}/.claude/skills/cycle/report.pl x"))
+check("perl -pi on project source is allowed",
+      not blocked(PROJ, "Bash", command=f"perl -pi -e s/a/b/ {PROJ.as_posix()}/lib/app.dart"))
+check("  ... and node writing project source",
+      not blocked(PROJ, "Bash",
+                  command=f"node -e \"require('fs').writeFileSync('{PROJ.as_posix()}/lib/app.dart', 'x')\""))
+
+# ------------------------------------------------- Windows, on any host
+#
+# The Windows rules are named variants in lib/guard_match.py beside the POSIX
+# ones, so their string work runs here on every host. The guards are loaded in
+# process to show they use the shared objects and, given the Windows variant,
+# pick out Windows paths.
+sys.path.insert(0, str(HOOK.parent / "lib"))
+import guard_match as gm  # noqa: E402
+
+
+def load(path: pathlib.Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+gf = load(HOOK, "guard_framework")
+gs = load(HOOK.parent / "guard-secrets.py", "guard_secrets")
+check("both guards use the shared native() and command_name()",
+      gf.native is gm.native is gs.native
+      and gf.command_name is gm.command_name is gs.command_name)
+check("guard-framework uses the shared PATHISH", gf.PATHISH is gm.PATHISH)
+check("the host picks the variant",
+      gm.PATHISH is (gm.PATHISH_WINDOWS if os.name == "nt" else gm.PATHISH_POSIX))
+
+for given, want in (("/c/dev/x", "C:/dev/x"), ("/c", "C:/"), ("/C/Users/x", "C:/Users/x"),
+                    ("/d/", "D:/"), ("//srv/share/x", "//srv/share/x"), ("/tmp/x", "/tmp/x"),
+                    ("/cygdrive/c/x", "/cygdrive/c/x"), ("C:\\Users\\x", "C:\\Users\\x"),
+                    ("rel/x", "rel/x"), (None, None)):
+    check(f"windows: msys_to_native({given!r}) is {want!r}", gm.msys_to_native(given) == want,
+          repr(gm.msys_to_native(given)))
+check("native() converts only on Windows",
+      gm.native("/c/dev/x") == ("C:/dev/x" if os.name == "nt" else "/c/dev/x"))
+
+PROG = "open('C:\\\\dev\\\\fw\\\\.claude\\\\agents\\\\coding.md','w')"
+check("windows: PATHISH finds a backslash path in a program",
+      "C:\\\\dev\\\\fw\\\\.claude\\\\agents\\\\coding.md"
+      in [m.group(0) for m in gm.PATHISH_WINDOWS.finditer(PROG)])
+check("  ... and a forward-slash drive path",
+      [m.group(0) for m in gm.PATHISH_WINDOWS.finditer("open('C:/dev/x.md','w')")] == ["C:/dev/x.md"])
+check("  ... which the POSIX form does not",
+      "C:/dev/x.md" not in [m.group(0) for m in gm.PATHISH_POSIX.finditer("open('C:/dev/x.md','w')")])
+gf.PATHISH = gm.PATHISH_WINDOWS
+try:
+    check("windows: bash_targets hands a backslash path in a python write to the resolver",
+          "C:\\\\dev\\\\fw\\\\.claude\\\\agents\\\\coding.md"
+          in gf.bash_targets(f"python3 -c \"{PROG}\""))
+finally:
+    gf.PATHISH = gm.PATHISH
+
+# ---------------------------------------------------------------- Windows
+#
+# Native Windows Python reads Git Bash's `/c/dev/x` as `C:\c\dev\x`, so the
+# guard normalises MSYS-form paths and cwds; unnormalised, it fails open,
+# silently. These resolve through ntpath, so they run on Windows only.
+if os.name == "nt":
+    def msys(p: pathlib.Path) -> str:
+        s = p.as_posix()
+        return "/" + s[0].lower() + s[2:]
+
+    AGENT_MSYS = msys(FW / ".claude/agents/coding.md")
+    AGENT_BS = str(FW / ".claude/agents/coding.md")
+    check("windows: an MSYS-form path is blocked",
+          blocked(PROJ, "Bash", command=f"sed -i 's/a/b/' {AGENT_MSYS}"))
+    check("  ... through a redirect",
+          blocked(PROJ, "Bash", command=f"echo x > {AGENT_MSYS}"))
+    check("  ... and inside a python one-liner",
+          blocked(PROJ, "Bash",
+                  command=f"python3 -c \"open('{AGENT_MSYS}','w').write('x')\""))
+    check("windows: a quoted backslash path is blocked",
+          blocked(PROJ, "Bash", command=f"sed -i 's/a/b/' '{AGENT_BS}'"))
+    check("  ... and through a redirect",
+          blocked(PROJ, "Bash", command=f"echo x > '{AGENT_BS}'"))
+    check("windows: a lower-case drive letter is still the same file",
+          blocked(PROJ, "Bash", command=f"cp /tmp/x {AGENT[0].lower() + AGENT[1:]}"))
+    check("windows: a POSIX-form cwd still resolves the deployment",
+          blocked(pathlib.PurePosixPath(msys(PROJ)), "Bash",
+                  command="echo x > .claude/skills/cycle/SKILL.md"))
+    check("windows: reading through an MSYS-form path is still allowed",
+          not blocked(PROJ, "Bash", command=f"cat {AGENT_MSYS}"))
+    check("  ... and writing project source through one",
+          not blocked(PROJ, "Bash", command=f"echo x > {msys(PROJ / 'lib/app.dart')}"))
+
+# ------------------------------------------------------ a path with a space
+#
+# A Windows profile path can hold a space, so a framework under one is the
+# ordinary case there. Each write names the path quoted, as a shell needs it.
+SFW = R / "with space/agent-sdlc"
+(SFW / ".claude/skills/cycle").mkdir(parents=True)
+(SFW / ".claude/agents").mkdir(parents=True)
+(SFW / ".claude/agents/coding.md").write_text("tools: Read\n")
+(SFW / ".claude/skills/cycle/SKILL.md").write_text("skill\n")
+SPROJ = R / "with space/clone"
+(SPROJ / ".claude/skills").mkdir(parents=True)
+os.symlink(SFW / ".claude/skills/cycle", SPROJ / ".claude/skills/cycle")
+SA = (SFW / ".claude/agents/coding.md").as_posix()
+for label, command in [
+    ("sed -i", f"sed -i '' 's/a/b/' '{SA}'"),
+    ("a double-quoted sed -i", f'sed -i "" s/a/b/ "{SA}"'),
+    ("a redirect", f"echo x > '{SA}'"),
+    ("a double-quoted redirect appended", f'printf x >> "{SA}"'),
+    ("cp", f"cp /tmp/x '{SA}'"),
+    ("a python one-liner", f"python3 -c \"open('{SA}','w')\""),
+    ("node", f"node -e \"fs.writeFileSync('{SA}', 'x')\""),
+    ("pwsh", f"pwsh -c \"Set-Content '{SA}' x\""),
+    ("perl -pi", f"perl -pi -e s/a/b/ '{SA}'"),
+]:
+    check(f"framework under a path with a space: {label} is blocked",
+          blocked(SPROJ, "Bash", command=command))
+check("  ... and the Write tool", blocked(SPROJ, "Write", file_path=SA, content="x"))
+check("  ... and reading it is still allowed",
+      not blocked(SPROJ, "Bash", command=f"cat '{SA}'"))
+check("  ... as is running a framework script whose arguments name it",
+      not blocked(SPROJ, "Bash",
+                  command=f"python3 .claude/skills/cycle/evidence.py absence --pattern 'rm -rf' '{SA}'"))
 
 # ---------------------------------------------------------------- failure
 #

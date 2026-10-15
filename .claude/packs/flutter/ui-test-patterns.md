@@ -1,7 +1,6 @@
 <!--
-PACK REFERENCE FILE (pack: flutter) — the original Flutter widget/ViewModel test patterns.
-Worked example for authoring a pack's UI test patterns. The ACTIVE skill agents load is
-`.claude/skills/ui-test-patterns/SKILL.md`; copy this body there to make Flutter active.
+PACK FILE (pack: flutter) — starter text for a project's widget and view-model test patterns.
+`/setup` offers it for the project's instruction file; the project's copy is what agents follow.
 -->
 
 # Widget Test Patterns (pack: flutter)

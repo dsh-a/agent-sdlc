@@ -1,6 +1,6 @@
 # `.claude/agents/` — the agent team
 
-Each `*.md` file is a subagent: YAML frontmatter (name, model, `tools:`, `skills:`,
+Each `*.md` file is a subagent: YAML frontmatter (name, model, `tools:`,
 `produces:`) plus a system-prompt body. The orchestrator (`/cycle`) spawns these during the
 pipeline; it writes no implementation code itself.
 
@@ -26,10 +26,9 @@ pipeline; it writes no implementation code itself.
 
 ## How conventions reach an agent
 
-Conventions are loaded **deterministically** via the `skills:` frontmatter — e.g. `ui-story`,
-`test`, `review`, `scaffold` list `project-conventions`. That skill is the active stack's
-conventions (populated from a pack). This is why there is no runtime "read a pointer, chase a
-file" hop — the skill name in frontmatter resolves at spawn time.
+Conventions live in the project's instruction file (`CLAUDE.md`, `AGENTS.md`), which the harness
+loads into every agent. `/setup` seeds that file from the project's pack. Agent bodies refer to
+"the project's conventions" and name no stack.
 
 ## How external context reaches an agent
 
@@ -41,30 +40,20 @@ their handoff for auditability. See [`../skills/context-sources/SKILL.md`](../sk
 
 ## Two per-agent things that are NOT config-driven
 
-- **`tools:` frontmatter** — the Bash/MCP allowlist is static per agent. The default pack
-  (`flutter`) uses `Bash(flutter …)` + `mcp__ide__getDiagnostics`. Switching toolchains means
-  editing these tokens across the implementation/review agents.
+- **`tools:` frontmatter** — static per agent, and stack-neutral. An agent that runs the
+  project's commands holds a plain `Bash`. Which commands may run is decided by the project's
+  permission rules. `deploy.sh grants --apply <project>` writes them from two sources: the
+  project's § Project Commands table, and the `git <verb>` and `gh <noun> <verb>` entries in
+  these `tools:` lines. A `Bash(pattern)` entry limits nothing by itself; name one for each git
+  or gh command an agent's protocol runs, so the project is granted it.
 
-  **The grants are a contract, not a preference.** A Phase-3 agent works in an isolated
-  workspace and commits its own work, so `coding`, `test`, `scaffold` and `ui-story` must each
-  be able to run `git log` (the mandated base check), `git add`/`git commit`, `git diff`, and
-  the pack's codegen command — the last because hand-editing a generated file is forbidden
-  outright, leaving an agent without codegen no legal path at all. `tests/framework_checks.py`
-  § phase-3 permissions pins this. Harness parity does **not**: it compares agent bodies, and
-  frontmatter legitimately differs between harnesses, so nothing else guards these tokens.
+  **The named entries are a contract.** A Phase-3 agent works in an isolated workspace and
+  commits its own work, so `coding`, `test`, `scaffold` and `ui-story` each name `git log` (the
+  mandated base check), `git add`/`git commit`, `git diff` and `run-suite.sh start`.
+  `tests/framework_checks.py` § phase-3 permissions pins this, and fails a `tools:` line that
+  names a stack command. Prefer named git verbs over `Bash(git*)`.
 
-  It is worth stating why that check exists. The matrix was originally derived from an assumed
-  task shape rather than from what the pipeline instructs, and it drifted out of agreement
-  silently: the `test` agent could not run the base check its own protocol mandates, nor commit,
-  so a human committed for it; and a task needing two toolchains had no agent at all. Neither is
-  visible from reading any single file. When you widen a grant, prefer named verbs over
-  `Bash(git*)` — `test` and `scaffold` deliberately hold neither `git push` nor `git reset`,
-  because the isolation protocol tells agents never to reset their way out of a base mismatch
-  and a permission states that more firmly than a sentence in a prompt does.
-
-  **This is a Claude Code contract only.** omp agents hold bare `bash`, so a task that cannot run
-  here may run there. That asymmetry is a reason to report a permission gap rather than work
-  around it — see the cycle skill § When no agent holds the permission a task needs.
+  omp agents hold a bare `bash`; bash approval there is `.omp/config.yml`'s.
 - **Data-layer schema checks** — `review`, `verify`, `test-rubric`, and `adversarial-tester`
   contain a **context-gated** schema-drift check that activates only when a data-schema
   Context Source is enabled. With none wired, the check is skipped and noted as not performed.

@@ -1,6 +1,6 @@
 ---
 name: review-report-format
-description: Output structure for the review agent's report — section order, severity buckets, finding format, verdict taxonomy. Single source of truth for review report shape; consumed by review.md and any tooling that parses review reports.
+description: Section order, severity buckets and verdicts for the review agent's report.
 disable-model-invocation: true
 ---
 

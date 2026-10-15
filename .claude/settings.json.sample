@@ -10,9 +10,8 @@
     "argument that can widen its scope. Keep the blanket rm deny.",
     "Both paths are allowed because a deployment may symlink the framework skills into",
     "~/.claude/skills rather than into the project. See .claude/skills/cycle/monitor.md.",
-    "Both are also RELATIVE, and agents must call them that way. In fan-out 6 a monitor",
-    "expanded the first into an absolute clone path, matched neither entry, fell through",
-    "to the auto-mode classifier and was refused at Finalize."
+    "Both are also RELATIVE, and agents must call them that way: an absolute clone path",
+    "matches neither entry and falls through to the auto-mode classifier, which refuses it."
   ],
   "permissions": {
     "allow": [
@@ -36,10 +35,10 @@
       "Bash(python3 ~/.claude/skills/cycle/aggregate-telemetry.py*)",
       "Bash(python3 .claude/skills/cycle/clear-agent-states.py*)",
       "Bash(python3 ~/.claude/skills/cycle/clear-agent-states.py*)",
-      "Bash(python3 .claude/skills/cycle/discard-untracked.py*)",
-      "Bash(python3 ~/.claude/skills/cycle/discard-untracked.py*)",
       "Bash(python3 .claude/skills/cycle/config-get.py*)",
       "Bash(python3 ~/.claude/skills/cycle/config-get.py*)",
+      "Bash(python3 .claude/skills/cycle/discard-untracked.py*)",
+      "Bash(python3 ~/.claude/skills/cycle/discard-untracked.py*)",
       "Bash(python3 .claude/skills/cycle/gate-report.py*)",
       "Bash(python3 ~/.claude/skills/cycle/gate-report.py*)",
       "Bash(python3 .claude/skills/cycle/prune-analyzer-baselines.py*)",
@@ -54,6 +53,19 @@
       "Bash(python3 ~/.claude/skills/refine/probes.py*)",
       "Bash(python3 .claude/skills/refine/story.py*)",
       "Bash(python3 ~/.claude/skills/refine/story.py*)",
+      "Bash(gh pr diff*)",
+      "Bash(gh pr view*)",
+      "Bash(gh run view*)",
+      "Bash(gh run watch*)",
+      "Bash(git add*)",
+      "Bash(git branch*)",
+      "Bash(git checkout*)",
+      "Bash(git commit*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git restore*)",
+      "Bash(git rev-parse*)",
+      "Bash(git status*)",
       "Edit(/agent_tasks/**)",
       "Read(/agent_tasks/**)",
       "Edit(/agent_states/**)",
@@ -66,7 +78,7 @@
       "Bash(rm -rf *)"
     ]
   },
-  "_comment": "Sample hooks block \u2014 merge into your .claude/settings.json. Enables the per-agent event log at agent_states/events/<agent_id>.jsonl (consumed by run-report telemetry and stall salvage). gate-log.py is wired on all five events it handles \u2014 Stop and UserPromptSubmit measure gate wait, PermissionRequest and PostToolUse measure permission-dialog wait \u2014 and on SubagentStop it is what captures refused tool calls: PostToolUse never fires on a refusal, so a subagent denied a command leaves no trace anywhere else \u2014 fan-out 7 reported zero permission wait while three calls had been refused. Requires python3 on PATH.",
+  "_comment": "Sample hooks block \u2014 merge into your .claude/settings.json. Enables the per-agent event log at agent_states/events/<agent_id>.jsonl (consumed by run-report telemetry and stall salvage). gate-log.py is wired on all five events it handles \u2014 Stop and UserPromptSubmit measure gate wait, PermissionRequest and PostToolUse measure permission-dialog wait \u2014 and on SubagentStop it is what captures refused tool calls: PostToolUse never fires on a refusal, so a subagent denied a command leaves no trace anywhere else, and permission wait reads as zero while calls were refused. Requires python3 on PATH.",
   "hooks": {
     "PreToolUse": [
       {
@@ -74,11 +86,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-framework.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/guard-framework.py"
           },
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/guard-secrets.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/guard-secrets.py"
           }
         ]
       }
@@ -89,11 +101,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/log-event.py"
           },
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-log.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/gate-log.py"
           }
         ]
       }
@@ -104,7 +116,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/log-event.py"
           }
         ]
       }
@@ -115,7 +127,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-log.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/gate-log.py"
           }
         ]
       }
@@ -126,11 +138,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/log-event.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/log-event.py"
           },
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-log.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/gate-log.py"
           }
         ]
       }
@@ -141,7 +153,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-log.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/gate-log.py"
           }
         ]
       }
@@ -152,7 +164,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/gate-log.py"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/gate-log.py"
           }
         ]
       }

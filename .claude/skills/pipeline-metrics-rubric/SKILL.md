@@ -1,6 +1,6 @@
 ---
 name: pipeline-metrics-rubric
-description: The taxonomy of patterns self-improve looks for across run reports, the recommendation format, and the confidence × impact priority order. Single source of truth for pipeline-tuning analysis.
+description: Pattern taxonomy and recommendation format for self-improve.
 disable-model-invocation: true
 ---
 

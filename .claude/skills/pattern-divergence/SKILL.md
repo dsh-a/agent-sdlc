@@ -1,6 +1,6 @@
 ---
 name: pattern-divergence
-description: Rule for handling existing test-pattern conventions in a directory. When an agent's preferred pattern differs from the dominant one, it must match, migrate, or declare — never split silently. Generalized from synthesis item 5.4.5; consumed today by the test agent.
+description: Rule for matching, migrating or declaring a test pattern that differs from a directory's.
 disable-model-invocation: true
 ---
 

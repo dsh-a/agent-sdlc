@@ -1,15 +1,13 @@
 """The vault-sync staging snippet in cycle/SKILL.md § Phase 4A step 7b.
 
-Fan-out 1 shipped an *app*-scoped `git add` believing it isolated concurrent
-cycles. It does not: every cycle in a fan-out shares one `app_slug`, so all three
-commits swept up each other's in-flight files. `22e1da8` says "cycle 378" and
-carries 404's and 419's PRDs; `793ddac` says "cycle 419" and carries 404's PR
-body. Cleanly named, not cleanly scoped — and the run report recorded it as a
-success, because nobody opened the commits.
+An *app*-scoped `git add` does not isolate concurrent cycles: every cycle in a
+fan-out shares one `app_slug`, so each commit sweeps up its siblings' in-flight
+files, cleanly named and not cleanly scoped. Staging is scoped to the cycle's own
+feature.
 
 So this test runs the snippet **extracted from SKILL.md itself** rather than a
-copy of it. A copy would keep passing while the instruction drifted, which is the
-same class of mistake as the finding.
+copy of it. A copy would keep passing while the instruction drifted: named
+correctly, testing something else.
 
 Stdlib only:
 
@@ -26,6 +24,8 @@ import sys
 import tempfile
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / ".claude/skills/cycle"))
+import git_bash  # noqa: E402
 SKILL = ROOT / ".claude/skills/cycle/SKILL.md"
 
 FAILURES: list[str] = []
@@ -57,7 +57,7 @@ def make_vault(tmp: pathlib.Path) -> pathlib.Path:
     subprocess.run(["git", "-C", str(v), "add", "-A"], check=True, capture_output=True)
     subprocess.run(["git", "-C", str(v), "commit", "-qm", "init"], check=True, capture_output=True)
 
-    # Three concurrent cycles, exactly the fan-out 1 shape.
+    # Three concurrent cycles sharing one app_slug.
     for feat in ("reset-password-deep-link", "404-migration-fixture-schema-snapshots",
                  "378-dropdown-label-a11y"):
         (v / "cycle_reports/myapp" / f"{feat}-2026-09-06.md").write_text("# report\n")
@@ -86,10 +86,17 @@ def shells() -> list[str]:
 
 def run_sync(vault: pathlib.Path, feature: str, shell: str = "bash") -> str:
     script = (staging_snippet()
-              .replace("{vault_root}", str(vault))
+              .replace("{vault_root}", vault.as_posix())
               .replace("{app_slug}", "myapp")
               .replace("{feature}", feature))
-    p = subprocess.run([shell, "-c", script], capture_output=True, text=True, timeout=60)
+    return run_script(shell, script)
+
+
+def run_script(shell: str, script: str) -> str:
+    # Resolved to a full path, never by bare name: Windows' CreateProcess searches
+    # System32 before PATH, and a bare "bash" there is WSL's bash.exe.
+    exe = git_bash.bash() if shell == "bash" else shutil.which(shell) or shell
+    p = subprocess.run([exe, "-c", script], capture_output=True, text=True, timeout=60)
     return p.stdout + p.stderr
 
 
@@ -243,7 +250,7 @@ def main() -> int:
         vault = make_vault(t)
         feat = "reset-password-deep-link"
         script = (staging_snippet()
-                  .replace("{vault_root}", str(vault))
+                  .replace("{vault_root}", vault.as_posix())
                   .replace("{app_slug}", "myapp")
                   .replace("{feature}", feat))
         # Simulate the race: stage a foreign file and make `restore --staged` a no-op,
@@ -251,9 +258,8 @@ def main() -> int:
         subprocess.run(["git", "-C", str(vault), "add", "--",
                         "cycle_reports/myapp/pr-body-404-migration-fixture-schema-snapshots-2026-09-06.md"],
                        check=True, capture_output=True)
-        neutered = script.replace('git -C "%s" restore --staged -- "$f"' % vault, "true")
-        out = subprocess.run(["bash", "-c", neutered], capture_output=True, text=True, timeout=60)
-        blob = out.stdout + out.stderr
+        neutered = script.replace('git -C "%s" restore --staged -- "$f"' % vault.as_posix(), "true")
+        blob = run_script("bash", neutered)
         check("a foreign file left staged blocks the commit",
               "REFUSING to commit" in blob, blob[:400])
         check("  ... and nothing was committed",

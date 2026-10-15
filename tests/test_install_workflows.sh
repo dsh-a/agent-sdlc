@@ -26,6 +26,12 @@ git init -q "$P"; git -C "$P" config user.email t@t; git -C "$P" config user.nam
 # gh is not available in the test environment, and must not be required: the
 # installer degrades to "could not read the default branch" rather than failing.
 export PATH="$R/bin:$PATH"; mkdir -p "$R/bin"
+# ...and on a developer's machine gh *is* installed and authenticated, so the
+# board cases made real `gh project` calls against an `acme` org with that
+# person's credentials, and the suite took minutes waiting on the network. A
+# gh that fails like an unauthenticated one is the environment the cases mean.
+printf '#!/bin/sh\necho "gh: not authenticated (test stub)" >&2\nexit 4\n' > "$R/bin/gh"
+chmod +x "$R/bin/gh"
 
 WF=".github/workflows/review-comment-to-issue.yml"
 
@@ -157,6 +163,18 @@ out="$("$S" install "$R/plain" 2>&1)"; rc=$?
 chk "refuses a directory that is not a git repository" "$rc" 2
 out="$("$S" bogus "$P" 2>&1)"; rc=$?
 chk "refuses an unknown command" "$rc" 2
+# Each command refuses what it does not take, with the usage.
+for a in "list extra" "list --force" "check $P extra" "check $P --force" \
+         "install $P extra" "install --bogus" "install $P --bogus"; do
+  out="$("$S" $a 2>&1)"; rc=$?
+  chk "refuses: ${a//$R/R}" "$rc|$(echo "$out" | grep -c 'Usage:')" "2|1"
+done
+
+# --help prints the whole header comment, without its comment markers, and no code.
+out="$("$S" --help 2>&1)"; rc=$?
+chk "--help prints the header" "$rc|$(echo "$out" | grep -c 'set -uo pipefail')|$(echo "$out" | grep -c '^#')" "0|0|0"
+chk "  ... through its last comment line" "$(printf '%s\n' "$out" | tail -n 1)" \
+    "$(grep -B1 -m1 '^set -uo pipefail' "$S" | head -n 1 | sed 's/^# \{0,1\}//')"
 
 # --- board configured ------------------------------------------------------
 #

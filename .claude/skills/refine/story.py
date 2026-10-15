@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 """story.py — the `gh` half of /refine: load a story, gate it, write the board.
 
-Step 1 of `refine/SKILL.md` was 66 lines of prose orchestrating five `gh` calls
-and four stop conditions, re-derived on every invocation. None of it is judgement:
-the repo slug comes from the remote, the issue and its board fields come from one
-GraphQL query, and "a split parent is closed to further refinement" is a boolean
-over `sub_issues`. Step 8's `Depth` write is four id lookups the skill never even
-spelled out, so in practice the field went unset and `/cycle` fell back to
-guessing depth from the argument string — which rated a two-layer ViewModel
-lifetime change as `hotfix`.
+Loading and gating a story is mechanical, not judgement: the repo slug comes
+from the remote, the issue and its board fields come from one GraphQL query, and
+"a split parent is closed to further refinement" is a boolean over
+`sub_issues`. Writing `Depth` is four id lookups; done here, the field is set
+every time, so `/cycle` reads depth from the board instead of guessing it from
+the argument string.
 
     $ python3 .claude/skills/refine/story.py load 413
-    STORY #413 gate=ok repo=dsh-a/myapp state=OPEN
+    STORY #413 gate=ok repo=owner/myapp state=OPEN
     title     0.36.2: Decide and implement CI suite topology
     board     Refinement=REFINED Status=Backlog Depth=unset        project=3
     links     parent=none children=none blocked_by=#412 blocking=#554,#488
@@ -106,12 +104,21 @@ class GhError(RuntimeError):
     """A `gh` call that did not return usable JSON. Always exit 3, never a default."""
 
 
-def gh(args: argparse.Namespace, *argv: str, allow_fail: bool = False):
-    """Run `gh` with list argv — no shell, no interpolation."""
+def gh_cmd(args: argparse.Namespace) -> list[str]:
+    """The argv prefix that runs `gh`.
+
+    A `--gh` that is a Python script — the tests' stub — runs under this
+    interpreter, because Windows cannot execute a shebang.
+    """
     exe = args.gh or shutil.which("gh")
     if not exe:
         raise GhError("gh is not on PATH")
-    p = subprocess.run([exe, *argv], capture_output=True, text=True)
+    return [sys.executable, exe] if exe.endswith(".py") else [exe]
+
+
+def gh(args: argparse.Namespace, *argv: str, allow_fail: bool = False):
+    """Run `gh` with list argv — no shell, no interpolation."""
+    p = subprocess.run([*gh_cmd(args), *argv], capture_output=True, text=True)
     if p.returncode != 0:
         if allow_fail:
             return None
@@ -448,8 +455,8 @@ def cmd_dor(args: argparse.Namespace) -> int:
             met.append("probe coverage complete")
     else:
         unknown.append("no --coverage given, so 'every probe reported' is "
-                       "unverified — this is the condition the lenses used to "
-                       "self-report")
+                       "unverified — a lens's own report is not evidence of "
+                       "coverage")
 
     depth = fields.get("Depth")
     if not items:
@@ -658,7 +665,7 @@ def cmd_split(args: argparse.Namespace) -> int:
         "> Closed to further refinement. Original prose retained below for "
         "archival; the children carry the live specification.")
     new_body = notice + "\n\n" + (issue.get("body") or "")
-    p = subprocess.run([args.gh or shutil.which("gh"), "issue", "edit",
+    p = subprocess.run([*gh_cmd(args), "issue", "edit",
                         str(args.number), "--repo", repo, "--body-file", "-"],
                        input=new_body, capture_output=True, text=True)
     if p.returncode != 0:

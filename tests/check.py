@@ -17,9 +17,11 @@ import subprocess
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / ".claude/skills/cycle"))
 
 import context_budget  # noqa: E402
 import framework_checks  # noqa: E402
+import git_bash  # noqa: E402
 import harness_parity  # noqa: E402
 import model_allocation  # noqa: E402
 import models_config  # noqa: E402
@@ -37,7 +39,8 @@ def sh_suite(name: str, script: str) -> int:
     """Run a bash test file and surface its output. Kept in the same runner so
     `python3 tests/check.py` stays the single command an agent can rely on."""
     print(f"\n{name}")
-    r = subprocess.run(["bash", str(pathlib.Path(__file__).resolve().parent / script)],
+    r = subprocess.run([git_bash.bash(),
+                        (pathlib.Path(__file__).resolve().parent / script).as_posix()],
                        capture_output=True, text=True)
     print(r.stdout.rstrip() or r.stderr.rstrip())
     return r.returncode
@@ -127,10 +130,9 @@ def main() -> int:
     rc |= sh_suite("install-workflows", "test_install_workflows.sh")
     rc |= sh_suite("preflight-deploy", "test_preflight_deploy.sh")
     rc |= sh_suite("open-terminal", "test_open_terminal.sh")
-    # These three assert at import time, so they run as subprocesses. The first
-    # two were not in this runner at all until 2026-09-14 — `check.py` is billed
-    # as the one command an agent can rely on, and it was silently skipping the
-    # suite that guards the framework from its own agents.
+    # These three assert at import time, so they run as subprocesses. `check.py`
+    # is the one command an agent relies on, so every suite runs from here,
+    # including the one that guards the framework from its own agents.
     rc |= py_suite("guard-framework", "test_guard_framework.py")
     rc |= py_suite("cache-usage", "test_cache_usage.py")
     rc |= py_suite("peak-context", "test_peak_context.py")
@@ -139,7 +141,9 @@ def main() -> int:
     rc |= py_suite("qualify (selftest)", "qualify.py --selftest")
     rc |= py_suite("cycle-health", "test_cycle_health.py")
     rc |= py_suite("suite-result", "test_suite_result.py")
+    rc |= py_suite("git-bash", "test_git_bash.py")
     rc |= py_suite("config-get", "test_config_get.py")
+    rc |= py_suite("sparse-set", "test_sparse_set.py")
     rc |= py_suite("symbol-refs", "test_symbol_refs.py")
     rc |= py_suite("evidence", "test_evidence.py")
     rc |= py_suite("findings-extract", "test_findings_extract.py")

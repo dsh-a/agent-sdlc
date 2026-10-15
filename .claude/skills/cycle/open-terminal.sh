@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 # open-terminal.sh — run a command in a new terminal window. Detection only.
 #
-# Extracted from open-diff-review.sh when the lazygit diff-review feature was
-# removed. The feature was judged pointless in practice; its OS and terminal
-# detection was not, and `start-parallel-cycles.sh` had already grown a second,
-# worse copy of it — no iTerm path, no per-emulator handling on Linux. One copy,
-# used twice, is the point of this file.
+# The one copy of OS and terminal detection; every caller that needs a window
+# uses it.
 #
 # Knows nothing about lazygit, cycles, or git. It opens a window and runs a
 # string in it.
@@ -22,8 +19,8 @@
 # Platforms, and the shell each runs the command under:
 #   macOS    Ghostty / iTerm / WezTerm / kitty, else Terminal.app — under zsh,
 #            the default login shell since Catalina, not bash.
-#   Windows  Ghostty if ever built for it, else PowerShell (pwsh, then the
-#            bundled powershell.exe) in Windows Terminal when present.
+#   Windows  Ghostty if ever built for it, else Windows Terminal, else Git
+#            Bash's mintty — under Git Bash, since the command is POSIX.
 #   Linux    $TERMINAL, then ghostty / wezterm / kitty / gnome-terminal /
 #            konsole / alacritty / xterm — under bash.
 #
@@ -68,9 +65,8 @@ launch() { "$@" >/dev/null 2>&1 & disown 2>/dev/null; return 0; }
 
 # ---------------------------------------------------------------- platform ----
 # `uname -s` under Git Bash and MSYS2 reports MINGW64_NT-10.0, under Cygwin
-# CYGWIN_NT-10.0. Neither is Darwin, so before this both fell through to the
-# Linux branch, searched for gnome-terminal and friends, found none, and exited 1
-# — Windows was not unsupported so much as unconsidered.
+# CYGWIN_NT-10.0. Both are Windows, and the Linux branch's emulators are not
+# there.
 case "$(uname -s)" in
   Darwin)                  PLATFORM=mac ;;
   MINGW*|MSYS*|CYGWIN*)    PLATFORM=windows ;;
@@ -86,7 +82,10 @@ esac
 #
 # `$INNER` is POSIX (`cd 'dir' && cmd`) and runs identically in both, so this
 # changes which login files load and nothing else.
-mac_shell() { [ -x /bin/zsh ] && printf 'zsh' || printf 'bash'; }
+#
+# The probe path is overridable, like GHOSTTY_APP below: the zsh branch is
+# otherwise untestable on a host without /bin/zsh (Linux CI, Windows).
+mac_shell() { [ -x "${OPEN_TERMINAL_ZSH:-/bin/zsh}" ] && printf 'zsh' || printf 'bash'; }
 
 # Where Ghostty is installed. An absolute path baked into a conditional cannot be
 # driven from a test: on a developer machine that has Ghostty, the no-Ghostty
@@ -100,12 +99,12 @@ GHOSTTY_APP="${OPEN_TERMINAL_GHOSTTY_APP:-/Applications/Ghostty.app}"
 make_launcher() {
   local f sh
   sh="${1:-bash}"
-  # Portable template: `mktemp -t NAME` is BSD-only. This script is macOS-only
-  # today, so the BSD form worked — but it is the same latent bug that made
-  # deploy.sh's --apply a silent no-op on Linux CI, so it does not stay.
-  f="$(mktemp "${TMPDIR:-/tmp}/open-terminal.XXXXXX")" || return 1
-  printf '#!/bin/%s\nrm -f -- "$0"\n%s\n' "$sh" "$INNER" > "$f"
-  chmod +x "$f"
+  local dir="${2:-${TMPDIR:-/tmp}}"
+  # Portable template: `mktemp -t NAME` is BSD-only and fails on GNU mktemp.
+  f="$(mktemp "${dir%/}/open-terminal.XXXXXX")" || return 1
+  # A half-written launcher is never handed out, so it is removed here.
+  { printf '#!/bin/%s\nrm -f -- "$0"\n%s\n' "$sh" "$INNER" > "$f" && chmod +x "$f"; } \
+    || { rm -f -- "$f"; return 1; }
   printf '%s' "$f"
 }
 
@@ -133,7 +132,6 @@ ghostty_tab() {
   command -v osascript >/dev/null 2>&1 || return 1
   # pgrep, not System Events: querying System Events needs its own macOS
   # automation grant and blocks on the consent dialog when it has not been given.
-  # Measured — it stalled this script for two minutes on first run.
   pgrep -x Ghostty >/dev/null 2>&1 || return 1
   # `count windows` also drives the consent prompt for Ghostty itself, but that
   # grant is needed for the tab anyway, so it is not an extra one. Bound it so a
@@ -178,56 +176,92 @@ if [ "$PLATFORM" = mac ]; then
       fi ;;
   esac
 elif [ "$PLATFORM" = windows ]; then
-  # Ghostty first, as everywhere else — it has no Windows build today, so in
-  # practice this branch is the fallback the operator asked for, but the order
-  # is what matters and it should not have to change when that ships.
+  # Ghostty first, as everywhere else, so a Windows build is picked up with no
+  # change here.
   if command -v ghostty >/dev/null 2>&1; then
     launch ghostty --working-directory="$CWD" --title="$TITLE" -e bash -lc "$INNER"
     exit 0
   fi
 
-  # PowerShell, not bash. `$INNER` is POSIX and will not run here: `&&` is a
-  # syntax error in PowerShell 5.1, and the quoting rules differ, so the command
-  # is rebuilt rather than reused.
+  # Git Bash, as on every other platform — not PowerShell. The launcher's
+  # command is POSIX (`cd /c/… && claude "/cycle N"`), which PowerShell cannot
+  # run: `&&` is a syntax error in 5.1, and in 7 the `/c/…` cd fails. Running
+  # `$INNER` in the POSIX shell the pipeline already requires means one command
+  # string means one thing.
   #
-  # The path needs converting too. Under MSYS the cwd is `/c/Users/...`, which
-  # PowerShell cannot resolve; cygpath is the supported translation and is
-  # present in every Git-Bash/MSYS2/Cygwin install that got us here.
-  WINCWD="$CWD"
-  if command -v cygpath >/dev/null 2>&1; then
-    WINCWD="$(cygpath -w "$CWD" 2>/dev/null || printf '%s' "$CWD")"
-  fi
-  # Single quotes are PowerShell's literal string; the escape for one inside is
-  # to double it. Nothing else needs escaping in a literal.
-  ps_lit() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/''/g")"; }
-  PSCMD="Set-Location -LiteralPath $(ps_lit "$WINCWD"); $CMD"
+  # Git's bin\bash.exe, not usr\bin\bash.exe: the bin\ wrapper sets MSYSTEM so
+  # the login profile puts git itself on PATH; the bare usr\bin one does not.
+  # So the Git root comes first here, where git_bash.py, which runs `bash -c`
+  # inside an environment that already has git, takes PATH's bash first.
+  # Overridable for the same reason as GHOSTTY_APP: a test host has a real
+  # mintty in /usr/bin, and the no-Windows-Terminal branch would open it.
+  MINTTY="${OPEN_TERMINAL_MINTTY:-$(command -v mintty 2>/dev/null)}"
 
-  # pwsh is PowerShell 7+ and the one to prefer; powershell.exe is the 5.1 that
-  # ships with Windows and is always there.
-  PSEXE=""
-  for c in pwsh.exe pwsh powershell.exe powershell; do
-    command -v "$c" >/dev/null 2>&1 && { PSEXE="$c"; break; }
-  done
-  [ -n "$PSEXE" ] || { echo "open-terminal: no PowerShell found (pwsh.exe or powershell.exe)" >&2; exit 1; }
-
-  # Windows Terminal is the only one of these that can do a tab, and it is also
-  # the better window when present. `-NoExit` keeps the pane open after the
-  # command finishes, which is what a cycle window is for.
+  # The terminal and everything it needs are settled before the launcher is
+  # written, so every refusal exits with no file left behind.
   if command -v wt.exe >/dev/null 2>&1; then
-    if [ "$TAB" = 1 ]; then
-      launch wt.exe -w 0 nt -d "$WINCWD" --title "$TITLE" "$PSEXE" -NoExit -Command "$PSCMD"
-    else
-      launch wt.exe -d "$WINCWD" --title "$TITLE" "$PSEXE" -NoExit -Command "$PSCMD"
-    fi
+    TERM_KIND=wt
+  elif [ -n "$MINTTY" ] && [ -x "$MINTTY" ]; then
+    TERM_KIND=mintty
   else
-    # Bare PowerShell gets its own window via cmd's `start`. The empty "" is
-    # start's title argument: without it, a quoted first argument is consumed as
-    # the title and the shell never launches.
-    if command -v cmd.exe >/dev/null 2>&1; then
-      launch cmd.exe /c start "" "$PSEXE" -NoExit -Command "$PSCMD"
-    else
-      launch "$PSEXE" -NoExit -Command "$PSCMD"
+    echo "open-terminal: no terminal found (Windows Terminal wt.exe, or Git Bash's mintty)" >&2
+    exit 1
+  fi
+
+  if [ "$TERM_KIND" = wt ]; then
+    WINCWD="$(cygpath -w "$CWD" 2>/dev/null || printf '%s' "$CWD")"
+    GITBASH="${OPEN_TERMINAL_GITBASH:-}"
+    if [ -z "$GITBASH" ]; then
+      groot="$(cygpath -w / 2>/dev/null)"
+      if [ -n "$groot" ] && [ -f "$(cygpath -u "$groot")/bin/bash.exe" ]; then
+        GITBASH="${groot%\\}\\bin\\bash.exe"
+      else
+        GITBASH="$(cygpath -w "$(command -v bash)" 2>/dev/null)"
+      fi
     fi
+    [ -n "$GITBASH" ] || {
+      echo 'open-terminal: no Git Bash found; looked at OPEN_TERMINAL_GITBASH, bin\bash.exe under `cygpath -w /`, and bash on PATH. Run this from Git Bash, or set OPEN_TERMINAL_GITBASH to its bin\bash.exe' >&2
+      exit 1
+    }
+
+    # wt.exe re-tokenises its command line, so the launcher path it is handed
+    # must have no space. The launcher goes in the first existing directory of
+    # OPEN_TERMINAL_LAUNCHER_DIR, TMPDIR, LOCALAPPDATA whose Windows form, or
+    # failing that its 8.3 form, has none.
+    LDIR="" LDIRW=""
+    LAD="${LOCALAPPDATA:+$(cygpath -u "$LOCALAPPDATA" 2>/dev/null || printf '%s' "$LOCALAPPDATA")}"
+    for d in "${OPEN_TERMINAL_LAUNCHER_DIR:-}" "${TMPDIR:-/tmp}" "$LAD"; do
+      [ -n "$d" ] && [ -d "$d" ] || continue
+      w="$(cygpath -m "$d" 2>/dev/null || printf '%s' "$d")"
+      case "$w" in *" "*) w="$(cygpath -ms "$d" 2>/dev/null)" ;; esac
+      case "$w" in ""|*" "*) continue ;; esac
+      LDIR="$d" LDIRW="${w%/}"; break
+    done
+    [ -n "$LDIR" ] || {
+      echo 'open-terminal: Windows Terminal needs a launcher path with no space; looked at OPEN_TERMINAL_LAUNCHER_DIR, TMPDIR and LOCALAPPDATA, and their 8.3 names. Set OPEN_TERMINAL_LAUNCHER_DIR to an existing directory whose path has no space' >&2
+      exit 1
+    }
+  fi
+
+  # The command goes in a launcher file, as for Terminal.app, and the terminal
+  # is handed only its path: wt.exe re-parses its command line, where quotes
+  # and `;` are significant, and a path carries neither. The launcher deletes
+  # itself when the window's bash runs it, so it is not removed here.
+  L="$(make_launcher bash "${LDIR:-}")" || { echo "open-terminal: mktemp failed" >&2; exit 1; }
+  if [ "$TERM_KIND" = wt ]; then
+    # Windows Terminal: the only one here that can do a tab. MSYS rewrites any
+    # argument that looks like a POSIX path when it starts a native program;
+    # conversion is off for this call and every path is given Windows-form.
+    LW="$LDIRW/${L##*/}"
+    WT_ARGS=()
+    [ "$TAB" = 1 ] && WT_ARGS=(-w 0 nt)
+    # The `+` form expands an empty array cleanly under `set -u` in bash 3.2.
+    MSYS2_ARG_CONV_EXCL='*' launch wt.exe ${WT_ARGS[@]+"${WT_ARGS[@]}"} -d "$WINCWD" --title "$TITLE" "$GITBASH" -l "$LW"
+  else
+    # mintty is Git Bash's own terminal and an MSYS program, so no conversion.
+    # It inherits this shell's MSYSTEM, so the bare /usr/bin/bash gets the
+    # login PATH that bin\bash.exe would set up.
+    launch "$MINTTY" -t "$TITLE" --dir "$CWD" /usr/bin/bash -l "$L"
   fi
 else
   for t in "${TERMINAL:-}" ghostty wezterm kitty gnome-terminal konsole alacritty xterm; do

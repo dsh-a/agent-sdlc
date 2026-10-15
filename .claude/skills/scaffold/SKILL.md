@@ -1,6 +1,6 @@
 ---
 name: scaffold
-description: Scaffold new components following established project patterns — entities/models, use cases, facades, services, or presentation (view-model + view) pairs. Routes to the right pattern file and includes DI wiring and codegen.
+description: Scaffold a new component from the project's pattern files, with DI wiring and codegen. Run as /scaffold.
 disable-model-invocation: true
 ---
 # Scaffold

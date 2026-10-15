@@ -27,6 +27,8 @@ TPL_DIR="$FW/.github/workflow-templates"
 
 say()  { printf '  %s\n' "$*"; }
 die()  { printf '%s: %s\n' "$PROG" "$*" >&2; exit 2; }
+# A command's output as bash reads it: LF lines. See deploy.sh's strip_cr.
+strip_cr() { "$@" | tr -d '\r'; return "${PIPESTATUS[0]}"; }
 
 MARK="# agent-sdlc:workflow-template"
 
@@ -98,21 +100,28 @@ render_at() {  # $1=sha  $2=name  then board args
 }
 
 CMD="${1:-}"; shift 2>/dev/null || true
+USAGE="Usage: $PROG list|check|install [project] [--force]"
 FORCE=0
 ARGS=()
 for a in "$@"; do
   case "$a" in
     --force) FORCE=1 ;;
+    -*) die "$CMD: unknown flag '$a'. $USAGE" ;;
     *) ARGS+=("$a") ;;
   esac
 done
 PROJ="${ARGS[0]:-$PWD}"
 
+# Each command refuses what it does not take, so a mistyped argument never runs
+# as the command without it: list takes nothing, check a project, install a
+# project and --force.
 case "$CMD" in
-  list) templates; exit 0 ;;
-  check|install) ;;
-  ""|-h|--help) sed -n '3,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-  *) die "unknown command '$CMD'. Usage: $PROG list|check|install [project] [--force]" ;;
+  list) [ $# -eq 0 ] || die "list takes no arguments. $USAGE"; templates; exit 0 ;;
+  check) [ "$FORCE" = 0 ] && [ ${#ARGS[@]} -le 1 ] || die "check takes only a project. $USAGE" ;;
+  install) [ ${#ARGS[@]} -le 1 ] || die "install: unexpected argument '${ARGS[1]}'. $USAGE" ;;
+  # The header comment block, up to its first non-comment line.
+  ""|-h|--help) awk 'NR > 1 && !/^#/ { exit } NR > 1 { sub(/^# ?/, ""); print }' "$0"; exit 0 ;;
+  *) die "unknown command '$CMD'. $USAGE" ;;
 esac
 
 PROJ="$(cd "$PROJ" 2>/dev/null && pwd -P)" || die "no such directory: ${ARGS[0]:-$PWD}"
@@ -144,11 +153,10 @@ fi
 
 BOARD="" PID="" FID="" OID="" DID=""
 CFG="$PROJ/.omp/agent-config.md"
-# Two notations, because the config documents one and the only real project uses
-# the other. `project:<owner>/<number>` is the scheme Artifact Paths defines; a
-# Roadmap row written as prose with a backticked `<owner>/<number>` is what
-# myapp actually carries. Prefer the scheme, accept the prose, and say which
-# was matched rather than silently guessing.
+# Two notations, because projects write both. `project:<owner>/<number>` is the
+# scheme Artifact Paths defines; a Roadmap row written as prose with a backticked
+# `<owner>/<number>` is the other. Prefer the scheme, accept the prose, and say
+# which was matched rather than silently guessing.
 BOARD_SRC=""
 if [ -f "$CFG" ]; then
   BOARD="$(sed -n 's|.*project:\([A-Za-z0-9_.-]*/[0-9][0-9]*\).*|\1|p' "$CFG" | head -1)"
@@ -162,7 +170,7 @@ fi
 if [ -n "$BOARD" ] && command -v gh >/dev/null 2>&1; then
   say "resolving board ids"
   IDS="$(cd "$PROJ" && gh project field-list "${BOARD##*/}" --owner "${BOARD%%/*}" --format json 2>/dev/null \
-    | python3 -c '
+    | strip_cr python3 -c '
 import json,sys
 try: d=json.load(sys.stdin)
 except Exception: sys.exit(1)
@@ -177,7 +185,7 @@ for f in d.get("fields",[]):
   OID="$(printf '%s\n' "$IDS" | sed -n 2p)"
   DID="$(printf '%s\n' "$IDS" | sed -n 3p)"
   PID="$(cd "$PROJ" && gh project view "${BOARD##*/}" --owner "${BOARD%%/*}" --format json 2>/dev/null \
-    | python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' 2>/dev/null)"
+    | strip_cr python3 -c 'import json,sys; print(json.load(sys.stdin).get("id",""))' 2>/dev/null)"
   if [ -z "$FID" ] || [ -z "$OID" ] || [ -z "$PID" ]; then
     say "! could not resolve board ids — installing without the board step."
     BOARD=""

@@ -1,6 +1,6 @@
 ---
 name: task-file-format
-description: Output format for task files produced by generate-tasks — the Relevant Files block, the Tasks block with kind tags, and the agent-dispatch taxonomy. Loaded by generate-tasks; the orchestrator parses this format mechanically.
+description: Format of the task files generate-tasks writes and the orchestrator parses.
 disable-model-invocation: true
 ---
 
