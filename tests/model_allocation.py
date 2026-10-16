@@ -9,7 +9,7 @@ It also makes a new mistake possible, and this check exists because I made it.
 `openai/gpt-oss-20b` won the qualification matrix outright and is 60x cheaper
 than the models it beat, so it was the obvious choice everywhere. It holds
 131,072 tokens. `verify` peaks at 251,457 and `review` at 286k
-(`docs/internal/data/peak-context-history.jsonl`, measured over 1,151
+(the measured peak-context history, over 1,151
 transcripts). Assigned there it would fail mid-cycle, on the long runs, after the
 work was done — and nothing in the repo would have objected.
 
@@ -93,7 +93,7 @@ def provenance(text: str) -> dict[str, int]:
 def peaks_available() -> bool:
     """Whether measured peak-context history is present in this checkout.
 
-    `PEAKS` lives under `docs/internal/`, which is private-only — the public core
+    `PEAKS` is private-only measurement data — the public core
     is synced without it by design. A caller that treats a missing file as "no
     agent exceeds its window" is not measuring anything, so anything that gates
     on these numbers has to ask this first.

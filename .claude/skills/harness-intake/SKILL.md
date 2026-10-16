@@ -63,7 +63,7 @@ standalone `findings-*.md` is recognised by filename as a whole-document section
 
 ```sh
 python3 .claude/skills/harness-intake/findings-extract.py \
-  ~/dev/myapp-docs/reports/myapp docs/internal --json
+  ~/dev/myapp-docs/reports/myapp path/to/findings --json
 ```
 
 ```
@@ -184,7 +184,7 @@ puts a P1 above a P0 the list stops being trusted, and an untrusted list costs m
 **Ten rows and a tail count.**
 
 ```
-HARNESS-INTAKE repo=dsh-a/agent-sdlc-private reports=114 new=3 recurred=9 reopened=0 issues=12
+HARNESS-INTAKE repo=owner/agent-sdlc reports=114 new=3 recurred=9 reopened=0 issues=12
 
 ! #7  P0 ×6  2026-08-24 → 2026-10-03 (40d)  worktree isolation forks from the wrong base
       pass the session branch to `git worktree add`; the base resolves to `main`
@@ -207,5 +207,5 @@ never existed before.
 P3s stay unfiled — 124 of 226 are P3, mostly one-off friction. Nothing is lost: the reports are the
 staging, so any P3 is re-derivable at any time with `--severity P3`.
 
-Then backfill `docs/internal/findings-*.md`. This is **not optional**: the 2026-08-24 P0 exists
-nowhere else — that cycle's run report has no findings section at all.
+Then backfill the standalone `findings-*.md` files. This is **not optional**: a finding from a
+cycle whose run report has no findings section exists nowhere else.

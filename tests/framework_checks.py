@@ -764,7 +764,7 @@ def check_no_stale_config_name() -> list[str]:
     `test_structure.py` already scans skills and `.omp/agents` for this. The two
     MCP templates were in neither, so both kept the retired name through the omp
     migration — including the line a reader follows to learn where Context
-    Sources are declared. `docs/internal/` and the rename log are history and are
+    Sources are declared. Archived notes and the rename log are history and are
     exempt.
     """
     stale = re.compile(r"(?<![-/.\w])config\.md")
