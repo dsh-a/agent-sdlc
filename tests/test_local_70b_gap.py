@@ -37,7 +37,7 @@ sys.path.insert(0, str(ROOT))
 
 import model_allocation  # noqa: E402
 
-# Measured 2026-09-24 against docs/internal/data/peak-context-history.jsonl.
+# Measured 2026-09-24 against the peak-context history (`PEAKS`).
 # Re-record deliberately, with the reason, when a number here moves.
 OVER_131K = {
     "orchestrator": 375_233,
@@ -62,9 +62,8 @@ def check(label: str, cond: bool, detail: str = "") -> None:
 def main() -> int:
     print("local-70b gap")
 
-    # This is a ratchet over measured p90 context, and the measurements live in
-    # `docs/internal/data/peak-context-history.jsonl` — private-only, so the
-    # public core is synced without them. Skip rather than run: with no data
+    # This is a ratchet over measured p90 context, and the measurements are
+    # private-only, so the public core is synced without them. Skip rather than run: with no data
     # every role trivially "fits" its window, the over-131k set empties, and the
     # failure text reads "If that is real, this is the win" — a missing file
     # reported as the goal being achieved. Loudly skipped beats vacuously

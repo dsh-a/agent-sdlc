@@ -137,8 +137,8 @@ def main() -> int:
     print("vram-footprint")
 
     # Every sizing assertion here prices a role from its measured p90 context,
-    # read through `model_allocation.peaks()` — and that history is private-only
-    # (`docs/internal/`), so the public core has none of it. Without it 17 rows
+    # read through `model_allocation.peaks()` — and that history is private-only,
+    # so the public core has none of it. Without it 17 rows
     # report `UNKNOWN — no measured p90` and eight assertions fail on absent
     # input rather than on anything about the code. Skip, and say which data is
     # missing.
